@@ -1,0 +1,81 @@
+.
+├── alembic.ini
+├── app
+│   ├── alembic
+│   │   ├── env.py
+│   │   ├── README
+│   │   ├── script.py.mako
+│   │   └── versions
+│   │       ├── 1a31ce608336_add_cascade_delete_relationships.py
+│   │       ├── 9c0a54914c78_add_max_length_for_string_varchar_.py
+│   │       ├── d98dd8ec85a3_edit_replace_id_integers_in_all_models_.py
+│   │       └── e2412789c190_initialize_models.py
+│   ├── api
+│   │   ├── deps.py
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   └── routes
+│   │       ├── __init__.py
+│   │       ├── items.py
+│   │       ├── login.py
+│   │       ├── private.py
+│   │       ├── users.py
+│   │       └── utils.py
+│   ├── backend_pre_start.py
+│   ├── core
+│   │   ├── config.py
+│   │   ├── db.py
+│   │   ├── __init__.py
+│   │   └── security.py
+│   ├── crud.py
+│   ├── email-templates
+│   │   ├── build
+│   │   │   ├── new_account.html
+│   │   │   ├── reset_password.html
+│   │   │   └── test_email.html
+│   │   └── src
+│   │       ├── new_account.mjml
+│   │       ├── reset_password.mjml
+│   │       └── test_email.mjml
+│   ├── initial_data.py
+│   ├── __init__.py
+│   ├── main.py
+│   ├── models.py
+│   ├── tests
+│   │   ├── api
+│   │   │   ├── __init__.py
+│   │   │   └── routes
+│   │   │       ├── __init__.py
+│   │   │       ├── test_items.py
+│   │   │       ├── test_login.py
+│   │   │       ├── test_private.py
+│   │   │       └── test_users.py
+│   │   ├── conftest.py
+│   │   ├── crud
+│   │   │   ├── __init__.py
+│   │   │   └── test_user.py
+│   │   ├── __init__.py
+│   │   ├── scripts
+│   │   │   ├── __init__.py
+│   │   │   ├── test_backend_pre_start.py
+│   │   │   └── test_test_pre_start.py
+│   │   └── utils
+│   │       ├── __init__.py
+│   │       ├── item.py
+│   │       ├── user.py
+│   │       └── utils.py
+│   ├── tests_pre_start.py
+│   └── utils.py
+├── Dockerfile
+├── pyproject.toml
+├── README.md
+├── scripts
+│   ├── format.sh
+│   ├── lint.sh
+│   ├── prestart.sh
+│   ├── test.sh
+│   └── tests-start.sh
+├── treeback.txt
+└── uv.lock
+
+17 directories, 62 files

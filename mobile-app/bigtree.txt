@@ -1,0 +1,74 @@
+.
+├── app
+│   ├── +html.tsx
+│   ├── _layout.tsx
+│   ├── login
+│   │   ├── login.tsx
+│   │   └── signup.tsx
+│   ├── modal.tsx
+│   ├── +not-found.tsx
+│   └── (tabs)
+│       ├── index.tsx
+│       ├── _layout.tsx
+│       └── two.tsx
+├── app.d.ts
+├── App.js
+├── app.json
+├── assets
+│   ├── fonts
+│   │   └── SpaceMono-Regular.ttf
+│   └── images
+│       ├── adaptive-icon.png
+│       ├── favicon.png
+│       ├── icon.png
+│       └── splash-icon.png
+├── babel.config.js
+├── bigtree.txt
+├── components
+│   ├── chat
+│   │   ├── MessageInput.tsx
+│   │   └── Message.tsx
+│   ├── EditScreenInfo.tsx
+│   ├── ExternalLink.tsx
+│   ├── StyledText.tsx
+│   ├── __tests__
+│   │   └── StyledText-test.js
+│   ├── Themed.tsx
+│   ├── ui
+│   │   ├── Button.tsx
+│   │   └── Input.tsx
+│   ├── useClientOnlyValue.ts
+│   ├── useClientOnlyValue.web.ts
+│   ├── useColorScheme.ts
+│   └── useColorScheme.web.ts
+├── constants
+│   └── Colors.ts
+├── global.css
+├── index.web.js
+├── lib
+│   ├── api
+│   │   ├── core
+│   │   │   ├── OpenAPI.tsx
+│   │   │   └── request.tsx
+│   │   ├── index.tsx
+│   │   └── services
+│   │       ├── AuthService.tsx
+│   │       ├── ChatService.tsx
+│   │       └── UserService.tsx
+│   ├── auth
+│   │   ├── AuthContext.tsx
+│   │   ├── protected-route.tsx
+│   │   └── useAuth.tsx
+│   └── utils.tsx
+├── metro.config.js
+├── metro.web.config.js
+├── nativewind-env.d.ts
+├── package.json
+├── package.json.updates
+├── package-lock.json
+├── tailwind.config.js
+├── treemob.txt
+├── tree.txt
+└── tsconfig.json
+
+17 directories, 55 files
