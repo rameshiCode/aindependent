@@ -39,14 +39,10 @@ async def login_google():
 
 
 @router.get("/login/auth/google")
-async def auth_google(request: Request, session: SessionDep, code: str):
+async def auth_google(session: SessionDep, code: str):
     """
     Handle Google OAuth2 callback and issue a JWT token.
     """
-    # code = request.query_params.get("code")
-    # if not code:
-    #     raise HTTPException(status_code=400, detail="Authorization code not found.")
-    print('rrrrrrrrreeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')
     token_data = {
         "code": code,
         "client_id": settings.GOOGLE_CLIENT_ID,
@@ -57,7 +53,7 @@ async def auth_google(request: Request, session: SessionDep, code: str):
 
     async with httpx.AsyncClient() as client:
         # Exchange authorization code for access token
-        token_response = await client.post(settings.GOOGLE_TOKEN_URL, data=token_data)#, headers = {"Content-Type": "application/x-www-form-urlencoded"})
+        token_response = await client.post(settings.GOOGLE_TOKEN_URL, data=token_data)
         if token_response.status_code != 200:
             raise HTTPException(status_code=token_response.status_code, detail="Failed to retrieve access token.")
         token_json = token_response.json()
@@ -73,18 +69,14 @@ async def auth_google(request: Request, session: SessionDep, code: str):
         if not user_email:
             raise HTTPException(status_code=400, detail="Email not available in user info.")
 
-        # Extract user data
-        google_id = user_json["sub"]
-        user_name = user_json.get("name", "")
-
         # Check if user exists in database
         user = crud.get_user_by_email(session=session, email=user_email)
         if not user:
             user = User(
                 email=user_email,
-                full_name=user_name,
+                full_name=user_json.get("name", ""),
                 is_active=True,
-                # google_id=google_id
+                google_id=user_json["sub"]
             )
             session.add(user)
             session.commit()
