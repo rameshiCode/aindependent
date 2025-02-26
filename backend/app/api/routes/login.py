@@ -35,7 +35,6 @@ async def login_google():
     }
     
     authorize_url = f"{settings.GOOGLE_AUTH_URL}?" + "&".join(f"{k}={v}" for k, v in params.items())
-    # print(authorize_url)
     return RedirectResponse(authorize_url)
 
 
@@ -75,15 +74,18 @@ async def auth_google(request: Request, session: SessionDep, code: str):
             raise HTTPException(status_code=400, detail="Email not available in user info.")
 
         # Extract user data
-        # google_id = user_json["id"]
-        # email = user_json["email"]
-        # full_name = user_json.get("name", "")
-        # picture = user_json.get("picture", "")
+        google_id = user_json["sub"]
+        user_name = user_json.get("name", "")
 
         # Check if user exists in database
         user = crud.get_user_by_email(session=session, email=user_email)
         if not user:
-            user = User(email=user_email, password='password')#, full_name=full_name, is_active=True, google_id=google_id, avatar_url=picture)
+            user = User(
+                email=user_email,
+                full_name=user_name,
+                is_active=True,
+                # google_id=google_id
+            )
             session.add(user)
             session.commit()
 
