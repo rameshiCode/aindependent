@@ -3,7 +3,7 @@ from typing import Annotated
 
 import jwt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2AuthorizationCodeBearer
 from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
 from sqlmodel import Session
@@ -18,6 +18,13 @@ reusable_oauth2 = OAuth2PasswordBearer(
 )
 
 
+google_oauth2 = OAuth2AuthorizationCodeBearer(
+    authorizationUrl=settings.GOOGLE_AUTH_URL,
+    tokenUrl=settings.GOOGLE_TOKEN_URL,
+    scopes={"openid": "OpenID Connect scope", "email": "Access to your email", "profile": "Access to your profile"}
+)
+
+
 def get_db() -> Generator[Session, None, None]:
     with Session(engine) as session:
         yield session
@@ -25,6 +32,7 @@ def get_db() -> Generator[Session, None, None]:
 
 SessionDep = Annotated[Session, Depends(get_db)]
 TokenDep = Annotated[str, Depends(reusable_oauth2)]
+GoogleDep = Annotated[str, Depends(google_oauth2)]
 
 
 def get_current_user(session: SessionDep, token: TokenDep) -> User:

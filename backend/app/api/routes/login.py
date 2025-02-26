@@ -1,8 +1,9 @@
 from datetime import timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app import crud
@@ -10,7 +11,7 @@ from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.core import security
 from app.core.config import settings
 from app.core.security import get_password_hash
-from app.models import Message, NewPassword, Token, UserPublic
+from app.models import Message, NewPassword, Token, User, UserPublic
 from app.utils import (
     generate_password_reset_token,
     generate_reset_password_email,
@@ -20,10 +21,82 @@ from app.utils import (
 
 router = APIRouter(tags=["login"])
 
+@router.get("/login/google")
+async def login_google():
+    """
+    Redirect users to Google for authentication
+    """
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "prompt": "select_account",
+    }
+    
+    authorize_url = f"{settings.GOOGLE_AUTH_URL}?" + "&".join(f"{k}={v}" for k, v in params.items())
+    # print(authorize_url)
+    return RedirectResponse(authorize_url)
+
+
+@router.get("/login/auth/google")
+async def auth_google(request: Request, session: SessionDep, code: str):
+    """
+    Handle Google OAuth2 callback and issue a JWT token.
+    """
+    # code = request.query_params.get("code")
+    # if not code:
+    #     raise HTTPException(status_code=400, detail="Authorization code not found.")
+    print('rrrrrrrrreeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')
+    token_data = {
+        "code": code,
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "client_secret": settings.GOOGLE_CLIENT_SECRET,
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "grant_type": "authorization_code",
+    }
+
+    async with httpx.AsyncClient() as client:
+        # Exchange authorization code for access token
+        token_response = await client.post(settings.GOOGLE_TOKEN_URL, data=token_data)#, headers = {"Content-Type": "application/x-www-form-urlencoded"})
+        if token_response.status_code != 200:
+            raise HTTPException(status_code=token_response.status_code, detail="Failed to retrieve access token.")
+        token_json = token_response.json()
+        
+        # Fetch user info from Google
+        userinfo_response = await client.get(settings.GOOGLE_USER_INFO_URL, headers={"Authorization": f"Bearer {token_json['access_token']}"})
+        if userinfo_response.status_code != 200:
+            raise HTTPException(status_code=userinfo_response.status_code, detail="Failed to retrieve user info.")
+        user_json = userinfo_response.json()
+
+        # TODO: properly create a user, add schemas
+        user_email = user_json.get("email")
+        if not user_email:
+            raise HTTPException(status_code=400, detail="Email not available in user info.")
+
+        # Extract user data
+        # google_id = user_json["id"]
+        # email = user_json["email"]
+        # full_name = user_json.get("name", "")
+        # picture = user_json.get("picture", "")
+
+        # Check if user exists in database
+        user = crud.get_user_by_email(session=session, email=user_email)
+        if not user:
+            user = User(email=user_email, password='password')#, full_name=full_name, is_active=True, google_id=google_id, avatar_url=picture)
+            session.add(user)
+            session.commit()
+
+        # Generate JWT token
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        jwt_token = security.create_access_token(subject=user.id, expires_delta=access_token_expires)
+
+        return Token(access_token=jwt_token, token_type="bearer")
+
 
 @router.post("/login/access-token")
-def login_access_token(
-    session: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
+async def login_for_access_token(
+     session: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ) -> Token:
     """
     OAuth2 compatible token login, get an access token for future requests
@@ -32,15 +105,16 @@ def login_access_token(
         session=session, email=form_data.username, password=form_data.password
     )
     if not user:
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return Token(
-        access_token=security.create_access_token(
-            user.id, expires_delta=access_token_expires
-        )
-    )
+    access_token = security.create_access_token(user.id, expires_delta=access_token_expires)
+    return Token(access_token=access_token, token_type="bearer")
 
 
 @router.post("/login/test-token", response_model=UserPublic)
