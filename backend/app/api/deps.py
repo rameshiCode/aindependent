@@ -3,7 +3,7 @@ from typing import Annotated
 
 import jwt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2AuthorizationCodeBearer
+from fastapi.security import OAuth2AuthorizationCodeBearer, OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
 from sqlmodel import Session
@@ -21,7 +21,11 @@ reusable_oauth2 = OAuth2PasswordBearer(
 google_oauth2 = OAuth2AuthorizationCodeBearer(
     authorizationUrl=settings.GOOGLE_AUTH_URL,
     tokenUrl=settings.GOOGLE_TOKEN_URL,
-    scopes={"openid": "OpenID Connect scope", "email": "Access to your email", "profile": "Access to your profile"}
+    scopes={
+        "openid": "OpenID Connect scope",
+        "email": "Access to your email",
+        "profile": "Access to your profile",
+    },
 )
 
 

@@ -2,7 +2,7 @@ from datetime import timedelta
 from typing import Annotated, Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -21,6 +21,7 @@ from app.utils import (
 
 router = APIRouter(tags=["login"])
 
+
 @router.get("/login/google")
 async def login_google():
     """
@@ -33,8 +34,10 @@ async def login_google():
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
         "prompt": "select_account",
     }
-    
-    authorize_url = f"{settings.GOOGLE_AUTH_URL}?" + "&".join(f"{k}={v}" for k, v in params.items())
+
+    authorize_url = f"{settings.GOOGLE_AUTH_URL}?" + "&".join(
+        f"{k}={v}" for k, v in params.items()
+    )
     return RedirectResponse(authorize_url)
 
 
@@ -55,19 +58,30 @@ async def auth_google(session: SessionDep, code: str):
         # Exchange authorization code for access token
         token_response = await client.post(settings.GOOGLE_TOKEN_URL, data=token_data)
         if token_response.status_code != 200:
-            raise HTTPException(status_code=token_response.status_code, detail="Failed to retrieve access token.")
+            raise HTTPException(
+                status_code=token_response.status_code,
+                detail="Failed to retrieve access token.",
+            )
         token_json = token_response.json()
-        
+
         # Fetch user info from Google
-        userinfo_response = await client.get(settings.GOOGLE_USER_INFO_URL, headers={"Authorization": f"Bearer {token_json['access_token']}"})
+        userinfo_response = await client.get(
+            settings.GOOGLE_USER_INFO_URL,
+            headers={"Authorization": f"Bearer {token_json['access_token']}"},
+        )
         if userinfo_response.status_code != 200:
-            raise HTTPException(status_code=userinfo_response.status_code, detail="Failed to retrieve user info.")
+            raise HTTPException(
+                status_code=userinfo_response.status_code,
+                detail="Failed to retrieve user info.",
+            )
         user_json = userinfo_response.json()
 
         # TODO: properly create a user, add schemas
         user_email = user_json.get("email")
         if not user_email:
-            raise HTTPException(status_code=400, detail="Email not available in user info.")
+            raise HTTPException(
+                status_code=400, detail="Email not available in user info."
+            )
 
         # Check if user exists in database
         user = crud.get_user_by_email(session=session, email=user_email)
@@ -76,21 +90,23 @@ async def auth_google(session: SessionDep, code: str):
                 email=user_email,
                 full_name=user_json.get("name", ""),
                 is_active=True,
-                google_id=user_json["sub"]
+                google_id=user_json["sub"],
             )
             session.add(user)
             session.commit()
 
         # Generate JWT token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        jwt_token = security.create_access_token(subject=user.id, expires_delta=access_token_expires)
+        jwt_token = security.create_access_token(
+            subject=user.id, expires_delta=access_token_expires
+        )
 
         return Token(access_token=jwt_token, token_type="bearer")
 
 
 @router.post("/login/access-token")
 async def login_for_access_token(
-     session: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
+    session: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ) -> Token:
     """
     OAuth2 compatible token login, get an access token for future requests
@@ -107,7 +123,9 @@ async def login_for_access_token(
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = security.create_access_token(user.id, expires_delta=access_token_expires)
+    access_token = security.create_access_token(
+        user.id, expires_delta=access_token_expires
+    )
     return Token(access_token=access_token, token_type="bearer")
 
 

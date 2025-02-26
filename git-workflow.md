@@ -20,7 +20,7 @@ git pull origin develop  # Get the latest changes
 git checkout -b feature/<feature-name>  # Create a feature branch
 # Example: git checkout -b feature/user-auth
 ```
-🚀 _Work on the feature and commit regularly._  
+🚀 _Work on the feature and commit regularly._
 
 ```sh
 git add .
@@ -29,7 +29,7 @@ git push origin feature/<feature-name>  # Push to remote repo
 ```
 
 ### **2️⃣ Merge Feature Into `develop`**
-Once reviewed and tested, merge it:  
+Once reviewed and tested, merge it:
 ```sh
 git checkout develop
 git pull origin develop  # Ensure up-to-date
@@ -41,7 +41,7 @@ git branch -d feature/<feature-name>  # Delete local feature branch
 ---
 
 ### **3️⃣ Prepare for Deployment**
-Before deploying, finalize a release:  
+Before deploying, finalize a release:
 ```sh
 git checkout -b release/<version> develop  # Example: release/v1.0
 # Run final tests, fix minor bugs, update docs...
@@ -87,12 +87,12 @@ git branch -d hotfix/<bug-name>
 
 ## ✅ Summary
 
-1️⃣ `develop` → Main development branch.  
-2️⃣ `feature/<name>` → Use for new features.  
-3️⃣ `bugfix/<name>` → Non-critical bug fixes.  
-4️⃣ `hotfix/<name>` → Urgent production fixes.  
-5️⃣ `release/<version>` → Used before merging into `master`.  
-6️⃣ `master` → **Production-ready, auto-deployed.**  
+1️⃣ `develop` → Main development branch.
+2️⃣ `feature/<name>` → Use for new features.
+3️⃣ `bugfix/<name>` → Non-critical bug fixes.
+4️⃣ `hotfix/<name>` → Urgent production fixes.
+5️⃣ `release/<version>` → Used before merging into `master`.
+6️⃣ `master` → **Production-ready, auto-deployed.**
 
 ```sh
 git checkout -b develop master
@@ -103,4 +103,3 @@ git checkout -b release/1.0 develop
 ```
 ---
 🚀 Happy coding! 🎉
-

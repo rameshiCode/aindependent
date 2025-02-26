@@ -106,7 +106,7 @@ class Settings(BaseSettings):
     def GOOGLE_REDIRECT_URI(self) -> str:
         # return f"{self.BACKEND_HOST}{self.API_V1_STR}/login/auth/google"
         return f"http://127.0.0.1:8000{self.API_V1_STR}/login/auth/google"
-    
+
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
             message = (

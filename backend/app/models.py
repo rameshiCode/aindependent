@@ -1,4 +1,3 @@
-from typing import Optional
 import uuid
 
 from pydantic import EmailStr
@@ -43,10 +42,13 @@ class UpdatePassword(SQLModel):
 # Database model, database table inferred from class name
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    hashed_password: Optional[str] = None  # Not needed for Google users
+    hashed_password: str | None = None  # Not needed for Google users
     # hashed_password: str
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
-    google_id: Optional[str] = Field(default=None, unique=True, index=True)  # Store Google ID
+    google_id: str | None = Field(
+        default=None, unique=True, index=True
+    )  # Store Google ID
+
 
 # Properties to return via API, id is always required
 class UserPublic(UserBase):
