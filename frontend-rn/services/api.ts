@@ -5,10 +5,83 @@ import { Platform } from 'react-native';
 const TOKEN_KEY = 'auth_token';
 const API_URL = 'http://127.0.0.1:8000/api/v1';
 
-// For Android emulator, you need to use 10.0.2.2 instead of localhost/127.0.0.1
+// Token clearing code removed - we want to persist the token between app restarts
+// console.log("🧹 STARTUP: Clearing any existing auth tokens");
+// clearAuthToken();
+
+// Custom storage implementation that works across platforms
+const storage = {
+  async getItem(key: string): Promise<string | null> {
+    try {
+      // Web platform
+      if (Platform.OS === 'web') {
+        const item = localStorage.getItem(key);
+        console.log(`🔍 Storage - getItem(${key}):`, item ? 'Found value' : 'No value found');
+        return item;
+      }
+      // Native platforms
+      const item = await SecureStore.getItemAsync(key);
+      console.log(`🔍 Storage - getItem(${key}):`, item ? 'Found value' : 'No value found');
+      return item;
+    } catch (e) {
+      console.error(`❌ Storage getItem(${key}) error:`, e);
+      return null;
+    }
+  },
+  
+  async setItem(key: string, value: string): Promise<void> {
+    try {
+      // Web platform
+      if (Platform.OS === 'web') {
+        console.log(`💾 Storage - setItem(${key}):`, value ? `Value length: ${value.length}` : 'Empty value');
+        localStorage.setItem(key, value);
+        // Verify it was set correctly
+        const stored = localStorage.getItem(key);
+        console.log(`✅ Storage - setItem(${key}) verification:`, stored === value ? 'Success' : 'Failed');
+        return;
+      }
+      // Native platforms
+      console.log(`💾 Storage - setItem(${key}):`, value ? `Value length: ${value.length}` : 'Empty value');
+      await SecureStore.setItemAsync(key, value);
+    } catch (e) {
+      console.error(`❌ Storage setItem(${key}) error:`, e);
+    }
+  },
+  
+  async removeItem(key: string): Promise<void> {
+    try {
+      // Web platform
+      if (Platform.OS === 'web') {
+        console.log(`🧹 Storage - removeItem(${key})`);
+        localStorage.removeItem(key);
+        return;
+      }
+      // Native platforms
+      console.log(`🧹 Storage - removeItem(${key})`);
+      await SecureStore.deleteItemAsync(key);
+    } catch (e) {
+      console.error(`❌ Storage removeItem(${key}) error:`, e);
+    }
+  }
+};
+
+// Constants
+// const TOKEN_KEY = 'auth_token';
+// const API_URL = 'http://127.0.0.1:8000/api/v1';
+
+// Base URL handling for different environments
 const getBaseUrl = () => {
-  if (Platform.OS === 'android' && __DEV__) {
+  if (Platform.OS === 'web') {
+    // For web, use the local URL
+    // Using localhost instead of 127.0.0.1 to avoid CORS issues
+    return 'http://localhost:8000/api/v1';
+  } else if (Platform.OS === 'android' && __DEV__) {
+    // For Android emulator in most environments
     return 'http://10.0.2.2:8000/api/v1';
+    
+    // For physical Android device, use your computer's local IP address
+    // Uncomment and update this with your actual IP address to test on a physical device
+    // return 'http://192.168.1.100:8000/api/v1';
   }
   return API_URL;
 };
@@ -31,21 +104,21 @@ export interface AuthResponse {
  * Helper function to get the stored auth token
  */
 export const getToken = async (): Promise<string | null> => {
-  return await SecureStore.getItemAsync(TOKEN_KEY);
+  return storage.getItem(TOKEN_KEY);
 };
 
 /**
  * Helper function to set the auth token in secure storage
  */
 export const setToken = async (token: string): Promise<void> => {
-  await SecureStore.setItemAsync(TOKEN_KEY, token);
+  return storage.setItem(TOKEN_KEY, token);
 };
 
 /**
  * Helper function to remove the auth token from secure storage
  */
 export const removeToken = async (): Promise<void> => {
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
+  return storage.removeItem(TOKEN_KEY);
 };
 
 /**
@@ -61,6 +134,9 @@ export const apiRequest = async <T>(
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     ...(options.headers as Record<string, string> || {}),
   };
   
@@ -71,6 +147,8 @@ export const apiRequest = async <T>(
   const config: RequestInit = {
     ...options,
     headers,
+    // Enable CORS mode explicitly on web
+    ...(Platform.OS === 'web' ? { mode: 'cors' } : {})
   };
 
   const response = await fetch(url, config);
@@ -99,13 +177,24 @@ export const apiRequest = async <T>(
  * API Service object with methods for interacting with the backend
  */
 export const api = {
+  // Make getBaseUrl accessible to components
+  getBaseUrl,
+  
   auth: {
     /**
      * Get the URL for initiating Google login
      */
     getGoogleLoginUrl: () => {
       const baseUrl = getBaseUrl();
-      return `${baseUrl}/login/google/mobile`;
+      
+      // Use the appropriate endpoint based on platform
+      if (Platform.OS === 'web') {
+        // For web, use the standard Google login endpoint that supports redirect flow
+        return `${baseUrl}/login/google`;
+      } else {
+        // For mobile, use the mobile-specific endpoint
+        return `${baseUrl}/login/google/mobile`;
+      }
     },
 
     /**

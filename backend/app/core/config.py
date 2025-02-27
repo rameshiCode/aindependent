@@ -46,9 +46,17 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def all_cors_origins(self) -> list[str]:
-        return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS] + [
+        base_origins = [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS] + [
             self.FRONTEND_HOST
         ]
+        # Add Expo dev server URLs
+        expo_origins = [
+            "http://localhost:8081",
+            "http://10.0.2.2:8081",
+            "exp://localhost:8081",
+            "exp://10.0.2.2:8081"
+        ]
+        return base_origins + expo_origins
 
     PROJECT_NAME: str
     SENTRY_DSN: HttpUrl | None = None
@@ -104,7 +112,7 @@ class Settings(BaseSettings):
 
     @property
     def GOOGLE_REDIRECT_URI(self) -> str:
-        # return f"{self.BACKEND_HOST}{self.API_V1_STR}/login/auth/google"
+        # This must match one of the authorized redirect URIs in Google Cloud Console
         return f"http://127.0.0.1:8000{self.API_V1_STR}/login/auth/google"
     
     def _check_default_secret(self, var_name: str, value: str | None) -> None:

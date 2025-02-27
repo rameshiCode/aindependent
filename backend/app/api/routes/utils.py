@@ -27,5 +27,8 @@ def test_email(email_to: EmailStr) -> Message:
 
 
 @router.get("/health-check/")
-async def health_check() -> bool:
-    return True
+async def health_check() -> dict:
+    """
+    Simple health check endpoint to confirm API connectivity
+    """
+    return {"status": "ok", "message": "API is running"}
