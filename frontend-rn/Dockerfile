@@ -1,6 +1,6 @@
-FROM ubuntu:22.04
+FROM ubuntu:22.04 AS android-base
 
-LABEL Description="This image provides a base Android development environment for React Native, and may be used to run tests."
+LABEL Description="Base Android development environment for React Native."
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -85,3 +85,26 @@ RUN curl -sS https://dl.google.com/android/repository/${SDK_VERSION} -o /tmp/sdk
 
 # Disable git safe directory check as this is causing GHA to fail on GH Runners
 RUN git config --global --add safe.directory '*'
+
+# ---- Stage 2: Expo Development Layer ----
+FROM android-base AS expo-dev
+
+LABEL Description="Expo development environment on top of Android setup."
+
+# Set working directory inside container
+WORKDIR /frontend-rn
+
+# Copy package.json and yarn.lock first (for optimized caching)
+COPY package.json yarn.lock ./
+
+# Install dependencies before copying the full project
+RUN yarn install
+
+# Copy the rest of the project files
+COPY ./ ./
+
+# Install expo-dev-client?
+RUN npx expo install expo-dev-client
+
+# Set default command to start ADB and Expo automaticallyw
+CMD ["bash"]

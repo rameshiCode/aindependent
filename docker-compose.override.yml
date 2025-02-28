@@ -126,6 +126,29 @@ services:
       - ./frontend/test-results:/app/test-results
     ports:
       - 9323:9323
+  expo-dev:
+    # docker compose build expo-dev
+    # docker compose run --remove-orphans --service-ports expo-dev
+    build:
+      context: ./frontend-rn
+
+    volumes:
+      - ./frontend-rn:/frontend-rn
+    ports:
+      - "8081:8081"
+      - "19000:19000"
+      - "19001:19001"
+      - "19002:19002"
+    devices:
+      - "/dev/bus/usb:/dev/bus/usb"  # For USB debugging
+    networks:
+      - traefik-public
+      - default
+    working_dir: /frontend-rn
+    environment:
+      - REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.184  # local pc ip
+    command: ["bash", "-c", "adb start-server && npx expo start"]
+    tty: true
 
 networks:
   traefik-public:
