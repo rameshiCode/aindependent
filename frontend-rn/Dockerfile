@@ -91,20 +91,28 @@ FROM android-base AS expo-dev
 
 LABEL Description="Expo development environment on top of Android setup."
 
+# Create devuser & dev group
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+RUN groupadd -g $GROUP_ID devgroup \
+  && useradd -m -u $USER_ID -g devgroup devuser \
+  && mkdir -p /frontend-rn \
+  && chown -R devuser:devgroup /frontend-rn
+
 # Set working directory inside container
 WORKDIR /frontend-rn
 
+# Run commands as devuser from now on
+USER devuser
+
 # Copy package.json and yarn.lock first (for optimized caching)
-COPY package.json yarn.lock ./
+COPY package.json ./
 
 # Install dependencies before copying the full project
-RUN yarn install
+RUN npm install
 
 # Copy the rest of the project files
 COPY ./ ./
 
-# Install expo-dev-client?
-RUN npx expo install expo-dev-client
-
-# Set default command to start ADB and Expo automaticallyw
+# Set default command to start ADB and Expo automatically
 CMD ["bash"]
