@@ -87,6 +87,8 @@ services:
       EMAILS_FROM_EMAIL: "noreply@example.com"
 
   mailcatcher:
+    profiles:
+    - react_frontend
     image: schickling/mailcatcher
     ports:
       - "1080:1080"
@@ -103,6 +105,8 @@ services:
         - NODE_ENV=development
 
   playwright:
+    profiles:
+      - react_frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile.playwright
@@ -138,7 +142,7 @@ services:
       - ./frontend-rn:/frontend-rn
     ports:
       - "8081:8081"
-      # - "19000:19000"
+      - "8097:8097"
       # - "19001:19001"
       # - "19002:19002"
     devices:
