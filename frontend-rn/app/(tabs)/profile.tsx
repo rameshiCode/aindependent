@@ -1,5 +1,6 @@
 import { StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useState } from 'react';
+import { router } from 'expo-router';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -29,6 +30,10 @@ export default function ProfileScreen() {
             setIsLoading(true);
             try {
               await signOut();
+              
+              // Force navigation to login screen
+              console.log('🔀 Navigating to login screen after logout');
+              router.replace('/(auth)/login');
             } catch (error) {
               console.error('Error signing out:', error);
               Alert.alert('Error', 'Failed to sign out. Please try again.');

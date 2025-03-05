@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = secrets.token_urlsafe(32)
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
-    BACKEND_HOST: str = "http://localhost:8000"
+    BACKEND_HOST: str = "http://192.168.1.6:8000"  # Use your local IP for mobile connectivity
     FRONTEND_HOST: str = "http://localhost:5173"
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
 
@@ -53,8 +53,11 @@ class Settings(BaseSettings):
         expo_origins = [
             "http://localhost:8081",
             "http://10.0.2.2:8081",
+            "http://192.168.1.6:8081",  # Add your local IP for Android devices
             "exp://localhost:8081",
-            "exp://10.0.2.2:8081"
+            "exp://10.0.2.2:8081",
+            "exp://192.168.1.6:8081",  # Expo URL for your local IP
+            "frontendrn://"  # Add your app scheme for deep linking
         ]
         return base_origins + expo_origins
 

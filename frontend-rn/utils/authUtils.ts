@@ -24,9 +24,20 @@ export async function clearAuthToken(): Promise<void> {
  * 1. Direct access_token in URL params (mobile flow): "frontendrn:///(auth)/callback?access_token={jwt_token}"
  * 2. JSON response body (standard flow): {"access_token": "token", "token_type": "bearer"}
  */
-export function extractAccessToken(result: WebBrowser.WebBrowserAuthSessionResult): string | null {
-  if (result.type !== 'success' || !('url' in result)) {
-    console.log('❌ WebBrowser result not successful or missing URL', result.type);
+export function extractAccessToken(result: WebBrowser.WebBrowserAuthSessionResult | WebBrowser.WebBrowserOpenOptions): string | null {
+  // Handle different result types from different WebBrowser methods
+  if (result.type !== 'success') {
+    console.log('❌ WebBrowser result not successful:', result.type);
+    return null;
+  }
+  
+  // openBrowserAsync doesn't include a URL directly but may still work
+  if (!('url' in result)) {
+    console.log('⚠️ No URL in result - this is normal for openBrowserAsync on Android');
+    
+    // For openBrowserAsync on Android, we need to use the deep linking system
+    // The URL will be passed to the app via handleUrl in useEffect
+    console.log('🔍 This is expected when using openBrowserAsync. The token will be handled via deep linking');
     return null;
   }
 
@@ -35,6 +46,18 @@ export function extractAccessToken(result: WebBrowser.WebBrowserAuthSessionResul
     // Parse the URL that matches our backend redirect pattern
     const url = new URL(result.url);
     console.log('🔄 Auth redirect URL received:', result.url);
+    
+    // For Android when using openBrowserAsync, we're more likely to use the callback route
+    if (url.pathname.includes('callback')) {
+      console.log('✅ Detected callback route in URL');
+      
+      // Direct access_token in URL params from our FastAPI backend (mobile flow)
+      const accessToken = url.searchParams.get('access_token');
+      if (accessToken) {
+        console.log('✅ Found access_token in URL params:', accessToken.substring(0, 10) + '...');
+        return accessToken;
+      }
+    }
     
     // Check if the URL contains our API endpoint for token retrieval
     // This handles the standard OAuth flow where we get redirected back to the API endpoint
@@ -54,13 +77,6 @@ export function extractAccessToken(result: WebBrowser.WebBrowserAuthSessionResul
           console.error('Failed to parse JSON response:', jsonError);
         }
       }
-    }
-    
-    // Direct access_token in URL params from our FastAPI backend (mobile flow)
-    const accessToken = url.searchParams.get('access_token');
-    if (accessToken) {
-      console.log('✅ Found access_token in URL params:', accessToken.substring(0, 10) + '...');
-      return accessToken;
     }
     
     // Try to extract from token_data if the backend changes

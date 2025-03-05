@@ -84,17 +84,23 @@ function RootLayoutNav() {
     checkUrlForToken();
     
     // Also run when window gets focus again (for when popup flow redirects back)
-    const handleFocus = () => {
-      console.log('🔍 Window focused, checking for token again');
-      checkUrlForToken();
-    };
+    // This is web-specific functionality
+    if (Platform.OS === 'web') {
+      const handleFocus = () => {
+        console.log('🔍 Window focused, checking for token again');
+        checkUrlForToken();
+      };
+      
+      window.addEventListener('focus', handleFocus);
+      
+      // Clean up listener on unmount
+      return () => {
+        window.removeEventListener('focus', handleFocus);
+      };
+    }
     
-    window.addEventListener('focus', handleFocus);
-    
-    // Clean up listener on unmount
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-    };
+    // Return empty cleanup function for non-web platforms
+    return () => {};
   }, [signIn]);
 
   // Show loading state until we're ready

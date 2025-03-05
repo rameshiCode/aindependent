@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, getToken, setToken, removeToken, User } from '@/services/api';
@@ -136,6 +137,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       console.log('Sign-out successfully completed');
+      
+      // Force navigation or app reload to trigger layout change
+      if (Platform.OS === 'web') {
+        // For web, reload the page to ensure auth state is refreshed
+        window.location.href = '/';
+      }
+      // For native platforms, the layout will update automatically
+      // because we've set tokenState to null, which will trigger 
+      // RootLayoutNav to show the auth screens
     } catch (error) {
       console.error('Failed to sign out:', error);
       // Even if there's an error, try to reset the state

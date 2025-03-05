@@ -252,15 +252,18 @@ async def auth_google_mobile(request: Request, code: str = None, error: str = No
             status_code=400
         )
     
+    # For the mobile flow, use the same redirect URI that was used to get the code
+    mobile_redirect_uri = f"{settings.BACKEND_HOST}{settings.API_V1_STR}/login/mobile/google/callback"
+    
     # Debug info
     print(f"Received auth code: {code[:10]}...")
-    print(f"Using redirect URI in token exchange: {settings.GOOGLE_REDIRECT_URI}")
+    print(f"Using mobile redirect URI in token exchange: {mobile_redirect_uri}")
     
     token_data = {
         "code": code,
         "client_id": settings.GOOGLE_CLIENT_ID,
         "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "redirect_uri": mobile_redirect_uri,
         "grant_type": "authorization_code",
     }
 
@@ -318,8 +321,12 @@ async def auth_google_mobile(request: Request, code: str = None, error: str = No
             return RedirectResponse(url=redirect_url, status_code=303)
         else:
             # For mobile app, redirect with URL scheme
-            redirect_url = f"frontendrn:///(auth)/callback?access_token={jwt_token}"
-            return RedirectResponse(url=redirect_url)
+            # Make sure to use the right format that works with deep linking
+            # The key point is to prefix with the app scheme and include the proper path
+            # Make the URL more explicit for better debugging
+            redirect_url = f"frontendrn://callback?access_token={jwt_token}"
+            print(f"Redirecting to mobile app with URL: {redirect_url}")
+            return RedirectResponse(url=redirect_url, status_code=302)
 
 @router.get("/login/google/mobile")
 async def login_google_mobile(request: Request):
@@ -339,7 +346,7 @@ async def login_google_mobile(request: Request):
         "client_id": settings.GOOGLE_CLIENT_ID,
         "response_type": "code",
         "scope": "openid email profile",
-        "redirect_uri": settings.GOOGLE_REDIRECT_URI,  # Use the configured redirect URI
+        "redirect_uri": mobile_redirect_uri,  # Use the mobile redirect URI
         "prompt": "select_account",
         "access_type": "offline",  # For refresh tokens
     }

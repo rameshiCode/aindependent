@@ -88,18 +88,29 @@ export default function LoginScreen() {
             enableDefaultShareMenuItem: false,
             toolbarColor: '#4285F4',
             secondaryToolbarColor: '#ffffff',
+            // Add preferNoSession=true to avoid WebBrowser session issues
+            preferNoSession: true,
           };
           
           console.log('🔄 Opening browser with URL:', googleLoginUrl);
           console.log('🔄 Using redirect URI:', redirectUri || 'undefined');
           
-          // Use auth session approach (don't use openBrowserAsync before this)
-          console.log('🌐 Attempting openAuthSessionAsync...');
-          result = await WebBrowser.openAuthSessionAsync(
-            googleLoginUrl,
-            redirectUri, 
-            browserOptions
-          );
+          // For Android, use the simpler openBrowserAsync which has better compatibility
+          if (Platform.OS === 'android') {
+            console.log('🌐 Using openBrowserAsync for Android...');
+            result = await WebBrowser.openBrowserAsync(
+              googleLoginUrl,
+              browserOptions
+            );
+          } else {
+            // For iOS, use the auth session approach
+            console.log('🌐 Attempting openAuthSessionAsync...');
+            result = await WebBrowser.openAuthSessionAsync(
+              googleLoginUrl,
+              redirectUri, 
+              browserOptions
+            );
+          }
         }
         
         console.log('🔄 WebBrowser session complete');
@@ -122,6 +133,21 @@ export default function LoginScreen() {
           console.log('❌ WebBrowser session was not successful:', result.type);
         }
 
+        // For Android with openBrowserAsync, the result type will be "opened"
+        // which means the browser opened successfully, but we won't get a direct URL result
+        // as we're relying on deep linking to handle the callback
+        if (Platform.OS === 'android' && result.type === 'opened') {
+          console.log('🌐 Browser opened successfully on Android - waiting for deep link callback');
+          
+          // Return early - we'll wait for the deep link handler to complete authentication
+          // The token will be handled by the useEffect deep link handler
+          console.log('⏱️ Authentication in progress via deep linking. This function will return now.');
+          
+          // Return a dummy token that will be ignored - the real token will come via deep linking
+          return 'pending_deep_link';
+        }
+        
+        // For other platforms or result types, check for success
         if (result.type !== 'success' || !('url' in result)) {
           console.error('❌ WebBrowser session failed or was cancelled', result);
           throw new Error(result.type === 'cancel' 
@@ -211,45 +237,109 @@ export default function LoginScreen() {
     const handleUrl = async (event: { url: string }) => {
       console.log('📱 Received deep link URL:', event.url);
       
-      if (event.url.includes('callback')) {
+      try {
+        // Deep links may be in several formats, so log all incoming URLs
+        console.log('🔎 URL details:');
+        console.log('- Full URL:', event.url);
+        console.log('- Host:', new URL(event.url).host);
+        console.log('- Pathname:', new URL(event.url).pathname);
+        console.log('- Search:', new URL(event.url).search);
+        
+        // Check if this is a callback URL - it could be in a few formats
+        const isCallback = (
+          event.url.includes('callback') || 
+          event.url.includes('/(auth)/callback') ||
+          event.url.includes('auth/callback')
+        );
+        
+        if (!isCallback) {
+          console.log('⏭️ Not a callback URL, ignoring:', event.url);
+          return;
+        }
+        
         console.log('🔄 Processing OAuth callback URL');
         
-        try {
-          // Parse the URL to extract token
-          const url = new URL(event.url);
+        // Parse the URL to extract token
+        const url = new URL(event.url);
           
-          // Check for access_token in query params
-          const accessToken = url.searchParams.get('access_token');
-          console.log('🔍 Looking for access_token in URL:', accessToken ? 'Found token' : 'No token in params');
+        // Check for access_token in query params
+        const accessToken = url.searchParams.get('access_token');
+        console.log('🔍 Looking for access_token in URL:', accessToken ? 'Found token' : 'No token in params');
+        
+        if (accessToken) {
+          console.log('🔑 Found access token, signing in');
+          // This might trigger a navigation effect, which is what we want
+          await signIn(accessToken);
           
-          if (accessToken) {
-            console.log('🔑 Found access token, signing in');
-            await signIn(accessToken);
-          } else {
-            console.error('❌ No access token found in callback URL');
-            setError('Authentication failed: No token found in the response');
+          // Show success message
+          console.log('✅ Successfully signed in via deep link');
+          setError(null); // Clear any previous errors
+        } else {
+          console.error('❌ No access token found in callback URL');
+          setError('Authentication failed: No token found in the response');
+          
+          // Check if we have a code parameter - this means we need to manually exchange it
+          const code = url.searchParams.get('code');
+          if (code) {
+            console.log('🔄 Found authorization code, attempting to exchange for token');
+            try {
+              // Make a direct API call to exchange the code for a token
+              const baseUrl = api.getBaseUrl();
+              const response = await fetch(`${baseUrl}/login/auth/google?code=${code}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                if (data.access_token) {
+                  console.log('✅ Successfully exchanged code for token');
+                  await signIn(data.access_token);
+                  setError(null);
+                  return;
+                }
+              } else {
+                console.error('❌ Code exchange failed:', await response.text());
+              }
+            } catch (exchangeError) {
+              console.error('❌ Error exchanging code for token:', exchangeError);
+            }
           }
-        } catch (error) {
-          console.error('Error handling deep link:', error);
-          setError(`Authentication error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          
+          // If we got here, both access_token and code exchange failed
+          setError('Authentication failed: Could not obtain a valid token');
         }
+      } catch (error) {
+        console.error('Error handling deep link:', error);
+        setError(`Authentication error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     };
 
     // Add event listener for deep linking
+    console.log('🔗 Setting up deep link handler');
     const subscription = Linking.addEventListener('url', handleUrl);
 
     // Get the initial URL (if app was opened through a deep link)
     const getInitialUrl = async () => {
+      console.log('🔍 Checking for initial URL from deep link...');
       const initialUrl = await Linking.getInitialURL();
       if (initialUrl) {
+        console.log('📱 App was opened from deep link:', initialUrl);
         handleUrl({ url: initialUrl });
+      } else {
+        console.log('📱 No initial deep link URL found');
       }
     };
     getInitialUrl();
 
+    // Print the app's URL scheme for debugging
+    console.log('🔗 App URL scheme:', Linking.createURL(''));
+
     // Cleanup
     return () => {
+      console.log('🧹 Removing deep link listener');
       subscription.remove();
     };
   }, [signIn]);
@@ -340,14 +430,25 @@ export default function LoginScreen() {
                   console.log('Testing direct fetch...');
                   const baseUrl = api.getBaseUrl();
                   // Use a simpler endpoint that doesn't require authentication
+                  console.log(`Testing API connection to: ${baseUrl}/utils/health-check/`);
+                  
+                  // Add a timeout to prevent waiting too long
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 5000);
+                  
                   const response = await fetch(`${baseUrl}/utils/health-check/`, {
                     method: 'GET',
                     headers: {
                       'Content-Type': 'application/json',
+                      'Accept': 'application/json',
                     },
+                    signal: controller.signal,
                     // Add mode: 'cors' for web platform
                     ...(Platform.OS === 'web' ? { mode: 'cors' } : {})
                   });
+                  
+                  // Clear the timeout
+                  clearTimeout(timeoutId);
                   
                   console.log('API Response:', response.status);
                   if (response.ok) {

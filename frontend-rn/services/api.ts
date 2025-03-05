@@ -76,12 +76,13 @@ const getBaseUrl = () => {
     // Using localhost instead of 127.0.0.1 to avoid CORS issues
     return 'http://localhost:8000/api/v1';
   } else if (Platform.OS === 'android' && __DEV__) {
-    // For Android emulator in most environments
-    return 'http://10.0.2.2:8000/api/v1';
+    // For Android emulator or physical device
+    // Use your computer's actual local IP address on your network 
+    // This must match what your Android device can reach
+    return 'http://192.168.1.6:8000/api/v1';
     
-    // For physical Android device, use your computer's local IP address
-    // Uncomment and update this with your actual IP address to test on a physical device
-    // return 'http://192.168.1.100:8000/api/v1';
+    // For standard Android emulator only
+    // return 'http://10.0.2.2:8000/api/v1';
   }
   return API_URL;
 };
