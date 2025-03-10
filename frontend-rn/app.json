@@ -16,7 +16,21 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.frontendrn"
+      "package": "com.anonymous.frontendrn",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "myapp"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -24,18 +38,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://aindependent.com"
-        }
-      ],
-      [
-        "@stripe/stripe-react-native",
-        {
-          "publishableKey": "pk_test_51R04QIF7P8kDElAhIvVr0fDR3qSwPClQOSeTGaQhGAculMikrRATQaPFdF8G5chyz7ntVNOLAoC3A1weNRMDk4Qk00k20RqJ79"
-        }
-      ],
+      "expo-router",
       [
         "expo-splash-screen",
         {
