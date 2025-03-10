@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "frontend-rn",
-    "slug": "frontend-rn",
+    "name": "AIndependent",
+    "slug": "AIndependent",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "aindependent",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -24,7 +24,18 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "origin": "https://aindependent.com"
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "publishableKey": "pk_test_51R04QIF7P8kDElAhIvVr0fDR3qSwPClQOSeTGaQhGAculMikrRATQaPFdF8G5chyz7ntVNOLAoC3A1weNRMDk4Qk00k20RqJ79"
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -37,6 +48,15 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "API_URL": "http://localhost:8000",
+      "router": {
+        "origin": "https://aindependent.com"
+      },
+      "eas": {
+        "projectId": "fd7e472d-31c9-445f-8c15-4f95c12e1391"
+      }
     }
   }
 }

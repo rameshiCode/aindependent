@@ -1,0 +1,9 @@
+{
+  "venvPath": "/home/rares/coding/aindependent/backend",
+  "venv": ".venv",
+  "extraPaths": [
+    "/home/rares/coding/aindependent/backend",
+    "/home/rares/coding/aindependent"
+  ],
+  "reportMissingImports": "warning"
+}
