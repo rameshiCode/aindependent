@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = ""
 
+    # Stripe configuration
+    # STRIPE_SECRET_KEY: str = ""
+    # STRIPE_PUBLISHABLE_KEY: str = ""
+    # STRIPE_WEBHOOK_SECRET: str = ""
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:
