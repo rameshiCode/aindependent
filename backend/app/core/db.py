@@ -31,3 +31,12 @@ def init_db(session: Session) -> None:
             is_superuser=True,
         )
         user = crud.create_user(session=session, user_create=user_in)
+
+
+def get_session():
+    """
+    FastAPI dependency that provides a SQLModel session.
+    Used in route dependencies to get database access.
+    """
+    with Session(engine) as session:
+        yield session

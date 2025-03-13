@@ -1,6 +1,6 @@
 import secrets
 import warnings
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     AnyUrl,
@@ -128,15 +128,13 @@ class Settings(BaseSettings):
 
         return self
 
-
-    
     # Stripe settings
-    STRIPE_API_KEY: Optional[str] = None
-    STRIPE_WEBHOOK_SECRET: Optional[str] = None
-    STRIPE_PUBLISHABLE_KEY: Optional[str] = None
-    FRONTEND_URL: Optional[str] = None
-    STRIPE_BASIC_PRICE_ID: Optional[str] = None
-    STRIPE_PREMIUM_PRICE_ID: Optional[str] = None
+    STRIPE_API_KEY: str | None = None
+    STRIPE_WEBHOOK_SECRET: str | None = None
+    STRIPE_PUBLISHABLE_KEY: str | None = None
+    FRONTEND_URL: str | None = None
+    STRIPE_BASIC_PRICE_ID: str | None = None
+    STRIPE_PREMIUM_PRICE_ID: str | None = None
 
 
 settings = Settings()

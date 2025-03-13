@@ -1,8 +1,9 @@
-from typing import Optional
 import uuid
+from datetime import datetime
+from enum import Enum
 
 from pydantic import EmailStr
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Column, Field, Relationship, SQLModel, String
 
 
 # Shared properties
@@ -43,12 +44,8 @@ class UpdatePassword(SQLModel):
 # Database model, database table inferred from class name
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    hashed_password: Optional[str] = None  # Not needed for Google users
-    # hashed_password: str
-    items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
-    google_id: Optional[str] = Field(default=None, unique=True, index=True)  # Store Google ID
-    stripe_customer_id: Optional[str] = Field(default=None, unique=True, index=True)  # Store Stripe Customer ID
-    subscriptions: list["StripeSubscription"] = Relationship(back_populates="user", cascade_delete=True)
+    hashed_password: str
+
 
 # Properties to return via API, id is always required
 class UserPublic(UserBase):
@@ -57,43 +54,6 @@ class UserPublic(UserBase):
 
 class UsersPublic(SQLModel):
     data: list[UserPublic]
-    count: int
-
-
-# Shared properties
-class ItemBase(SQLModel):
-    title: str = Field(min_length=1, max_length=255)
-    description: str | None = Field(default=None, max_length=255)
-
-
-# Properties to receive on item creation
-class ItemCreate(ItemBase):
-    pass
-
-
-# Properties to receive on item update
-class ItemUpdate(ItemBase):
-    title: str | None = Field(default=None, min_length=1, max_length=255)  # type: ignore
-
-
-# Database model, database table inferred from class name
-class Item(ItemBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    title: str = Field(max_length=255)
-    owner_id: uuid.UUID = Field(
-        foreign_key="user.id", nullable=False, ondelete="CASCADE"
-    )
-    owner: User | None = Relationship(back_populates="items")
-
-
-# Properties to return via API, id is always required
-class ItemPublic(ItemBase):
-    id: uuid.UUID
-    owner_id: uuid.UUID
-
-
-class ItemsPublic(SQLModel):
-    data: list[ItemPublic]
     count: int
 
 
@@ -118,117 +78,117 @@ class NewPassword(SQLModel):
     new_password: str = Field(min_length=8, max_length=40)
 
 
-# Stripe Subscription Models
-class StripeProductBase(SQLModel):
-    name: str = Field(max_length=255)
-    description: str | None = Field(default=None, max_length=1000)
-    active: bool = True
-    stripe_product_id: str = Field(max_length=255, unique=True)
+# Subscription Status Enum
+class SubscriptionStatus(str, Enum):
+    ACTIVE = "active"
+    PAST_DUE = "past_due"
+    UNPAID = "unpaid"
+    CANCELED = "canceled"
+    INCOMPLETE = "incomplete"
+    INCOMPLETE_EXPIRED = "incomplete_expired"
+    TRIALING = "trialing"
 
 
-class StripeProductCreate(StripeProductBase):
-    pass
+# Plan Interval Enum
+class PlanInterval(str, Enum):
+    MONTH = "month"
+    YEAR = "year"
 
 
-class StripeProductUpdate(StripeProductBase):
-    name: str | None = Field(default=None, max_length=255)
-    description: str | None = Field(default=None, max_length=1000)
-    active: bool | None = None
-    stripe_product_id: str | None = Field(default=None, max_length=255)
-
-
-class StripeProduct(StripeProductBase, table=True):
+# Plan model
+class Plan(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    prices: list["StripePrice"] = Relationship(back_populates="product")
-
-
-class StripeProductPublic(StripeProductBase):
-    id: uuid.UUID
-
-
-class StripePriceBase(SQLModel):
-    unit_amount: int  # Amount in cents
-    currency: str = Field(max_length=3, default="usd")
-    recurring_interval: str = Field(max_length=10, default="month")  # month, year, etc.
-    stripe_price_id: str = Field(max_length=255, unique=True)
+    name: str = Field(index=True)
+    description: str | None = None
+    stripe_product_id: str = Field(unique=True)
     active: bool = True
-    product_id: uuid.UUID = Field(foreign_key="stripeproduct.id")
+
+    # Relationships
+    prices: list["Price"] = Relationship(back_populates="plan")
 
 
-class StripePriceCreate(StripePriceBase):
-    pass
-
-
-class StripePriceUpdate(StripePriceBase):
-    unit_amount: int | None = None
-    currency: str | None = Field(default=None, max_length=3)
-    recurring_interval: str | None = Field(default=None, max_length=10)
-    stripe_price_id: str | None = Field(default=None, max_length=255)
-    active: bool | None = None
-    product_id: uuid.UUID | None = None
-
-
-class StripePrice(StripePriceBase, table=True):
+# Price model
+class Price(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    product: StripeProduct = Relationship(back_populates="prices")
-    subscriptions: list["StripeSubscription"] = Relationship(back_populates="price")
+    plan_id: uuid.UUID = Field(foreign_key="plan.id")
+    stripe_price_id: str = Field(unique=True)
+    interval: PlanInterval
+    amount: int  # in cents
+    currency: str = "usd"
+    active: bool = True
+
+    # Relationships
+    plan: Plan = Relationship(back_populates="prices")
+    subscriptions: list["Subscription"] = Relationship(back_populates="price")
 
 
-class StripePricePublic(StripePriceBase):
-    id: uuid.UUID
-    product: StripeProductPublic
+# Customer model (extends User)
+class Customer(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", unique=True)
+    stripe_customer_id: str | None = Field(unique=True, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    user: User = Relationship()
+    subscriptions: list["Subscription"] = Relationship(back_populates="customer")
+    payment_methods: list["PaymentMethod"] = Relationship(back_populates="customer")
 
 
-class StripeSubscriptionBase(SQLModel):
-    status: str = Field(max_length=50)  # active, canceled, past_due, etc.
-    current_period_start: int  # Unix timestamp
-    current_period_end: int  # Unix timestamp
+# Subscription model
+class Subscription(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    customer_id: uuid.UUID = Field(foreign_key="customer.id")
+    price_id: uuid.UUID = Field(foreign_key="price.id")
+    stripe_subscription_id: str = Field(unique=True, index=True)
+    status: SubscriptionStatus
+    current_period_start: datetime
+    current_period_end: datetime
     cancel_at_period_end: bool = False
-    stripe_subscription_id: str = Field(max_length=255, unique=True)
-    user_id: uuid.UUID = Field(foreign_key="user.id")
-    price_id: uuid.UUID = Field(foreign_key="stripeprice.id")
+    canceled_at: datetime | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    customer: Customer = Relationship(back_populates="subscriptions")
+    price: Price = Relationship(back_populates="subscriptions")
+    invoices: list["Invoice"] = Relationship(back_populates="subscription")
 
 
-class StripeSubscriptionCreate(StripeSubscriptionBase):
-    pass
-
-
-class StripeSubscriptionUpdate(StripeSubscriptionBase):
-    status: str | None = Field(default=None, max_length=50)
-    current_period_start: int | None = None
-    current_period_end: int | None = None
-    cancel_at_period_end: bool | None = None
-    stripe_subscription_id: str | None = Field(default=None, max_length=255)
-    user_id: uuid.UUID | None = None
-    price_id: uuid.UUID | None = None
-
-
-class StripeSubscription(StripeSubscriptionBase, table=True):
+# Invoice model
+class Invoice(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    user: User = Relationship(back_populates="subscriptions")
-    price: StripePrice = Relationship(back_populates="subscriptions")
+    subscription_id: uuid.UUID = Field(foreign_key="subscription.id")
+    stripe_invoice_id: str = Field(unique=True, index=True)
+    amount_paid: int  # in cents
+    currency: str = "usd"
+    status: str  # paid, open, void, uncollectible
+    invoice_pdf: str | None = Field(default=None, sa_column=Column(String(2048)))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    subscription: Subscription = Relationship(back_populates="invoices")
 
 
-class StripeSubscriptionPublic(StripeSubscriptionBase):
-    id: uuid.UUID
-    price: StripePricePublic
+# Payment Method model
+class PaymentMethod(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    customer_id: uuid.UUID = Field(foreign_key="customer.id")
+    stripe_payment_method_id: str = Field(unique=True, index=True)
+    type: str  # card, bank_account, etc.
+    card_last4: str | None = None
+    card_brand: str | None = None
+    card_exp_month: int | None = None
+    card_exp_year: int | None = None
+    is_default: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    customer: Customer = Relationship(back_populates="payment_methods")
 
 
-class StripeSubscriptionsPublic(SQLModel):
-    data: list[StripeSubscriptionPublic]
-    count: int
-
-
-# Stripe Checkout and Customer Portal
-class CreateCheckoutSessionRequest(SQLModel):
-    price_id: str
-    success_url: str
-    cancel_url: str
-
-
-class CreateCustomerPortalSessionRequest(SQLModel):
-    return_url: str
-
-
-class StripeSessionResponse(SQLModel):
-    url: str
+# class WebhookEvent(SQLModel):
+#     id: str
+#     type: str
+#     data: dict

@@ -8,7 +8,10 @@ from app.core.config import settings
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
-    return f"{route.tags[0]}-{route.name}"
+    if route.tags and len(route.tags) > 0:
+        return f"{route.tags[0]}-{route.name}"
+    else:
+        return f"api-{route.name}"  # Fallback when no tags
 
 
 if settings.SENTRY_DSN and settings.ENVIRONMENT != "local":

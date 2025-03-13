@@ -1,299 +1,356 @@
+import logging
+import os
+
 import stripe
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from dotenv import load_dotenv
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
-from app import crud
-from app.api.deps import CurrentUser, SessionDep, get_current_active_user
-from app.core.config import settings
+from app.api.deps import get_current_user
+from app.core.db import get_session
 from app.models import (
-    CreateCheckoutSessionRequest,
-    CreateCustomerPortalSessionRequest,
-    Message,
-    StripePrice,
-    StripePricePublic,
-    StripeProduct,
-    StripeProductPublic,
-    StripeSessionResponse,
-    StripeSubscription,
-    StripeSubscriptionPublic,
-    StripeSubscriptionsPublic,
+    Customer,
+    Plan,
+    Price,
+    Subscription,
+    SubscriptionStatus,
     User,
 )
 
-# Configure Stripe API key
-stripe.api_key = settings.STRIPE_API_KEY
+load_dotenv()
+# Initialize Stripe with your API key
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
-router = APIRouter(prefix="/stripe", tags=["stripe"])
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-
-@router.get("/products", response_model=list[StripeProductPublic])
-def get_products(session: SessionDep):
-    """
-    Get all active products.
-    """
-    products = session.exec(
-        select(StripeProduct).where(StripeProduct.active == True)
-    ).all()
-    return products
-
-
-@router.get("/prices", response_model=list[StripePricePublic])
-def get_prices(session: SessionDep):
-    """
-    Get all active prices.
-    """
-    prices = session.exec(
-        select(StripePrice).where(StripePrice.active == True)
-    ).all()
-    return prices
-
-
-@router.post("/create-customer", response_model=Message)
-def create_customer(current_user: CurrentUser, session: SessionDep):
-    """
-    Create a Stripe customer for the current user.
-    """
-    if current_user.stripe_customer_id:
-        return {"message": "Customer already exists"}
-
-    # Create customer in Stripe
-    customer = stripe.Customer.create(
-        email=current_user.email,
-        name=current_user.full_name,
-        metadata={"user_id": str(current_user.id)},
+if not stripe.api_key:
+    logger.error("Stripe API key is not set. Please check your environment variables.")
+else:
+    logger.info(f"API Key loaded: {'Yes' if stripe.api_key else 'No'}")
+    logger.info(f"API Key length: {len(stripe.api_key) if stripe.api_key else 0}")
+    logger.info(
+        f"API Key first/last chars: {stripe.api_key[:4]}...{stripe.api_key[-4:] if stripe.api_key else ''}"
     )
 
-    # Update user with Stripe customer ID
-    current_user.stripe_customer_id = customer.id
-    session.add(current_user)
-    session.commit()
-    session.refresh(current_user)
+router = APIRouter()
 
-    return {"message": "Customer created successfully"}
+# ESSENTIAL ENDPOINTS
 
 
-@router.post("/create-checkout-session", response_model=StripeSessionResponse)
-def create_checkout_session(
-    request: CreateCheckoutSessionRequest, current_user: CurrentUser, session: SessionDep
+# Health check endpoint (for development/debugging)
+@router.get("/stripe-health-check")
+async def stripe_health_check():
+    """
+    Simple health check to verify Stripe API connectivity.
+    This endpoint doesn't require authentication and can be used
+    to check if your server can communicate with Stripe.
+    """
+    try:
+        # Make a simple API call to Stripe that doesn't require any specific permissions
+        balance = stripe.Balance.retrieve()
+
+        logger.info(
+            f"Stripe balance retrieved successfully: {balance.available[0].amount} {balance.available[0].currency}"
+        )
+
+        return {
+            "status": "success",
+            "message": "Successfully connected to Stripe API",
+            "available_balance": {
+                "amount": balance.available[0].amount,
+                "currency": balance.available[0].currency,
+            },
+            "stripe_api_version": stripe.api_version,
+        }
+    except Exception as e:
+        logger.error(f"Stripe connection error: {str(e)}")
+        return {
+            "status": "error",
+            "message": "Error connecting to Stripe API",
+            "error": str(e),
+        }
+
+
+# Get subscription status (ESSENTIAL - for checking if user has active subscription)
+@router.get("/subscription-status", response_model=dict)
+def get_subscription_status(
+    db: Session = Depends(get_session), current_user: User = Depends(get_current_user)
 ):
     """
-    Create a Stripe Checkout Session for subscription.
+    Get the subscription status for the current user.
+    This is used to determine if a user has access to premium features.
     """
-    # Ensure user has a Stripe customer ID
-    if not current_user.stripe_customer_id:
-        # Create customer in Stripe
-        customer = stripe.Customer.create(
+    # Get customer
+    customer = db.exec(
+        select(Customer).where(Customer.user_id == current_user.id)
+    ).first()
+
+    if not customer:
+        return {"has_active_subscription": False}
+
+    # Check for active subscription
+    subscription = db.exec(
+        select(Subscription)
+        .where(Subscription.customer_id == customer.id)
+        .where(Subscription.status == SubscriptionStatus.ACTIVE)
+    ).first()
+
+    if not subscription:
+        return {"has_active_subscription": False}
+
+    # Get plan and price details
+    price = db.get(Price, subscription.price_id)
+    plan = db.get(Plan, price.plan_id) if price else None
+
+    return {
+        "has_active_subscription": True,
+        "subscription_id": str(subscription.id),
+        "stripe_subscription_id": subscription.stripe_subscription_id,
+        "status": subscription.status,
+        "current_period_end": subscription.current_period_end.isoformat(),
+        "cancel_at_period_end": subscription.cancel_at_period_end,
+        "plan": {
+            "name": plan.name if plan else None,
+            "description": plan.description if plan else None,
+        }
+        if plan
+        else None,
+        "price": {
+            "amount": price.amount if price else None,
+            "currency": price.currency if price else None,
+            "interval": price.interval if price else None,
+        }
+        if price
+        else None,
+    }
+
+
+# Create checkout session (ESSENTIAL - for initiating subscription purchase)
+@router.post("/create-checkout-session", response_model=dict)
+def create_checkout_session(
+    price_id: str,
+    success_url: str,
+    cancel_url: str,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create a checkout session for a subscription.
+    This is called when a user wants to subscribe after reaching the free request limit.
+    """
+    # Get or create customer
+    customer = db.exec(
+        select(Customer).where(Customer.user_id == current_user.id)
+    ).first()
+
+    if not customer:
+        # Create customer
+        stripe_customer = stripe.Customer.create(
             email=current_user.email,
             name=current_user.full_name,
             metadata={"user_id": str(current_user.id)},
         )
-        current_user.stripe_customer_id = customer.id
-        session.add(current_user)
-        session.commit()
-        session.refresh(current_user)
-    
-    # Create checkout session
-    checkout_session = stripe.checkout.Session.create(
-        customer=current_user.stripe_customer_id,
-        payment_method_types=["card"],
-        line_items=[
-            {
-                "price": request.price_id,
-                "quantity": 1,
-            }
-        ],
-        mode="subscription",
-        success_url=request.success_url,
-        cancel_url=request.cancel_url,
-    )
-    
-    return {"url": checkout_session.url}
 
+        customer = Customer(
+            user_id=current_user.id, stripe_customer_id=stripe_customer.id
+        )
+        db.add(customer)
+        db.commit()
+        db.refresh(customer)
 
-@router.post("/create-customer-portal-session", response_model=StripeSessionResponse)
-def create_customer_portal_session(
-    request: CreateCustomerPortalSessionRequest, current_user: CurrentUser
-):
-    """
-    Create a Stripe Customer Portal Session.
-    """
-    if not current_user.stripe_customer_id:
+    try:
+        # Create checkout session
+        checkout_session = stripe.checkout.Session.create(
+            customer=customer.stripe_customer_id,
+            payment_method_types=["card"],
+            line_items=[
+                {
+                    "price": price_id,
+                    "quantity": 1,
+                },
+            ],
+            mode="subscription",
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+
+        return {"checkout_url": checkout_session.url}
+    except stripe.error.StripeError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User does not have a Stripe customer ID",
+            detail=f"Error creating checkout session: {str(e)}",
         )
-    
-    # Create customer portal session
-    portal_session = stripe.billing_portal.Session.create(
-        customer=current_user.stripe_customer_id,
-        return_url=request.return_url,
-    )
-    
-    return {"url": portal_session.url}
 
 
-@router.get("/subscriptions", response_model=StripeSubscriptionsPublic)
-def get_subscriptions(current_user: CurrentUser, session: SessionDep):
+# RECOMMENDED ENDPOINTS
+
+
+# Get products (for displaying subscription options)
+@router.get("/products", response_model=list[dict])
+def get_products():
+    """
+    Get all products from Stripe and return them.
+    Used to display subscription options to users.
+    """
+    try:
+        products = stripe.Product.list(active=True)
+        return products.data
+    except stripe.error.StripeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error fetching products: {str(e)}",
+        )
+
+
+# Get current user's subscriptions
+@router.get("/my-subscriptions", response_model=list[dict])
+def get_my_subscriptions(
+    db: Session = Depends(get_session), current_user: User = Depends(get_current_user)
+):
     """
     Get all subscriptions for the current user.
+    Used to display subscription details to users.
     """
-    subscriptions = session.exec(
-        select(StripeSubscription).where(StripeSubscription.user_id == current_user.id)
-    ).all()
-    
-    return {"data": subscriptions, "count": len(subscriptions)}
-
-
-@router.post("/cancel-subscription/{subscription_id}", response_model=Message)
-def cancel_subscription(subscription_id: str, current_user: CurrentUser, session: SessionDep):
-    """
-    Cancel a subscription.
-    """
-    # Find subscription in database
-    db_subscription = session.exec(
-        select(StripeSubscription).where(
-            StripeSubscription.stripe_subscription_id == subscription_id,
-            StripeSubscription.user_id == current_user.id,
-        )
+    # Get customer
+    customer = db.exec(
+        select(Customer).where(Customer.user_id == current_user.id)
     ).first()
-    
-    if not db_subscription:
+
+    if not customer:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Subscription not found",
+            status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found"
         )
-    
-    # Cancel subscription in Stripe
-    stripe.Subscription.modify(
-        subscription_id,
-        cancel_at_period_end=True,
-    )
-    
-    # Update subscription in database
-    db_subscription.cancel_at_period_end = True
-    session.add(db_subscription)
-    session.commit()
-    
-    return {"message": "Subscription will be canceled at the end of the billing period"}
 
-
-@router.post("/webhook", status_code=status.HTTP_200_OK)
-async def stripe_webhook(request: Request, session: SessionDep):
-    """
-    Handle Stripe webhook events.
-    """
-    payload = await request.body()
-    sig_header = request.headers.get("stripe-signature")
-    
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        # Get subscriptions from Stripe
+        subscriptions = stripe.Subscription.list(customer=customer.stripe_customer_id)
+        return subscriptions.data
+    except stripe.error.StripeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error fetching subscriptions: {str(e)}",
         )
-    except ValueError as e:
-        # Invalid payload
-        raise HTTPException(status_code=400, detail=str(e))
-    except stripe.error.SignatureVerificationError as e:
-        # Invalid signature
-        raise HTTPException(status_code=400, detail=str(e))
-    
-    # Handle the event
-    if event["type"] == "checkout.session.completed":
-        session_obj = event["data"]["object"]
-        
-        # Get customer and subscription IDs
-        customer_id = session_obj["customer"]
-        subscription_id = session_obj["subscription"]
-        
-        # Find user by Stripe customer ID
-        user = session.exec(
-            select(User).where(User.stripe_customer_id == customer_id)
-        ).first()
-        
-        if not user:
-            return {"status": "error", "message": "User not found"}
-        
-        # Get subscription details from Stripe
-        subscription = stripe.Subscription.retrieve(subscription_id)
-        price_id = subscription["items"]["data"][0]["price"]["id"]
-        
-        # Find or create price in database
-        db_price = session.exec(
-            select(StripePrice).where(StripePrice.stripe_price_id == price_id)
-        ).first()
-        
-        if not db_price:
-            # Get price details from Stripe
-            price = stripe.Price.retrieve(price_id)
-            product = stripe.Product.retrieve(price["product"])
-            
-            # Create product in database
-            db_product = StripeProduct(
-                name=product["name"],
-                description=product.get("description", ""),
-                active=product["active"],
-                stripe_product_id=product["id"],
-            )
-            session.add(db_product)
-            session.commit()
-            session.refresh(db_product)
-            
-            # Create price in database
-            db_price = StripePrice(
-                unit_amount=price["unit_amount"],
-                currency=price["currency"],
-                recurring_interval=price["recurring"]["interval"],
-                stripe_price_id=price["id"],
-                active=price["active"],
-                product_id=db_product.id,
-            )
-            session.add(db_price)
-            session.commit()
-            session.refresh(db_price)
-        
-        # Create subscription in database
-        db_subscription = StripeSubscription(
-            status=subscription["status"],
-            current_period_start=subscription["current_period_start"],
-            current_period_end=subscription["current_period_end"],
-            cancel_at_period_end=subscription["cancel_at_period_end"],
-            stripe_subscription_id=subscription["id"],
-            user_id=user.id,
-            price_id=db_price.id,
+
+
+# Create customer portal session (for subscription management)
+@router.post("/create-portal-session", response_model=dict)
+def create_portal_session(
+    return_url: str,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create a customer portal session for managing subscriptions.
+    This allows users to update payment methods, cancel subscriptions, etc.
+    """
+    # Get customer
+    customer = db.exec(
+        select(Customer).where(Customer.user_id == current_user.id)
+    ).first()
+
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found"
         )
-        session.add(db_subscription)
-        session.commit()
-    
-    elif event["type"] == "customer.subscription.updated":
-        subscription = event["data"]["object"]
-        
-        # Update subscription in database
-        db_subscription = session.exec(
-            select(StripeSubscription).where(
-                StripeSubscription.stripe_subscription_id == subscription["id"]
-            )
-        ).first()
-        
-        if db_subscription:
-            db_subscription.status = subscription["status"]
-            db_subscription.current_period_start = subscription["current_period_start"]
-            db_subscription.current_period_end = subscription["current_period_end"]
-            db_subscription.cancel_at_period_end = subscription["cancel_at_period_end"]
-            session.add(db_subscription)
-            session.commit()
-    
-    elif event["type"] == "customer.subscription.deleted":
-        subscription = event["data"]["object"]
-        
-        # Update subscription in database
-        db_subscription = session.exec(
-            select(StripeSubscription).where(
-                StripeSubscription.stripe_subscription_id == subscription["id"]
-            )
-        ).first()
-        
-        if db_subscription:
-            db_subscription.status = "canceled"
-            session.add(db_subscription)
-            session.commit()
-    
-    return {"status": "success"}
+
+    try:
+        # Create portal session
+        portal_session = stripe.billing_portal.Session.create(
+            customer=customer.stripe_customer_id, return_url=return_url
+        )
+
+        return {"portal_url": portal_session.url}
+    except stripe.error.StripeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error creating portal session: {str(e)}",
+        )
+
+
+# Add this new endpoint for tracking usage
+@router.get("/usage-status", response_model=dict)
+def get_usage_status(
+    db: Session = Depends(get_session), current_user: User = Depends(get_current_user)
+):
+    """
+    Get the current usage status for the user.
+    This tracks how many free requests the user has used and how many remain.
+    """
+    # This is a simplified example - you'll need to implement the actual usage tracking
+    # in your database models and update it when users make requests
+
+    # Check if user has active subscription first
+    subscription_status = get_subscription_status(db=db, current_user=current_user)
+    if subscription_status.get("has_active_subscription", False):
+        return {
+            "has_active_subscription": True,
+            "unlimited_requests": True,
+            "requests_used": 0,  # Not relevant for subscribed users
+            "requests_limit": 0,  # Not relevant for subscribed users
+            "requests_remaining": "unlimited",
+        }
+
+    # For non-subscribed users, check usage
+    # This is where you'd query your usage tracking table
+    # For now, we'll use a placeholder implementation
+    FREE_REQUESTS_LIMIT = 5  # Set your free tier limit
+
+    # In a real implementation, you would get this from your database
+    # Example: user_usage = db.exec(select(UserUsage).where(UserUsage.user_id == current_user.id)).first()
+    requests_used = 0  # Replace with actual query to your usage tracking
+
+    return {
+        "has_active_subscription": False,
+        "unlimited_requests": False,
+        "requests_used": requests_used,
+        "requests_limit": FREE_REQUESTS_LIMIT,
+        "requests_remaining": max(0, FREE_REQUESTS_LIMIT - requests_used),
+    }
+
+
+# Add this new endpoint for incrementing usage
+@router.post("/increment-usage", response_model=dict)
+def increment_usage(
+    db: Session = Depends(get_session), current_user: User = Depends(get_current_user)
+):
+    """
+    Increment the usage counter for the current user.
+    Call this when a user makes a request to your chat API.
+    """
+    # Check if user has active subscription first
+    subscription_status = get_subscription_status(db=db, current_user=current_user)
+    if subscription_status.get("has_active_subscription", False):
+        return {
+            "has_active_subscription": True,
+            "unlimited_requests": True,
+            "requests_used": 0,  # Not relevant for subscribed users
+            "requests_remaining": "unlimited",
+        }
+
+    # For non-subscribed users, increment usage
+    # This is where you'd update your usage tracking table
+    # For now, we'll use a placeholder implementation
+    FREE_REQUESTS_LIMIT = 5  # Set your free tier limit
+
+    # In a real implementation, you would update your database
+    # Example:
+    # user_usage = db.exec(select(UserUsage).where(UserUsage.user_id == current_user.id)).first()
+    # if not user_usage:
+    #     user_usage = UserUsage(user_id=current_user.id, requests_count=0)
+    # user_usage.requests_count += 1
+    # db.add(user_usage)
+    # db.commit()
+    # db.refresh(user_usage)
+    # requests_used = user_usage.requests_count
+
+    requests_used = 1  # Replace with actual query to your usage tracking
+
+    return {
+        "has_active_subscription": False,
+        "unlimited_requests": False,
+        "requests_used": requests_used,
+        "requests_limit": FREE_REQUESTS_LIMIT,
+        "requests_remaining": max(0, FREE_REQUESTS_LIMIT - requests_used),
+        "limit_reached": requests_used >= FREE_REQUESTS_LIMIT,
+    }

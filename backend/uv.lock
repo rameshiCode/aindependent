@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.10, <4.0"
 resolution-markers = [
     "python_full_version < '3.13'",
@@ -63,6 +64,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "sentry-sdk", extra = ["fastapi"] },
     { name = "sqlmodel" },
+    { name = "stripe" },
     { name = "tenacity" },
 ]
 
@@ -93,6 +95,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.7,<1.0.0" },
     { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=1.40.6,<2.0.0" },
     { name = "sqlmodel", specifier = ">=0.0.21,<1.0.0" },
+    { name = "stripe", specifier = ">=11.6.0" },
     { name = "tenacity", specifier = ">=8.2.3,<9.0.0" },
 ]
 
@@ -220,7 +223,7 @@ name = "click"
 version = "8.1.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/96/d3/f04c7bfcf5c1862a2a5b845c6b2b360488cf47af55dfa79c98f6a6bf98b5/click-8.1.7.tar.gz", hash = "sha256:ca9853ad459e787e2192211578cc907e7594e294c7ccc834310722b41b9ca6de", size = 336121 }
 wheels = [
@@ -1293,6 +1296,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/b4/e25c3b688ef703d85e55017c6edd0cbf38e5770ab748234363d54ff0251a/starlette-0.38.6.tar.gz", hash = "sha256:863a1588f5574e70a821dadefb41e4881ea451a47a3cd1b4df359d4ffefe5ead", size = 2569491 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/9c/93f7bc03ff03199074e81974cc148908ead60dcf189f68ba1761a0ee35cf/starlette-0.38.6-py3-none-any.whl", hash = "sha256:4517a1409e2e73ee4951214ba012052b9e16f60e90d73cfb06192c19203bbb05", size = 71451 },
+]
+
+[[package]]
+name = "stripe"
+version = "11.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/30/a4/7e16668d7adfb45229f4b67c04c79f53fe78335a6d0625303b32024d831c/stripe-11.6.0.tar.gz", hash = "sha256:0ced7cce23a6cb1a393c86a1f7f9435c9d83ae7cbd556362868caf62cb44a92c", size = 1390405 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/67/e320a11da2049dfd50fd1726952093b173332563f32d1a94cc3758932147/stripe-11.6.0-py2.py3-none-any.whl", hash = "sha256:6e6cf09ebb6d5fc2d708401cb8868fd7bff987a6d09a0433caaa92c62f97dbc5", size = 1636766 },
 ]
 
 [[package]]
