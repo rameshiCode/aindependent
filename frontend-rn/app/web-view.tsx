@@ -8,7 +8,7 @@ import { ActivityIndicator } from 'react-native';
 export default function WebViewScreen() {
   const router = useRouter();
   const { url } = useLocalSearchParams();
-  
+
   if (!url) {
     router.back();
     return null;

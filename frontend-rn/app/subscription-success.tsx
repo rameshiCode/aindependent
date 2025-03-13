@@ -11,27 +11,27 @@ export default function SubscriptionSuccessScreen() {
     <ThemedView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Image 
-            source={require('../assets/images/check-circle.png')} 
+          <Image
+            source={require('../assets/images/check-circle.png')}
             style={styles.icon}
             resizeMode="contain"
           />
         </View>
-        
+
         <ThemedText style={styles.title}>Subscription Successful!</ThemedText>
-        
+
         <ThemedText style={styles.message}>
           Thank you for subscribing. Your subscription has been activated successfully.
           You now have access to all the premium features.
         </ThemedText>
-        
+
         <TouchableOpacity
           style={styles.button}
           onPress={() => router.push('/subscription')}
         >
           <Text style={styles.buttonText}>View My Subscription</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.button, styles.secondaryButton]}
           onPress={() => router.push('/')}

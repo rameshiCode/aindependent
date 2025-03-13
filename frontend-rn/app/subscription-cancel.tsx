@@ -11,27 +11,27 @@ export default function SubscriptionCancelScreen() {
     <ThemedView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Image 
-            source={require('../assets/images/info-circle.png')} 
+          <Image
+            source={require('../assets/images/info-circle.png')}
             style={styles.icon}
             resizeMode="contain"
           />
         </View>
-        
+
         <ThemedText style={styles.title}>Subscription Canceled</ThemedText>
-        
+
         <ThemedText style={styles.message}>
           Your subscription process was canceled. No charges have been made to your account.
           You can subscribe anytime when you're ready.
         </ThemedText>
-        
+
         <TouchableOpacity
           style={styles.button}
           onPress={() => router.push('/subscription')}
         >
           <Text style={styles.buttonText}>Return to Subscription</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.button, styles.secondaryButton]}
           onPress={() => router.push('/')}

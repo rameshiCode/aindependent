@@ -70,7 +70,7 @@ export default function SubscriptionScreen() {
     try {
       setLoading(true);
       const plan = plans.find(p => p.id === selectedPlan);
-      
+
       if (!plan) {
         Alert.alert('Error', 'Invalid plan selected');
         return;
@@ -78,7 +78,7 @@ export default function SubscriptionScreen() {
 
       // Create customer if needed
       await axios.post(`${OpenAPI.BASE}/api/v1/stripe/create-customer`);
-      
+
       // Create checkout session
       const response = await axios.post(`${OpenAPI.BASE}/api/v1/stripe/create-checkout-session`, {
         price_id: plan.stripe_price_id,
@@ -136,7 +136,7 @@ export default function SubscriptionScreen() {
       const response = await axios.post(`${OpenAPI.BASE}/api/v1/stripe/create-customer-portal-session`, {
         return_url: `${OpenAPI.BASE}/subscription`
       });
-      
+
       // Open the customer portal URL in a WebView
       router.push({
         pathname: '/web-view',
@@ -162,7 +162,7 @@ export default function SubscriptionScreen() {
     <ThemedView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <ThemedText style={styles.title}>Subscription Plans</ThemedText>
-        
+
         {currentSubscription ? (
           <View style={styles.currentSubscriptionContainer}>
             <ThemedText style={styles.currentSubscriptionTitle}>Current Subscription</ThemedText>
@@ -181,7 +181,7 @@ export default function SubscriptionScreen() {
               >
                 <Text style={styles.buttonText}>Manage Subscription</Text>
               </TouchableOpacity>
-              
+
               {!currentSubscription.cancel_at_period_end && (
                 <TouchableOpacity
                   style={[styles.button, styles.cancelButton]}
@@ -195,7 +195,7 @@ export default function SubscriptionScreen() {
         ) : (
           <>
             <ThemedText style={styles.subtitle}>Choose a subscription plan</ThemedText>
-            
+
             {plans.map((plan) => (
               <TouchableOpacity
                 key={plan.id}
@@ -210,7 +210,7 @@ export default function SubscriptionScreen() {
                 <ThemedText style={styles.planPrice}>${plan.price}/{plan.interval}</ThemedText>
               </TouchableOpacity>
             ))}
-            
+
             <TouchableOpacity
               style={[styles.button, styles.subscribeButton, !selectedPlan && styles.disabledButton]}
               onPress={handleSubscribe}

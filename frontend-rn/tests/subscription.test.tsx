@@ -51,12 +51,12 @@ describe('SubscriptionScreen', () => {
     expect(getByText('Premium Plan')).toBeTruthy();
     expect(getByText('$30/month')).toBeTruthy();
     expect(getByText('$50/month')).toBeTruthy();
-    
+
     // Check that the subscribe button is rendered but disabled
     const subscribeButton = getByText('Subscribe Now');
     expect(subscribeButton).toBeTruthy();
     expect(subscribeButton.props.disabled).toBeTruthy();
-    
+
     // Check that current subscription section is not rendered
     expect(queryByText('Current Subscription')).toBeNull();
   });
@@ -93,7 +93,7 @@ describe('SubscriptionScreen', () => {
         data: [],
       },
     });
-    
+
     (axios.post as jest.Mock).mockImplementation((url) => {
       if (url === 'http://localhost:8000/api/v1/stripe/create-customer') {
         return Promise.resolve({ data: { message: 'Customer created successfully' } });
@@ -159,7 +159,7 @@ describe('SubscriptionScreen', () => {
         },
       },
     };
-    
+
     (axios.get as jest.Mock).mockResolvedValueOnce({
       data: {
         count: 1,
@@ -179,7 +179,7 @@ describe('SubscriptionScreen', () => {
     expect(getByText('Status: active')).toBeTruthy();
     expect(getByText('Manage Subscription')).toBeTruthy();
     expect(getByText('Cancel Subscription')).toBeTruthy();
-    
+
     // Check that subscription plans are not rendered
     expect(queryByText('Choose a subscription plan')).toBeNull();
   });
@@ -212,14 +212,14 @@ describe('SubscriptionScreen', () => {
         },
       },
     };
-    
+
     (axios.get as jest.Mock).mockResolvedValueOnce({
       data: {
         count: 1,
         data: [mockSubscription],
       },
     });
-    
+
     (axios.post as jest.Mock).mockResolvedValueOnce({
       data: { url: 'https://billing.stripe.com/test' },
     });
@@ -274,14 +274,14 @@ describe('SubscriptionScreen', () => {
         },
       },
     };
-    
+
     (axios.get as jest.Mock).mockResolvedValueOnce({
       data: {
         count: 1,
         data: [mockSubscription],
       },
     });
-    
+
     // Mock Alert.alert
     const mockAlert = jest.spyOn(require('react-native'), 'Alert', 'get');
     const mockAlertFn = jest.fn();
