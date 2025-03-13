@@ -12,7 +12,7 @@ export default function SubscriptionCancelScreen() {
       <View style={styles.content}>
         <View style={styles.iconContainer}>
           <Image
-            source={require('../assets/images/info-circle.png')}
+            // source={require('../assets/images/info-circle.png')}
             style={styles.icon}
             resizeMode="contain"
           />

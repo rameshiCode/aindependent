@@ -2,7 +2,7 @@ import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
-import SubscriptionScreen from '../app/subscription';
+import SubscriptionScreen from '../app/(tabs)/subscription';
 
 // Mock dependencies
 jest.mock('expo-router', () => ({

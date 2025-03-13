@@ -1,15 +1,12 @@
 import React from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { OpenAPI, UtilsService } from '@/src/client';
+import { healthCheckOptions } from '@/src/client/@tanstack/react-query.gen';
 
 export default function HealthCheckScreen() {
-  const fullUrl = `${OpenAPI.BASE}/api/v1/utils/health-check/`;
-  console.log("Calling health check at:", fullUrl);
 
   const { data, error, isLoading } = useQuery({
-    queryKey: ['health-check'],
-    queryFn: () => UtilsService.healthCheck(),
+    ...healthCheckOptions(),
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,

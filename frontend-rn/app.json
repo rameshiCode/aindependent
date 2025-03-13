@@ -33,6 +33,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.example",
+          "publishableKey": "pk_test_123",
+          "urlScheme": "myapp"
+        }
       ]
     ],
     "experiments": {

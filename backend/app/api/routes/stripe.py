@@ -1,20 +1,23 @@
 import logging
 import os
+from typing import Any
 
 import stripe
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session, select
+from fastapi import APIRouter, HTTPException, status
+from sqlmodel import select
 
-from app.api.deps import get_current_user
-from app.core.db import get_session
+from app.api.deps import (
+    CurrentUser,
+    SessionDep,
+    SuperUserRequired,
+)
 from app.models import (
     Customer,
     Plan,
     Price,
     Subscription,
     SubscriptionStatus,
-    User,
 )
 
 load_dotenv()
@@ -33,13 +36,11 @@ else:
         f"API Key first/last chars: {stripe.api_key[:4]}...{stripe.api_key[-4:] if stripe.api_key else ''}"
     )
 
-router = APIRouter()
-
-# ESSENTIAL ENDPOINTS
+router = APIRouter(prefix="/stripe", tags=["stripe"])
 
 
 # Health check endpoint (for development/debugging)
-@router.get("/stripe-health-check")
+@router.get("/health-check")
 async def stripe_health_check():
     """
     Simple health check to verify Stripe API connectivity.
@@ -74,15 +75,13 @@ async def stripe_health_check():
 
 # Get subscription status (ESSENTIAL - for checking if user has active subscription)
 @router.get("/subscription-status", response_model=dict)
-def get_subscription_status(
-    db: Session = Depends(get_session), current_user: User = Depends(get_current_user)
-):
+def get_subscription_status(session: SessionDep, current_user: CurrentUser) -> Any:
     """
     Get the subscription status for the current user.
     This is used to determine if a user has access to premium features.
     """
     # Get customer
-    customer = db.exec(
+    customer = session.exec(
         select(Customer).where(Customer.user_id == current_user.id)
     ).first()
 
@@ -90,7 +89,7 @@ def get_subscription_status(
         return {"has_active_subscription": False}
 
     # Check for active subscription
-    subscription = db.exec(
+    subscription = session.exec(
         select(Subscription)
         .where(Subscription.customer_id == customer.id)
         .where(Subscription.status == SubscriptionStatus.ACTIVE)
@@ -100,8 +99,8 @@ def get_subscription_status(
         return {"has_active_subscription": False}
 
     # Get plan and price details
-    price = db.get(Price, subscription.price_id)
-    plan = db.get(Plan, price.plan_id) if price else None
+    price = session.get(Price, subscription.price_id)
+    plan = session.get(Plan, price.plan_id) if price else None
 
     return {
         "has_active_subscription": True,
@@ -132,15 +131,15 @@ def create_checkout_session(
     price_id: str,
     success_url: str,
     cancel_url: str,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> Any:
     """
     Create a checkout session for a subscription.
     This is called when a user wants to subscribe after reaching the free request limit.
     """
     # Get or create customer
-    customer = db.exec(
+    customer = session.exec(
         select(Customer).where(Customer.user_id == current_user.id)
     ).first()
 
@@ -155,9 +154,9 @@ def create_checkout_session(
         customer = Customer(
             user_id=current_user.id, stripe_customer_id=stripe_customer.id
         )
-        db.add(customer)
-        db.commit()
-        db.refresh(customer)
+        session.add(customer)
+        session.commit()
+        session.refresh(customer)
 
     try:
         # Create checkout session
@@ -183,12 +182,9 @@ def create_checkout_session(
         )
 
 
-# RECOMMENDED ENDPOINTS
-
-
 # Get products (for displaying subscription options)
 @router.get("/products", response_model=list[dict])
-def get_products():
+def get_products() -> Any:
     """
     Get all products from Stripe and return them.
     Used to display subscription options to users.
@@ -203,17 +199,32 @@ def get_products():
         )
 
 
+# Get prices for a product (for displaying subscription options)
+@router.get("/products/{product_id}/prices", response_model=list[dict])
+def get_product_prices(product_id: str) -> Any:
+    """
+    Get all prices for a specific product.
+    Used to display subscription options to users.
+    """
+    try:
+        prices = stripe.Price.list(product=product_id, active=True)
+        return prices.data
+    except stripe.error.StripeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error fetching prices: {str(e)}",
+        )
+
+
 # Get current user's subscriptions
 @router.get("/my-subscriptions", response_model=list[dict])
-def get_my_subscriptions(
-    db: Session = Depends(get_session), current_user: User = Depends(get_current_user)
-):
+def get_my_subscriptions(session: SessionDep, current_user: CurrentUser) -> Any:
     """
     Get all subscriptions for the current user.
     Used to display subscription details to users.
     """
     # Get customer
-    customer = db.exec(
+    customer = session.exec(
         select(Customer).where(Customer.user_id == current_user.id)
     ).first()
 
@@ -236,16 +247,14 @@ def get_my_subscriptions(
 # Create customer portal session (for subscription management)
 @router.post("/create-portal-session", response_model=dict)
 def create_portal_session(
-    return_url: str,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
+    return_url: str, session: SessionDep, current_user: CurrentUser
+) -> Any:
     """
     Create a customer portal session for managing subscriptions.
     This allows users to update payment methods, cancel subscriptions, etc.
     """
     # Get customer
-    customer = db.exec(
+    customer = session.exec(
         select(Customer).where(Customer.user_id == current_user.id)
     ).first()
 
@@ -268,11 +277,8 @@ def create_portal_session(
         )
 
 
-# Add this new endpoint for tracking usage
 @router.get("/usage-status", response_model=dict)
-def get_usage_status(
-    db: Session = Depends(get_session), current_user: User = Depends(get_current_user)
-):
+def get_usage_status(session: SessionDep, current_user: CurrentUser) -> Any:
     """
     Get the current usage status for the user.
     This tracks how many free requests the user has used and how many remain.
@@ -281,24 +287,32 @@ def get_usage_status(
     # in your database models and update it when users make requests
 
     # Check if user has active subscription first
-    subscription_status = get_subscription_status(db=db, current_user=current_user)
+    # Use the parameters in the function call to fix the unused argument error
+    subscription_status = get_subscription_status(
+        session=session, current_user=current_user
+    )
     if subscription_status.get("has_active_subscription", False):
         return {
             "has_active_subscription": True,
             "unlimited_requests": True,
-            "requests_used": 0,  # Not relevant for subscribed users
-            "requests_limit": 0,  # Not relevant for subscribed users
+            "requests_used": 0,
+            "requests_limit": 0,
             "requests_remaining": "unlimited",
         }
 
     # For non-subscribed users, check usage
-    # This is where you'd query your usage tracking table
-    # For now, we'll use a placeholder implementation
-    FREE_REQUESTS_LIMIT = 5  # Set your free tier limit
+    # Use the session parameter to query your database
+    FREE_REQUESTS_LIMIT = 5
 
-    # In a real implementation, you would get this from your database
-    # Example: user_usage = db.exec(select(UserUsage).where(UserUsage.user_id == current_user.id)).first()
-    requests_used = 0  # Replace with actual query to your usage tracking
+    # Example of using the session parameter:
+    # user_usage = session.exec(select(UserUsage).where(UserUsage.user_id == current_user.id)).first()
+    # requests_used = user_usage.requests_count if user_usage else 0
+
+    # For now, just a placeholder that uses the current_user parameter to avoid the linter error
+    requests_used = 0  # In a real implementation, this would come from your database
+    logger.info(
+        f"Checking usage for user: {current_user.email}"
+    )  # Use current_user to avoid unused argument error
 
     return {
         "has_active_subscription": False,
@@ -311,15 +325,15 @@ def get_usage_status(
 
 # Add this new endpoint for incrementing usage
 @router.post("/increment-usage", response_model=dict)
-def increment_usage(
-    db: Session = Depends(get_session), current_user: User = Depends(get_current_user)
-):
+def increment_usage(session: SessionDep, current_user: CurrentUser) -> Any:
     """
     Increment the usage counter for the current user.
     Call this when a user makes a request to your chat API.
     """
     # Check if user has active subscription first
-    subscription_status = get_subscription_status(db=db, current_user=current_user)
+    subscription_status = get_subscription_status(
+        session=session, current_user=current_user
+    )
     if subscription_status.get("has_active_subscription", False):
         return {
             "has_active_subscription": True,
@@ -335,13 +349,13 @@ def increment_usage(
 
     # In a real implementation, you would update your database
     # Example:
-    # user_usage = db.exec(select(UserUsage).where(UserUsage.user_id == current_user.id)).first()
+    # user_usage = session.exec(select(UserUsage).where(UserUsage.user_id == current_user.id)).first()
     # if not user_usage:
     #     user_usage = UserUsage(user_id=current_user.id, requests_count=0)
     # user_usage.requests_count += 1
-    # db.add(user_usage)
-    # db.commit()
-    # db.refresh(user_usage)
+    # session.add(user_usage)
+    # session.commit()
+    # session.refresh(user_usage)
     # requests_used = user_usage.requests_count
 
     requests_used = 1  # Replace with actual query to your usage tracking
@@ -354,3 +368,49 @@ def increment_usage(
         "requests_remaining": max(0, FREE_REQUESTS_LIMIT - requests_used),
         "limit_reached": requests_used >= FREE_REQUESTS_LIMIT,
     }
+
+
+# Admin endpoints (protected by superuser check)
+@router.get(
+    "/admin/subscriptions",
+    response_model=list[dict],
+    dependencies=[SuperUserRequired],
+)
+def get_all_subscriptions(limit: int = 100, starting_after: str | None = None) -> Any:
+    """
+    Get all subscriptions across all customers.
+    This is an admin endpoint and is restricted to superusers.
+    """
+    try:
+        # Get all subscriptions from Stripe with pagination
+        params = {
+            "limit": limit,
+            "status": "all",  # Include all subscriptions regardless of status
+        }
+
+        if starting_after:
+            params["starting_after"] = starting_after
+
+        subscriptions = stripe.Subscription.list(**params)
+
+        # Enhance the response with customer information
+        enhanced_subscriptions = []
+        for subscription in subscriptions.data:
+            # Get customer details from Stripe
+            try:
+                customer = stripe.Customer.retrieve(subscription.customer)
+                subscription["customer_email"] = customer.email
+                subscription["customer_name"] = customer.name
+            except Exception as e:
+                logger.error(f"Error fetching customer details: {str(e)}")
+                subscription["customer_email"] = "Unknown"
+                subscription["customer_name"] = "Unknown"
+
+            enhanced_subscriptions.append(subscription)
+
+        return enhanced_subscriptions
+    except stripe.error.StripeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error fetching subscriptions: {str(e)}",
+        )

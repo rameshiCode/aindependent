@@ -12,7 +12,7 @@ export default function SubscriptionSuccessScreen() {
       <View style={styles.content}>
         <View style={styles.iconContainer}>
           <Image
-            source={require('../assets/images/check-circle.png')}
+            // source={require('../assets/images/check-circle.png')}
             style={styles.icon}
             resizeMode="contain"
           />

@@ -7,14 +7,29 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import Constants from 'expo-constants';
-import { OpenAPI } from '@/src/client';
+// import { OpenAPI } from '@/src/client';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useReactQueryDevTools } from '@dev-plugins/react-query';
+import { client } from '@/src/client/client.gen';
 
 
-OpenAPI.BASE = Constants.expoConfig?.extra?.API_URL || 'http://localhost:8000';
+client.setConfig({
+  baseUrl: Constants.expoConfig?.extra?.API_URL || 'http://localhost:8000',
+  auth: () => '',
+});
+
+client.interceptors.request.use(async (request) => {
+  console.log(`Request: ${request}`);
+  return request;
+});
+
+client.interceptors.response.use((response) => {
+  console.log(`Response: ${response}`);
+  return response;
+});
+
 const queryClient = new QueryClient();
 
 // Stripe publishable key - replace with your actual key from environment
@@ -42,8 +57,8 @@ export default function RootLayout() {
   }
 
   return (
-    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
       <QueryClientProvider client={queryClient}>
+    {/* <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}> */}
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -53,7 +68,7 @@ export default function RootLayout() {
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>
+    {/* </StripeProvider> */}
       </QueryClientProvider>
-    </StripeProvider>
   );
 }
