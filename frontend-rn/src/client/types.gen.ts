@@ -9,10 +9,10 @@ export type BodyLoginLoginForAccessToken = {
   client_secret?: string | null
 }
 
-export type CheckoutSessionCreate = {
-  price_id: string
-  success_url: string
-  cancel_url: string
+export type GoogleAuthRequest = {
+  code: string
+  codeVerifier: string
+  platform: string
 }
 
 export type HttpValidationError = {
@@ -84,26 +84,10 @@ export type ValidationError = {
   type: string
 }
 
-export type LoginLoginGoogleData = {
-  body?: never
+export type LoginAuthGoogleData = {
+  body: GoogleAuthRequest
   path?: never
   query?: never
-  url: "/api/v1/login/google"
-}
-
-export type LoginLoginGoogleResponses = {
-  /**
-   * Successful Response
-   */
-  200: unknown
-}
-
-export type LoginAuthGoogleData = {
-  body?: never
-  path?: never
-  query: {
-    code: string
-  }
   url: "/api/v1/login/auth/google"
 }
 
@@ -118,6 +102,49 @@ export type LoginAuthGoogleError =
   LoginAuthGoogleErrors[keyof LoginAuthGoogleErrors]
 
 export type LoginAuthGoogleResponses = {
+  /**
+   * Successful Response
+   */
+  200: Token
+}
+
+export type LoginAuthGoogleResponse =
+  LoginAuthGoogleResponses[keyof LoginAuthGoogleResponses]
+
+export type LoginLoginGoogle1Data = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/login/google1"
+}
+
+export type LoginLoginGoogle1Responses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type LoginAuthGoogle1Data = {
+  body?: never
+  path?: never
+  query: {
+    code: string
+  }
+  url: "/api/v1/login/auth/google1"
+}
+
+export type LoginAuthGoogle1Errors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type LoginAuthGoogle1Error =
+  LoginAuthGoogle1Errors[keyof LoginAuthGoogle1Errors]
+
+export type LoginAuthGoogle1Responses = {
   /**
    * Successful Response
    */
@@ -833,52 +860,6 @@ export type StripeListPaymentMethodsResponses = {
 
 export type StripeListPaymentMethodsResponse =
   StripeListPaymentMethodsResponses[keyof StripeListPaymentMethodsResponses]
-
-export type StripeGetProductsData = {
-  body?: never
-  path?: never
-  query?: never
-  url: "/api/v1/stripe/products"
-}
-
-export type StripeGetProductsResponses = {
-  /**
-   * Successful Response
-   */
-  200: Array<unknown>
-}
-
-export type StripeGetProductsResponse =
-  StripeGetProductsResponses[keyof StripeGetProductsResponses]
-
-export type StripeGetProductPricesData = {
-  body?: never
-  path: {
-    product_id: string
-  }
-  query?: never
-  url: "/api/v1/stripe/products/{product_id}/prices"
-}
-
-export type StripeGetProductPricesErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError
-}
-
-export type StripeGetProductPricesError =
-  StripeGetProductPricesErrors[keyof StripeGetProductPricesErrors]
-
-export type StripeGetProductPricesResponses = {
-  /**
-   * Successful Response
-   */
-  200: Array<unknown>
-}
-
-export type StripeGetProductPricesResponse =
-  StripeGetProductPricesResponses[keyof StripeGetProductPricesResponses]
 
 export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})

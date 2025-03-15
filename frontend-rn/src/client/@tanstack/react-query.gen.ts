@@ -5,7 +5,7 @@ import {
   LoginService,
   UsersService,
   UtilsService,
-  StripeService,
+  ItemsService,
 } from "../sdk.gen"
 import {
   queryOptions,
@@ -13,8 +13,11 @@ import {
   type DefaultError,
 } from "@tanstack/react-query"
 import type {
-  LoginLoginGoogleData,
   LoginAuthGoogleData,
+  LoginAuthGoogleError,
+  LoginAuthGoogleResponse,
+  LoginLoginGoogle1Data,
+  LoginAuthGoogle1Data,
   LoginLoginForAccessTokenData,
   LoginLoginForAccessTokenError,
   LoginLoginForAccessTokenResponse,
@@ -56,30 +59,17 @@ import type {
   UtilsTestEmailError,
   UtilsTestEmailResponse,
   UtilsHealthCheckData,
-  StripeStripeWebhookData,
-  StripeStripeWebhookError,
-  StripeStripeWebhookResponse,
-  StripeStripeHealthCheckData,
-  StripeGetSubscriptionStatusData,
-  StripeCreateCheckoutSessionData,
-  StripeCreateCheckoutSessionError,
-  StripeCreateCheckoutSessionResponse,
-  StripeCreatePortalSessionData,
-  StripeCreatePortalSessionError,
-  StripeCreatePortalSessionResponse,
-  StripeGetUsageStatusData,
-  StripeIncrementUsageData,
-  StripeIncrementUsageResponse,
-  StripeGetAllSubscriptionsData,
-  StripeCreateSubscriptionWithPaymentMethodData,
-  StripeCreateSubscriptionWithPaymentMethodError,
-  StripeCreateSubscriptionWithPaymentMethodResponse,
-  StripeCancelSubscriptionData,
-  StripeCancelSubscriptionError,
-  StripeCancelSubscriptionResponse,
-  StripeListPaymentMethodsData,
-  StripeGetProductsData,
-  StripeGetProductPricesData,
+  ItemsReadItemsData,
+  ItemsCreateItemData,
+  ItemsCreateItemError,
+  ItemsCreateItemResponse,
+  ItemsDeleteItemData,
+  ItemsDeleteItemError,
+  ItemsDeleteItemResponse,
+  ItemsReadItemData,
+  ItemsUpdateItemData,
+  ItemsUpdateItemError,
+  ItemsUpdateItemResponse,
 } from "../types.gen"
 import { client as _heyApiClient } from "../client.gen"
 
@@ -117,13 +107,36 @@ const createQueryKey = <TOptions extends Options>(
   return [params]
 }
 
-export const loginGoogleQueryKey = (options?: Options<LoginLoginGoogleData>) =>
-  createQueryKey("loginLoginGoogle", options)
+export const authGoogleMutation = (
+  options?: Partial<Options<LoginAuthGoogleData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    LoginAuthGoogleResponse,
+    LoginAuthGoogleError,
+    Options<LoginAuthGoogleData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await LoginService.authGoogle({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
 
-export const loginGoogleOptions = (options?: Options<LoginLoginGoogleData>) => {
+export const loginGoogle1QueryKey = (
+  options?: Options<LoginLoginGoogle1Data>,
+) => createQueryKey("loginLoginGoogle1", options)
+
+export const loginGoogle1Options = (
+  options?: Options<LoginLoginGoogle1Data>,
+) => {
   return queryOptions({
     queryFn: async ({ queryKey, signal }) => {
-      const { data } = await LoginService.loginGoogle({
+      const { data } = await LoginService.loginGoogle1({
         ...options,
         ...queryKey[0],
         signal,
@@ -131,17 +144,17 @@ export const loginGoogleOptions = (options?: Options<LoginLoginGoogleData>) => {
       })
       return data
     },
-    queryKey: loginGoogleQueryKey(options),
+    queryKey: loginGoogle1QueryKey(options),
   })
 }
 
-export const authGoogleQueryKey = (options: Options<LoginAuthGoogleData>) =>
-  createQueryKey("loginAuthGoogle", options)
+export const authGoogle1QueryKey = (options: Options<LoginAuthGoogle1Data>) =>
+  createQueryKey("loginAuthGoogle1", options)
 
-export const authGoogleOptions = (options: Options<LoginAuthGoogleData>) => {
+export const authGoogle1Options = (options: Options<LoginAuthGoogle1Data>) => {
   return queryOptions({
     queryFn: async ({ queryKey, signal }) => {
-      const { data } = await LoginService.authGoogle({
+      const { data } = await LoginService.authGoogle1({
         ...options,
         ...queryKey[0],
         signal,
@@ -149,7 +162,66 @@ export const authGoogleOptions = (options: Options<LoginAuthGoogleData>) => {
       })
       return data
     },
-    queryKey: authGoogleQueryKey(options),
+    queryKey: authGoogle1QueryKey(options),
+  })
+}
+
+export const authGoogleMutation = (
+  options?: Partial<Options<LoginAuthGoogleData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    LoginAuthGoogleResponse,
+    LoginAuthGoogleError,
+    Options<LoginAuthGoogleData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await LoginService.authGoogle({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const loginGoogle1QueryKey = (
+  options?: Options<LoginLoginGoogle1Data>,
+) => createQueryKey("loginLoginGoogle1", options)
+
+export const loginGoogle1Options = (
+  options?: Options<LoginLoginGoogle1Data>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await LoginService.loginGoogle1({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: loginGoogle1QueryKey(options),
+  })
+}
+
+export const authGoogle1QueryKey = (options: Options<LoginAuthGoogle1Data>) =>
+  createQueryKey("loginAuthGoogle1", options)
+
+export const authGoogle1Options = (options: Options<LoginAuthGoogle1Data>) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await LoginService.authGoogle1({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: authGoogle1QueryKey(options),
   })
 }
 
@@ -870,169 +942,4 @@ export const incrementUsageMutation = (
     },
   }
   return mutationOptions
-}
-
-export const getAllSubscriptionsQueryKey = (
-  options?: Options<StripeGetAllSubscriptionsData>,
-) => createQueryKey("stripeGetAllSubscriptions", options)
-
-export const getAllSubscriptionsOptions = (
-  options?: Options<StripeGetAllSubscriptionsData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await StripeService.getAllSubscriptions({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: getAllSubscriptionsQueryKey(options),
-  })
-}
-
-export const createSubscriptionWithPaymentMethodQueryKey = (
-  options: Options<StripeCreateSubscriptionWithPaymentMethodData>,
-) => createQueryKey("stripeCreateSubscriptionWithPaymentMethod", options)
-
-export const createSubscriptionWithPaymentMethodOptions = (
-  options: Options<StripeCreateSubscriptionWithPaymentMethodData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await StripeService.createSubscriptionWithPaymentMethod({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: createSubscriptionWithPaymentMethodQueryKey(options),
-  })
-}
-
-export const createSubscriptionWithPaymentMethodMutation = (
-  options?: Partial<Options<StripeCreateSubscriptionWithPaymentMethodData>>,
-) => {
-  const mutationOptions: UseMutationOptions<
-    StripeCreateSubscriptionWithPaymentMethodResponse,
-    StripeCreateSubscriptionWithPaymentMethodError,
-    Options<StripeCreateSubscriptionWithPaymentMethodData>
-  > = {
-    mutationFn: async (localOptions) => {
-      const { data } = await StripeService.createSubscriptionWithPaymentMethod({
-        ...options,
-        ...localOptions,
-        throwOnError: true,
-      })
-      return data
-    },
-  }
-  return mutationOptions
-}
-
-export const cancelSubscriptionQueryKey = (
-  options: Options<StripeCancelSubscriptionData>,
-) => createQueryKey("stripeCancelSubscription", options)
-
-export const cancelSubscriptionOptions = (
-  options: Options<StripeCancelSubscriptionData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await StripeService.cancelSubscription({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: cancelSubscriptionQueryKey(options),
-  })
-}
-
-export const cancelSubscriptionMutation = (
-  options?: Partial<Options<StripeCancelSubscriptionData>>,
-) => {
-  const mutationOptions: UseMutationOptions<
-    StripeCancelSubscriptionResponse,
-    StripeCancelSubscriptionError,
-    Options<StripeCancelSubscriptionData>
-  > = {
-    mutationFn: async (localOptions) => {
-      const { data } = await StripeService.cancelSubscription({
-        ...options,
-        ...localOptions,
-        throwOnError: true,
-      })
-      return data
-    },
-  }
-  return mutationOptions
-}
-
-export const listPaymentMethodsQueryKey = (
-  options?: Options<StripeListPaymentMethodsData>,
-) => createQueryKey("stripeListPaymentMethods", options)
-
-export const listPaymentMethodsOptions = (
-  options?: Options<StripeListPaymentMethodsData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await StripeService.listPaymentMethods({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: listPaymentMethodsQueryKey(options),
-  })
-}
-
-export const getProductsQueryKey = (options?: Options<StripeGetProductsData>) =>
-  createQueryKey("stripeGetProducts", options)
-
-export const getProductsOptions = (
-  options?: Options<StripeGetProductsData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await StripeService.getProducts({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: getProductsQueryKey(options),
-  })
-}
-
-export const getProductPricesQueryKey = (
-  options: Options<StripeGetProductPricesData>,
-) => createQueryKey("stripeGetProductPrices", options)
-
-export const getProductPricesOptions = (
-  options: Options<StripeGetProductPricesData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await StripeService.getProductPrices({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: getProductPricesQueryKey(options),
-  })
 }
