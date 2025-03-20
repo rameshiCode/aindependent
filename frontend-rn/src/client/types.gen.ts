@@ -9,6 +9,12 @@ export type BodyLoginLoginForAccessToken = {
   client_secret?: string | null
 }
 
+export type CheckoutSessionCreate = {
+  price_id: string
+  success_url: string
+  cancel_url: string
+}
+
 export type HttpValidationError = {
   detail?: Array<ValidationError>
 }
@@ -552,28 +558,60 @@ export type UtilsHealthCheckResponses = {
 export type UtilsHealthCheckResponse =
   UtilsHealthCheckResponses[keyof UtilsHealthCheckResponses]
 
-export type ApiStripeHealthCheckData = {
+export type StripeStripeWebhookData = {
+  body?: never
+  headers?: {
+    "stripe-signature"?: string
+  }
+  path?: never
+  query?: never
+  url: "/api/v1/stripe/webhook"
+}
+
+export type StripeStripeWebhookErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type StripeStripeWebhookError =
+  StripeStripeWebhookErrors[keyof StripeStripeWebhookErrors]
+
+export type StripeStripeWebhookResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type StripeStripeWebhookResponse =
+  StripeStripeWebhookResponses[keyof StripeStripeWebhookResponses]
+
+export type StripeStripeHealthCheckData = {
   body?: never
   path?: never
   query?: never
-  url: "/api/v1/stripe-health-check"
+  url: "/api/v1/stripe/health-check"
 }
 
-export type ApiStripeHealthCheckResponses = {
+export type StripeStripeHealthCheckResponses = {
   /**
    * Successful Response
    */
   200: unknown
 }
 
-export type ApiGetSubscriptionStatusData = {
+export type StripeGetSubscriptionStatusData = {
   body?: never
   path?: never
   query?: never
-  url: "/api/v1/subscription-status"
+  url: "/api/v1/stripe/subscription-status"
 }
 
-export type ApiGetSubscriptionStatusResponses = {
+export type StripeGetSubscriptionStatusResponses = {
   /**
    * Successful Response
    */
@@ -582,31 +620,27 @@ export type ApiGetSubscriptionStatusResponses = {
   }
 }
 
-export type ApiGetSubscriptionStatusResponse =
-  ApiGetSubscriptionStatusResponses[keyof ApiGetSubscriptionStatusResponses]
+export type StripeGetSubscriptionStatusResponse =
+  StripeGetSubscriptionStatusResponses[keyof StripeGetSubscriptionStatusResponses]
 
-export type ApiCreateCheckoutSessionData = {
-  body?: never
+export type StripeCreateCheckoutSessionData = {
+  body: CheckoutSessionCreate
   path?: never
-  query: {
-    price_id: string
-    success_url: string
-    cancel_url: string
-  }
-  url: "/api/v1/create-checkout-session"
+  query?: never
+  url: "/api/v1/stripe/create-checkout-session"
 }
 
-export type ApiCreateCheckoutSessionErrors = {
+export type StripeCreateCheckoutSessionErrors = {
   /**
    * Validation Error
    */
   422: HttpValidationError
 }
 
-export type ApiCreateCheckoutSessionError =
-  ApiCreateCheckoutSessionErrors[keyof ApiCreateCheckoutSessionErrors]
+export type StripeCreateCheckoutSessionError =
+  StripeCreateCheckoutSessionErrors[keyof StripeCreateCheckoutSessionErrors]
 
-export type ApiCreateCheckoutSessionResponses = {
+export type StripeCreateCheckoutSessionResponses = {
   /**
    * Successful Response
    */
@@ -615,67 +649,29 @@ export type ApiCreateCheckoutSessionResponses = {
   }
 }
 
-export type ApiCreateCheckoutSessionResponse =
-  ApiCreateCheckoutSessionResponses[keyof ApiCreateCheckoutSessionResponses]
+export type StripeCreateCheckoutSessionResponse =
+  StripeCreateCheckoutSessionResponses[keyof StripeCreateCheckoutSessionResponses]
 
-export type ApiGetProductsData = {
-  body?: never
-  path?: never
-  query?: never
-  url: "/api/v1/products"
-}
-
-export type ApiGetProductsResponses = {
-  /**
-   * Successful Response
-   */
-  200: Array<{
-    [key: string]: unknown
-  }>
-}
-
-export type ApiGetProductsResponse =
-  ApiGetProductsResponses[keyof ApiGetProductsResponses]
-
-export type ApiGetMySubscriptionsData = {
-  body?: never
-  path?: never
-  query?: never
-  url: "/api/v1/my-subscriptions"
-}
-
-export type ApiGetMySubscriptionsResponses = {
-  /**
-   * Successful Response
-   */
-  200: Array<{
-    [key: string]: unknown
-  }>
-}
-
-export type ApiGetMySubscriptionsResponse =
-  ApiGetMySubscriptionsResponses[keyof ApiGetMySubscriptionsResponses]
-
-export type ApiCreatePortalSessionData = {
+export type StripeCreatePortalSessionData = {
   body?: never
   path?: never
   query: {
     return_url: string
   }
-  url: "/api/v1/create-portal-session"
+  url: "/api/v1/stripe/create-portal-session"
 }
 
-export type ApiCreatePortalSessionErrors = {
+export type StripeCreatePortalSessionErrors = {
   /**
    * Validation Error
    */
   422: HttpValidationError
 }
 
-export type ApiCreatePortalSessionError =
-  ApiCreatePortalSessionErrors[keyof ApiCreatePortalSessionErrors]
+export type StripeCreatePortalSessionError =
+  StripeCreatePortalSessionErrors[keyof StripeCreatePortalSessionErrors]
 
-export type ApiCreatePortalSessionResponses = {
+export type StripeCreatePortalSessionResponses = {
   /**
    * Successful Response
    */
@@ -684,17 +680,17 @@ export type ApiCreatePortalSessionResponses = {
   }
 }
 
-export type ApiCreatePortalSessionResponse =
-  ApiCreatePortalSessionResponses[keyof ApiCreatePortalSessionResponses]
+export type StripeCreatePortalSessionResponse =
+  StripeCreatePortalSessionResponses[keyof StripeCreatePortalSessionResponses]
 
-export type ApiGetUsageStatusData = {
+export type StripeGetUsageStatusData = {
   body?: never
   path?: never
   query?: never
-  url: "/api/v1/usage-status"
+  url: "/api/v1/stripe/usage-status"
 }
 
-export type ApiGetUsageStatusResponses = {
+export type StripeGetUsageStatusResponses = {
   /**
    * Successful Response
    */
@@ -703,17 +699,17 @@ export type ApiGetUsageStatusResponses = {
   }
 }
 
-export type ApiGetUsageStatusResponse =
-  ApiGetUsageStatusResponses[keyof ApiGetUsageStatusResponses]
+export type StripeGetUsageStatusResponse =
+  StripeGetUsageStatusResponses[keyof StripeGetUsageStatusResponses]
 
-export type ApiIncrementUsageData = {
+export type StripeIncrementUsageData = {
   body?: never
   path?: never
   query?: never
-  url: "/api/v1/increment-usage"
+  url: "/api/v1/stripe/increment-usage"
 }
 
-export type ApiIncrementUsageResponses = {
+export type StripeIncrementUsageResponses = {
   /**
    * Successful Response
    */
@@ -722,8 +718,167 @@ export type ApiIncrementUsageResponses = {
   }
 }
 
-export type ApiIncrementUsageResponse =
-  ApiIncrementUsageResponses[keyof ApiIncrementUsageResponses]
+export type StripeIncrementUsageResponse =
+  StripeIncrementUsageResponses[keyof StripeIncrementUsageResponses]
+
+export type StripeGetAllSubscriptionsData = {
+  body?: never
+  path?: never
+  query?: {
+    limit?: number
+    starting_after?: string | null
+  }
+  url: "/api/v1/stripe/admin/subscriptions"
+}
+
+export type StripeGetAllSubscriptionsErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type StripeGetAllSubscriptionsError =
+  StripeGetAllSubscriptionsErrors[keyof StripeGetAllSubscriptionsErrors]
+
+export type StripeGetAllSubscriptionsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<{
+    [key: string]: unknown
+  }>
+}
+
+export type StripeGetAllSubscriptionsResponse =
+  StripeGetAllSubscriptionsResponses[keyof StripeGetAllSubscriptionsResponses]
+
+export type StripeCreateSubscriptionWithPaymentMethodData = {
+  body: {
+    [key: string]: unknown
+  }
+  path?: never
+  query?: never
+  url: "/api/v1/stripe/create-subscription-with-payment-method"
+}
+
+export type StripeCreateSubscriptionWithPaymentMethodErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type StripeCreateSubscriptionWithPaymentMethodError =
+  StripeCreateSubscriptionWithPaymentMethodErrors[keyof StripeCreateSubscriptionWithPaymentMethodErrors]
+
+export type StripeCreateSubscriptionWithPaymentMethodResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type StripeCreateSubscriptionWithPaymentMethodResponse =
+  StripeCreateSubscriptionWithPaymentMethodResponses[keyof StripeCreateSubscriptionWithPaymentMethodResponses]
+
+export type StripeCancelSubscriptionData = {
+  body?: never
+  path: {
+    subscription_id: string
+  }
+  query?: never
+  url: "/api/v1/stripe/cancel-subscription/{subscription_id}"
+}
+
+export type StripeCancelSubscriptionErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type StripeCancelSubscriptionError =
+  StripeCancelSubscriptionErrors[keyof StripeCancelSubscriptionErrors]
+
+export type StripeCancelSubscriptionResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type StripeCancelSubscriptionResponse =
+  StripeCancelSubscriptionResponses[keyof StripeCancelSubscriptionResponses]
+
+export type StripeListPaymentMethodsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/stripe/payment-methods"
+}
+
+export type StripeListPaymentMethodsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<{
+    [key: string]: unknown
+  }>
+}
+
+export type StripeListPaymentMethodsResponse =
+  StripeListPaymentMethodsResponses[keyof StripeListPaymentMethodsResponses]
+
+export type StripeGetProductsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/stripe/products"
+}
+
+export type StripeGetProductsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<unknown>
+}
+
+export type StripeGetProductsResponse =
+  StripeGetProductsResponses[keyof StripeGetProductsResponses]
+
+export type StripeGetProductPricesData = {
+  body?: never
+  path: {
+    product_id: string
+  }
+  query?: never
+  url: "/api/v1/stripe/products/{product_id}/prices"
+}
+
+export type StripeGetProductPricesErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type StripeGetProductPricesError =
+  StripeGetProductPricesErrors[keyof StripeGetProductPricesErrors]
+
+export type StripeGetProductPricesResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<unknown>
+}
+
+export type StripeGetProductPricesResponse =
+  StripeGetProductPricesResponses[keyof StripeGetProductPricesResponses]
 
 export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})

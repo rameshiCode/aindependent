@@ -1,10 +1,29 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { healthCheckOptions } from '@/src/client/@tanstack/react-query.gen';
 
 export default function HealthCheckScreen() {
+  // Add this logging to see what's happening when the component mounts
+  useEffect(() => {
+    console.log('HealthCheckScreen mounted');
 
+    // Test the API endpoint directly with fetch
+    const testDirectFetch = async () => {
+      try {
+        console.log('Testing direct fetch to health check endpoint...');
+        const response = await fetch('http://100.78.104.99:8000/api/v1/utils/health-check/');
+        const data = await response.text();
+        console.log('Direct fetch successful:', data);
+      } catch (error) {
+        console.error('Direct fetch failed:', error);
+      }
+    };
+
+    testDirectFetch();
+  }, []);
+
+  // Continue with your normal React Query implementation
   const { data, error, isLoading } = useQuery({
     ...healthCheckOptions(),
     staleTime: 0,
@@ -12,6 +31,18 @@ export default function HealthCheckScreen() {
     refetchOnWindowFocus: true,
     refetchInterval: 30000
   });
+
+  // Log when data changes
+  useEffect(() => {
+    console.log('Health check data:', data);
+  }, [data]);
+
+  // Log when error changes
+  useEffect(() => {
+    if (error) {
+      console.error('Health check error details:', error);
+    }
+  }, [error]);
 
   return (
     <View style={styles.container}>

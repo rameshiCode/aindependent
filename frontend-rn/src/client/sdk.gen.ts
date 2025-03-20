@@ -57,23 +57,38 @@ import type {
   UtilsTestEmailError,
   UtilsHealthCheckData,
   UtilsHealthCheckResponse,
-  ApiStripeHealthCheckData,
-  ApiGetSubscriptionStatusData,
-  ApiGetSubscriptionStatusResponse,
-  ApiCreateCheckoutSessionData,
-  ApiCreateCheckoutSessionResponse,
-  ApiCreateCheckoutSessionError,
-  ApiGetProductsData,
-  ApiGetProductsResponse,
-  ApiGetMySubscriptionsData,
-  ApiGetMySubscriptionsResponse,
-  ApiCreatePortalSessionData,
-  ApiCreatePortalSessionResponse,
-  ApiCreatePortalSessionError,
-  ApiGetUsageStatusData,
-  ApiGetUsageStatusResponse,
-  ApiIncrementUsageData,
-  ApiIncrementUsageResponse,
+  StripeStripeWebhookData,
+  StripeStripeWebhookResponse,
+  StripeStripeWebhookError,
+  StripeStripeHealthCheckData,
+  StripeGetSubscriptionStatusData,
+  StripeGetSubscriptionStatusResponse,
+  StripeCreateCheckoutSessionData,
+  StripeCreateCheckoutSessionResponse,
+  StripeCreateCheckoutSessionError,
+  StripeCreatePortalSessionData,
+  StripeCreatePortalSessionResponse,
+  StripeCreatePortalSessionError,
+  StripeGetUsageStatusData,
+  StripeGetUsageStatusResponse,
+  StripeIncrementUsageData,
+  StripeIncrementUsageResponse,
+  StripeGetAllSubscriptionsData,
+  StripeGetAllSubscriptionsResponse,
+  StripeGetAllSubscriptionsError,
+  StripeCreateSubscriptionWithPaymentMethodData,
+  StripeCreateSubscriptionWithPaymentMethodResponse,
+  StripeCreateSubscriptionWithPaymentMethodError,
+  StripeCancelSubscriptionData,
+  StripeCancelSubscriptionResponse,
+  StripeCancelSubscriptionError,
+  StripeListPaymentMethodsData,
+  StripeListPaymentMethodsResponse,
+  StripeGetProductsData,
+  StripeGetProductsResponse,
+  StripeGetProductPricesData,
+  StripeGetProductPricesResponse,
+  StripeGetProductPricesError,
 } from "./types.gen"
 import { client as _heyApiClient } from "./client.gen"
 
@@ -523,22 +538,38 @@ export class UtilsService {
   }
 }
 
-export class DefaultService {
+export class StripeService {
+  /**
+   * Stripe Webhook
+   */
+  public static stripeWebhook<ThrowOnError extends boolean = false>(
+    options?: Options<StripeStripeWebhookData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).post<
+      StripeStripeWebhookResponse,
+      StripeStripeWebhookError,
+      ThrowOnError
+    >({
+      url: "/api/v1/stripe/webhook",
+      ...options,
+    })
+  }
+
   /**
    * Stripe Health Check
    * Simple health check to verify Stripe API connectivity.
    * This endpoint doesn't require authentication and can be used
    * to check if your server can communicate with Stripe.
    */
-  public static apiStripeHealthCheck<ThrowOnError extends boolean = false>(
-    options?: Options<ApiStripeHealthCheckData, ThrowOnError>,
+  public static stripeHealthCheck<ThrowOnError extends boolean = false>(
+    options?: Options<StripeStripeHealthCheckData, ThrowOnError>,
   ) {
     return (options?.client ?? _heyApiClient).get<
       unknown,
       unknown,
       ThrowOnError
     >({
-      url: "/api/v1/stripe-health-check",
+      url: "/api/v1/stripe/health-check",
       ...options,
     })
   }
@@ -548,11 +579,11 @@ export class DefaultService {
    * Get the subscription status for the current user.
    * This is used to determine if a user has access to premium features.
    */
-  public static apiGetSubscriptionStatus<ThrowOnError extends boolean = false>(
-    options?: Options<ApiGetSubscriptionStatusData, ThrowOnError>,
+  public static getSubscriptionStatus<ThrowOnError extends boolean = false>(
+    options?: Options<StripeGetSubscriptionStatusData, ThrowOnError>,
   ) {
     return (options?.client ?? _heyApiClient).get<
-      ApiGetSubscriptionStatusResponse,
+      StripeGetSubscriptionStatusResponse,
       unknown,
       ThrowOnError
     >({
@@ -562,7 +593,7 @@ export class DefaultService {
           type: "http",
         },
       ],
-      url: "/api/v1/subscription-status",
+      url: "/api/v1/stripe/subscription-status",
       ...options,
     })
   }
@@ -572,12 +603,12 @@ export class DefaultService {
    * Create a checkout session for a subscription.
    * This is called when a user wants to subscribe after reaching the free request limit.
    */
-  public static apiCreateCheckoutSession<ThrowOnError extends boolean = false>(
-    options: Options<ApiCreateCheckoutSessionData, ThrowOnError>,
+  public static createCheckoutSession<ThrowOnError extends boolean = false>(
+    options: Options<StripeCreateCheckoutSessionData, ThrowOnError>,
   ) {
     return (options.client ?? _heyApiClient).post<
-      ApiCreateCheckoutSessionResponse,
-      ApiCreateCheckoutSessionError,
+      StripeCreateCheckoutSessionResponse,
+      StripeCreateCheckoutSessionError,
       ThrowOnError
     >({
       security: [
@@ -586,50 +617,12 @@ export class DefaultService {
           type: "http",
         },
       ],
-      url: "/api/v1/create-checkout-session",
+      url: "/api/v1/stripe/create-checkout-session",
       ...options,
-    })
-  }
-
-  /**
-   * Get Products
-   * Get all products from Stripe and return them.
-   * Used to display subscription options to users.
-   */
-  public static apiGetProducts<ThrowOnError extends boolean = false>(
-    options?: Options<ApiGetProductsData, ThrowOnError>,
-  ) {
-    return (options?.client ?? _heyApiClient).get<
-      ApiGetProductsResponse,
-      unknown,
-      ThrowOnError
-    >({
-      url: "/api/v1/products",
-      ...options,
-    })
-  }
-
-  /**
-   * Get My Subscriptions
-   * Get all subscriptions for the current user.
-   * Used to display subscription details to users.
-   */
-  public static apiGetMySubscriptions<ThrowOnError extends boolean = false>(
-    options?: Options<ApiGetMySubscriptionsData, ThrowOnError>,
-  ) {
-    return (options?.client ?? _heyApiClient).get<
-      ApiGetMySubscriptionsResponse,
-      unknown,
-      ThrowOnError
-    >({
-      security: [
-        {
-          scheme: "bearer",
-          type: "http",
-        },
-      ],
-      url: "/api/v1/my-subscriptions",
-      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
     })
   }
 
@@ -638,12 +631,12 @@ export class DefaultService {
    * Create a customer portal session for managing subscriptions.
    * This allows users to update payment methods, cancel subscriptions, etc.
    */
-  public static apiCreatePortalSession<ThrowOnError extends boolean = false>(
-    options: Options<ApiCreatePortalSessionData, ThrowOnError>,
+  public static createPortalSession<ThrowOnError extends boolean = false>(
+    options: Options<StripeCreatePortalSessionData, ThrowOnError>,
   ) {
     return (options.client ?? _heyApiClient).post<
-      ApiCreatePortalSessionResponse,
-      ApiCreatePortalSessionError,
+      StripeCreatePortalSessionResponse,
+      StripeCreatePortalSessionError,
       ThrowOnError
     >({
       security: [
@@ -652,7 +645,7 @@ export class DefaultService {
           type: "http",
         },
       ],
-      url: "/api/v1/create-portal-session",
+      url: "/api/v1/stripe/create-portal-session",
       ...options,
     })
   }
@@ -662,11 +655,11 @@ export class DefaultService {
    * Get the current usage status for the user.
    * This tracks how many free requests the user has used and how many remain.
    */
-  public static apiGetUsageStatus<ThrowOnError extends boolean = false>(
-    options?: Options<ApiGetUsageStatusData, ThrowOnError>,
+  public static getUsageStatus<ThrowOnError extends boolean = false>(
+    options?: Options<StripeGetUsageStatusData, ThrowOnError>,
   ) {
     return (options?.client ?? _heyApiClient).get<
-      ApiGetUsageStatusResponse,
+      StripeGetUsageStatusResponse,
       unknown,
       ThrowOnError
     >({
@@ -676,7 +669,7 @@ export class DefaultService {
           type: "http",
         },
       ],
-      url: "/api/v1/usage-status",
+      url: "/api/v1/stripe/usage-status",
       ...options,
     })
   }
@@ -686,11 +679,11 @@ export class DefaultService {
    * Increment the usage counter for the current user.
    * Call this when a user makes a request to your chat API.
    */
-  public static apiIncrementUsage<ThrowOnError extends boolean = false>(
-    options?: Options<ApiIncrementUsageData, ThrowOnError>,
+  public static incrementUsage<ThrowOnError extends boolean = false>(
+    options?: Options<StripeIncrementUsageData, ThrowOnError>,
   ) {
     return (options?.client ?? _heyApiClient).post<
-      ApiIncrementUsageResponse,
+      StripeIncrementUsageResponse,
       unknown,
       ThrowOnError
     >({
@@ -700,7 +693,155 @@ export class DefaultService {
           type: "http",
         },
       ],
-      url: "/api/v1/increment-usage",
+      url: "/api/v1/stripe/increment-usage",
+      ...options,
+    })
+  }
+
+  /**
+   * Get All Subscriptions
+   * Get all subscriptions across all customers.
+   * This is an admin endpoint and is restricted to superusers.
+   */
+  public static getAllSubscriptions<ThrowOnError extends boolean = false>(
+    options?: Options<StripeGetAllSubscriptionsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      StripeGetAllSubscriptionsResponse,
+      StripeGetAllSubscriptionsError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/admin/subscriptions",
+      ...options,
+    })
+  }
+
+  /**
+   * Create Subscription With Payment Method
+   * Create a subscription with an existing payment method.
+   */
+  public static createSubscriptionWithPaymentMethod<
+    ThrowOnError extends boolean = false,
+  >(
+    options: Options<
+      StripeCreateSubscriptionWithPaymentMethodData,
+      ThrowOnError
+    >,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      StripeCreateSubscriptionWithPaymentMethodResponse,
+      StripeCreateSubscriptionWithPaymentMethodError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/create-subscription-with-payment-method",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Cancel Subscription
+   * Cancel a subscription directly (without portal).
+   */
+  public static cancelSubscription<ThrowOnError extends boolean = false>(
+    options: Options<StripeCancelSubscriptionData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      StripeCancelSubscriptionResponse,
+      StripeCancelSubscriptionError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/cancel-subscription/{subscription_id}",
+      ...options,
+    })
+  }
+
+  /**
+   * List Payment Methods
+   * Get all payment methods for the current user.
+   */
+  public static listPaymentMethods<ThrowOnError extends boolean = false>(
+    options?: Options<StripeListPaymentMethodsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      StripeListPaymentMethodsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/payment-methods",
+      ...options,
+    })
+  }
+
+  /**
+   * Get Products
+   * Get all active products from Stripe
+   */
+  public static getProducts<ThrowOnError extends boolean = false>(
+    options?: Options<StripeGetProductsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      StripeGetProductsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/products",
+      ...options,
+    })
+  }
+
+  /**
+   * Get Product Prices
+   * Get all prices for a specific product
+   */
+  public static getProductPrices<ThrowOnError extends boolean = false>(
+    options: Options<StripeGetProductPricesData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).get<
+      StripeGetProductPricesResponse,
+      StripeGetProductPricesError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/products/{product_id}/prices",
       ...options,
     })
   }

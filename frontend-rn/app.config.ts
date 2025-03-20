@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
@@ -8,5 +9,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ...config?.extra,
     API_URL: process.env.API_URL || 'http://localhost:8000',
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-   },
+    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
+  },
 });

@@ -16,7 +16,7 @@ import { client } from '@/src/client/client.gen';
 
 
 client.setConfig({
-  baseUrl: Constants.expoConfig?.extra?.API_URL || 'http://localhost:8000',
+  baseUrl: Constants.expoConfig?.extra?.API_URL || 'http://100.78.104.99:8000',
   auth: () => '',
 });
 
@@ -33,7 +33,7 @@ client.interceptors.response.use((response) => {
 const queryClient = new QueryClient();
 
 // Stripe publishable key - replace with your actual key from environment
-const STRIPE_PUBLISHABLE_KEY = 'pk_test_your_stripe_key';
+const STRIPE_PUBLISHABLE_KEY = Constants.expoConfig?.extra?.STRIPE_PUBLISHABLE_KEY || '';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -52,15 +52,16 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
+  // Don't render until fonts are loaded
   if (!loaded) {
     return null;
   }
 
   return (
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
       <QueryClientProvider client={queryClient}>
-    {/* <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}> */}
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
+          <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="subscription" options={{ title: 'Subscription' }} />
             <Stack.Screen name="web-view" options={{ title: 'Checkout', headerBackTitle: 'Back' }} />
@@ -68,7 +69,7 @@ export default function RootLayout() {
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>
-    {/* </StripeProvider> */}
       </QueryClientProvider>
+    </StripeProvider>
   );
 }

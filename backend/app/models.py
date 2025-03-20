@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-from pydantic import EmailStr
+from pydantic import BaseModel, EmailStr
 from sqlmodel import Column, Field, Relationship, SQLModel, String
 
 
@@ -76,6 +76,21 @@ class TokenPayload(SQLModel):
 class NewPassword(SQLModel):
     token: str
     new_password: str = Field(min_length=8, max_length=40)
+
+
+class UsageRecord(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    count: int = 0
+    last_request_at: datetime = Field(default_factory=datetime.utcnow)
+
+    user: User = Relationship()
+
+
+class CheckoutSessionCreate(BaseModel):
+    price_id: str
+    success_url: str  # Using str instead of HttpUrl for flexibility
+    cancel_url: str
 
 
 # Subscription Status Enum

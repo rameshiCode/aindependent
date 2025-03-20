@@ -5,7 +5,7 @@ import {
   LoginService,
   UsersService,
   UtilsService,
-  DefaultService,
+  StripeService,
 } from "../sdk.gen"
 import {
   queryOptions,
@@ -56,19 +56,30 @@ import type {
   UtilsTestEmailError,
   UtilsTestEmailResponse,
   UtilsHealthCheckData,
-  ApiStripeHealthCheckData,
-  ApiGetSubscriptionStatusData,
-  ApiCreateCheckoutSessionData,
-  ApiCreateCheckoutSessionError,
-  ApiCreateCheckoutSessionResponse,
-  ApiGetProductsData,
-  ApiGetMySubscriptionsData,
-  ApiCreatePortalSessionData,
-  ApiCreatePortalSessionError,
-  ApiCreatePortalSessionResponse,
-  ApiGetUsageStatusData,
-  ApiIncrementUsageData,
-  ApiIncrementUsageResponse,
+  StripeStripeWebhookData,
+  StripeStripeWebhookError,
+  StripeStripeWebhookResponse,
+  StripeStripeHealthCheckData,
+  StripeGetSubscriptionStatusData,
+  StripeCreateCheckoutSessionData,
+  StripeCreateCheckoutSessionError,
+  StripeCreateCheckoutSessionResponse,
+  StripeCreatePortalSessionData,
+  StripeCreatePortalSessionError,
+  StripeCreatePortalSessionResponse,
+  StripeGetUsageStatusData,
+  StripeIncrementUsageData,
+  StripeIncrementUsageResponse,
+  StripeGetAllSubscriptionsData,
+  StripeCreateSubscriptionWithPaymentMethodData,
+  StripeCreateSubscriptionWithPaymentMethodError,
+  StripeCreateSubscriptionWithPaymentMethodResponse,
+  StripeCancelSubscriptionData,
+  StripeCancelSubscriptionError,
+  StripeCancelSubscriptionResponse,
+  StripeListPaymentMethodsData,
+  StripeGetProductsData,
+  StripeGetProductPricesData,
 } from "../types.gen"
 import { client as _heyApiClient } from "../client.gen"
 
@@ -634,16 +645,16 @@ export const healthCheckOptions = (options?: Options<UtilsHealthCheckData>) => {
   })
 }
 
-export const apiStripeHealthCheckQueryKey = (
-  options?: Options<ApiStripeHealthCheckData>,
-) => createQueryKey("apiStripeHealthCheck", options)
+export const stripeWebhookQueryKey = (
+  options?: Options<StripeStripeWebhookData>,
+) => createQueryKey("stripeStripeWebhook", options)
 
-export const apiStripeHealthCheckOptions = (
-  options?: Options<ApiStripeHealthCheckData>,
+export const stripeWebhookOptions = (
+  options?: Options<StripeStripeWebhookData>,
 ) => {
   return queryOptions({
     queryFn: async ({ queryKey, signal }) => {
-      const { data } = await DefaultService.apiStripeHealthCheck({
+      const { data } = await StripeService.stripeWebhook({
         ...options,
         ...queryKey[0],
         signal,
@@ -651,62 +662,20 @@ export const apiStripeHealthCheckOptions = (
       })
       return data
     },
-    queryKey: apiStripeHealthCheckQueryKey(options),
+    queryKey: stripeWebhookQueryKey(options),
   })
 }
 
-export const apiGetSubscriptionStatusQueryKey = (
-  options?: Options<ApiGetSubscriptionStatusData>,
-) => createQueryKey("apiGetSubscriptionStatus", options)
-
-export const apiGetSubscriptionStatusOptions = (
-  options?: Options<ApiGetSubscriptionStatusData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await DefaultService.apiGetSubscriptionStatus({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: apiGetSubscriptionStatusQueryKey(options),
-  })
-}
-
-export const apiCreateCheckoutSessionQueryKey = (
-  options: Options<ApiCreateCheckoutSessionData>,
-) => createQueryKey("apiCreateCheckoutSession", options)
-
-export const apiCreateCheckoutSessionOptions = (
-  options: Options<ApiCreateCheckoutSessionData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await DefaultService.apiCreateCheckoutSession({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: apiCreateCheckoutSessionQueryKey(options),
-  })
-}
-
-export const apiCreateCheckoutSessionMutation = (
-  options?: Partial<Options<ApiCreateCheckoutSessionData>>,
+export const stripeWebhookMutation = (
+  options?: Partial<Options<StripeStripeWebhookData>>,
 ) => {
   const mutationOptions: UseMutationOptions<
-    ApiCreateCheckoutSessionResponse,
-    ApiCreateCheckoutSessionError,
-    Options<ApiCreateCheckoutSessionData>
+    StripeStripeWebhookResponse,
+    StripeStripeWebhookError,
+    Options<StripeStripeWebhookData>
   > = {
     mutationFn: async (localOptions) => {
-      const { data } = await DefaultService.apiCreateCheckoutSession({
+      const { data } = await StripeService.stripeWebhook({
         ...options,
         ...localOptions,
         throwOnError: true,
@@ -717,15 +686,16 @@ export const apiCreateCheckoutSessionMutation = (
   return mutationOptions
 }
 
-export const apiGetProductsQueryKey = (options?: Options<ApiGetProductsData>) =>
-  createQueryKey("apiGetProducts", options)
+export const stripeHealthCheckQueryKey = (
+  options?: Options<StripeStripeHealthCheckData>,
+) => createQueryKey("stripeStripeHealthCheck", options)
 
-export const apiGetProductsOptions = (
-  options?: Options<ApiGetProductsData>,
+export const stripeHealthCheckOptions = (
+  options?: Options<StripeStripeHealthCheckData>,
 ) => {
   return queryOptions({
     queryFn: async ({ queryKey, signal }) => {
-      const { data } = await DefaultService.apiGetProducts({
+      const { data } = await StripeService.stripeHealthCheck({
         ...options,
         ...queryKey[0],
         signal,
@@ -733,20 +703,20 @@ export const apiGetProductsOptions = (
       })
       return data
     },
-    queryKey: apiGetProductsQueryKey(options),
+    queryKey: stripeHealthCheckQueryKey(options),
   })
 }
 
-export const apiGetMySubscriptionsQueryKey = (
-  options?: Options<ApiGetMySubscriptionsData>,
-) => createQueryKey("apiGetMySubscriptions", options)
+export const getSubscriptionStatusQueryKey = (
+  options?: Options<StripeGetSubscriptionStatusData>,
+) => createQueryKey("stripeGetSubscriptionStatus", options)
 
-export const apiGetMySubscriptionsOptions = (
-  options?: Options<ApiGetMySubscriptionsData>,
+export const getSubscriptionStatusOptions = (
+  options?: Options<StripeGetSubscriptionStatusData>,
 ) => {
   return queryOptions({
     queryFn: async ({ queryKey, signal }) => {
-      const { data } = await DefaultService.apiGetMySubscriptions({
+      const { data } = await StripeService.getSubscriptionStatus({
         ...options,
         ...queryKey[0],
         signal,
@@ -754,20 +724,20 @@ export const apiGetMySubscriptionsOptions = (
       })
       return data
     },
-    queryKey: apiGetMySubscriptionsQueryKey(options),
+    queryKey: getSubscriptionStatusQueryKey(options),
   })
 }
 
-export const apiCreatePortalSessionQueryKey = (
-  options: Options<ApiCreatePortalSessionData>,
-) => createQueryKey("apiCreatePortalSession", options)
+export const createCheckoutSessionQueryKey = (
+  options: Options<StripeCreateCheckoutSessionData>,
+) => createQueryKey("stripeCreateCheckoutSession", options)
 
-export const apiCreatePortalSessionOptions = (
-  options: Options<ApiCreatePortalSessionData>,
+export const createCheckoutSessionOptions = (
+  options: Options<StripeCreateCheckoutSessionData>,
 ) => {
   return queryOptions({
     queryFn: async ({ queryKey, signal }) => {
-      const { data } = await DefaultService.apiCreatePortalSession({
+      const { data } = await StripeService.createCheckoutSession({
         ...options,
         ...queryKey[0],
         signal,
@@ -775,20 +745,20 @@ export const apiCreatePortalSessionOptions = (
       })
       return data
     },
-    queryKey: apiCreatePortalSessionQueryKey(options),
+    queryKey: createCheckoutSessionQueryKey(options),
   })
 }
 
-export const apiCreatePortalSessionMutation = (
-  options?: Partial<Options<ApiCreatePortalSessionData>>,
+export const createCheckoutSessionMutation = (
+  options?: Partial<Options<StripeCreateCheckoutSessionData>>,
 ) => {
   const mutationOptions: UseMutationOptions<
-    ApiCreatePortalSessionResponse,
-    ApiCreatePortalSessionError,
-    Options<ApiCreatePortalSessionData>
+    StripeCreateCheckoutSessionResponse,
+    StripeCreateCheckoutSessionError,
+    Options<StripeCreateCheckoutSessionData>
   > = {
     mutationFn: async (localOptions) => {
-      const { data } = await DefaultService.apiCreatePortalSession({
+      const { data } = await StripeService.createCheckoutSession({
         ...options,
         ...localOptions,
         throwOnError: true,
@@ -799,16 +769,16 @@ export const apiCreatePortalSessionMutation = (
   return mutationOptions
 }
 
-export const apiGetUsageStatusQueryKey = (
-  options?: Options<ApiGetUsageStatusData>,
-) => createQueryKey("apiGetUsageStatus", options)
+export const createPortalSessionQueryKey = (
+  options: Options<StripeCreatePortalSessionData>,
+) => createQueryKey("stripeCreatePortalSession", options)
 
-export const apiGetUsageStatusOptions = (
-  options?: Options<ApiGetUsageStatusData>,
+export const createPortalSessionOptions = (
+  options: Options<StripeCreatePortalSessionData>,
 ) => {
   return queryOptions({
     queryFn: async ({ queryKey, signal }) => {
-      const { data } = await DefaultService.apiGetUsageStatus({
+      const { data } = await StripeService.createPortalSession({
         ...options,
         ...queryKey[0],
         signal,
@@ -816,41 +786,82 @@ export const apiGetUsageStatusOptions = (
       })
       return data
     },
-    queryKey: apiGetUsageStatusQueryKey(options),
+    queryKey: createPortalSessionQueryKey(options),
   })
 }
 
-export const apiIncrementUsageQueryKey = (
-  options?: Options<ApiIncrementUsageData>,
-) => createQueryKey("apiIncrementUsage", options)
-
-export const apiIncrementUsageOptions = (
-  options?: Options<ApiIncrementUsageData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await DefaultService.apiIncrementUsage({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: apiIncrementUsageQueryKey(options),
-  })
-}
-
-export const apiIncrementUsageMutation = (
-  options?: Partial<Options<ApiIncrementUsageData>>,
+export const createPortalSessionMutation = (
+  options?: Partial<Options<StripeCreatePortalSessionData>>,
 ) => {
   const mutationOptions: UseMutationOptions<
-    ApiIncrementUsageResponse,
+    StripeCreatePortalSessionResponse,
+    StripeCreatePortalSessionError,
+    Options<StripeCreatePortalSessionData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await StripeService.createPortalSession({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getUsageStatusQueryKey = (
+  options?: Options<StripeGetUsageStatusData>,
+) => createQueryKey("stripeGetUsageStatus", options)
+
+export const getUsageStatusOptions = (
+  options?: Options<StripeGetUsageStatusData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.getUsageStatus({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getUsageStatusQueryKey(options),
+  })
+}
+
+export const incrementUsageQueryKey = (
+  options?: Options<StripeIncrementUsageData>,
+) => createQueryKey("stripeIncrementUsage", options)
+
+export const incrementUsageOptions = (
+  options?: Options<StripeIncrementUsageData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.incrementUsage({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: incrementUsageQueryKey(options),
+  })
+}
+
+export const incrementUsageMutation = (
+  options?: Partial<Options<StripeIncrementUsageData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    StripeIncrementUsageResponse,
     DefaultError,
-    Options<ApiIncrementUsageData>
+    Options<StripeIncrementUsageData>
   > = {
     mutationFn: async (localOptions) => {
-      const { data } = await DefaultService.apiIncrementUsage({
+      const { data } = await StripeService.incrementUsage({
         ...options,
         ...localOptions,
         throwOnError: true,
@@ -859,4 +870,169 @@ export const apiIncrementUsageMutation = (
     },
   }
   return mutationOptions
+}
+
+export const getAllSubscriptionsQueryKey = (
+  options?: Options<StripeGetAllSubscriptionsData>,
+) => createQueryKey("stripeGetAllSubscriptions", options)
+
+export const getAllSubscriptionsOptions = (
+  options?: Options<StripeGetAllSubscriptionsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.getAllSubscriptions({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getAllSubscriptionsQueryKey(options),
+  })
+}
+
+export const createSubscriptionWithPaymentMethodQueryKey = (
+  options: Options<StripeCreateSubscriptionWithPaymentMethodData>,
+) => createQueryKey("stripeCreateSubscriptionWithPaymentMethod", options)
+
+export const createSubscriptionWithPaymentMethodOptions = (
+  options: Options<StripeCreateSubscriptionWithPaymentMethodData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.createSubscriptionWithPaymentMethod({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: createSubscriptionWithPaymentMethodQueryKey(options),
+  })
+}
+
+export const createSubscriptionWithPaymentMethodMutation = (
+  options?: Partial<Options<StripeCreateSubscriptionWithPaymentMethodData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    StripeCreateSubscriptionWithPaymentMethodResponse,
+    StripeCreateSubscriptionWithPaymentMethodError,
+    Options<StripeCreateSubscriptionWithPaymentMethodData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await StripeService.createSubscriptionWithPaymentMethod({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const cancelSubscriptionQueryKey = (
+  options: Options<StripeCancelSubscriptionData>,
+) => createQueryKey("stripeCancelSubscription", options)
+
+export const cancelSubscriptionOptions = (
+  options: Options<StripeCancelSubscriptionData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.cancelSubscription({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: cancelSubscriptionQueryKey(options),
+  })
+}
+
+export const cancelSubscriptionMutation = (
+  options?: Partial<Options<StripeCancelSubscriptionData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    StripeCancelSubscriptionResponse,
+    StripeCancelSubscriptionError,
+    Options<StripeCancelSubscriptionData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await StripeService.cancelSubscription({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const listPaymentMethodsQueryKey = (
+  options?: Options<StripeListPaymentMethodsData>,
+) => createQueryKey("stripeListPaymentMethods", options)
+
+export const listPaymentMethodsOptions = (
+  options?: Options<StripeListPaymentMethodsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.listPaymentMethods({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: listPaymentMethodsQueryKey(options),
+  })
+}
+
+export const getProductsQueryKey = (options?: Options<StripeGetProductsData>) =>
+  createQueryKey("stripeGetProducts", options)
+
+export const getProductsOptions = (
+  options?: Options<StripeGetProductsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.getProducts({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getProductsQueryKey(options),
+  })
+}
+
+export const getProductPricesQueryKey = (
+  options: Options<StripeGetProductPricesData>,
+) => createQueryKey("stripeGetProductPrices", options)
+
+export const getProductPricesOptions = (
+  options: Options<StripeGetProductPricesData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.getProductPrices({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getProductPricesQueryKey(options),
+  })
 }

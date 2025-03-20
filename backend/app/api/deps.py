@@ -6,12 +6,12 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2AuthorizationCodeBearer, OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
-from app.models import TokenPayload, User
+from app.models import Customer, Subscription, SubscriptionStatus, TokenPayload, User
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
@@ -78,3 +78,41 @@ async def get_current_active_user(
 
 
 SuperUserRequired = Depends(get_current_active_superuser)
+
+
+def get_stripe_customer(session: SessionDep, current_user: CurrentUser) -> Customer:
+    """Get or create Stripe customer for current user"""
+    customer = session.exec(
+        select(Customer).where(Customer.user_id == current_user.id)
+    ).first()
+
+    if not customer:
+        raise HTTPException(
+            status_code=404,
+            detail="No payment profile found. Please set up your payment details first.",
+        )
+
+    return customer
+
+
+StripeCustomerDep = Annotated[Customer, Depends(get_stripe_customer)]
+
+
+def verify_active_subscription(session: SessionDep, current_user: CurrentUser) -> None:
+    """Verify user has an active subscription or raise error"""
+    result = session.exec(
+        select(Subscription)
+        .join(Customer)
+        .where(
+            Customer.user_id == current_user.id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+    ).first()
+
+    if not result:
+        raise HTTPException(
+            status_code=403, detail="Active subscription required for this feature"
+        )
+
+
+ActiveSubscriptionRequired = Depends(verify_active_subscription)
