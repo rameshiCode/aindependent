@@ -20,6 +20,7 @@ from app.models import (
     CheckoutSessionCreate,
     Customer,
     Plan,
+    PortalSessionCreate,
     Price,
     Subscription,
     SubscriptionStatus,
@@ -439,40 +440,50 @@ def get_subscription_status(session: SessionDep, current_user: CurrentUser) -> A
     }
 
 
-# Create checkout session (ESSENTIAL - for initiating subscription purchase)
 @router.post("/create-checkout-session", response_model=dict)
-def create_checkout_session(
+async def create_checkout_session(
     checkout_data: CheckoutSessionCreate,
-    session: SessionDep,
     current_user: CurrentUser,
-) -> Any:
+    session: SessionDep,
+) -> dict:
     """
-    Create a checkout session for a subscription.
-    This is called when a user wants to subscribe after reaching the free request limit.
+    Create a Stripe Checkout session for subscription purchase.
+
+    This endpoint creates a Checkout session that redirects the customer to the Stripe-hosted checkout page.
+    After successful payment, the customer will be redirected to the success_url.
     """
-    # Get or create customer
-    customer = session.exec(
-        select(Customer).where(Customer.user_id == current_user.id)
-    ).first()
-
-    if not customer:
-        # Create customer
-        stripe_customer = stripe.Customer.create(
-            email=current_user.email,
-            name=current_user.full_name,
-            metadata={"user_id": str(current_user.id)},
-        )
-
-        customer = Customer(
-            user_id=current_user.id, stripe_customer_id=stripe_customer.id
-        )
-        session.add(customer)
-        session.commit()
-        session.refresh(customer)
-
     try:
-        # Create checkout session with idempotency key
-        idempotency_key = f"checkout_{current_user.id}_{uuid.uuid4()}"
+        # Get or create a Stripe customer for the current user
+        customer = session.exec(
+            select(Customer).where(Customer.user_id == current_user.id)
+        ).first()
+
+        if not customer:
+            # Create a new Stripe customer if one doesn't exist
+            stripe_customer = stripe.Customer.create(
+                email=current_user.email,
+                metadata={"user_id": str(current_user.id)},
+            )
+
+            # Save the customer in your database
+            customer = Customer(
+                user_id=current_user.id,
+                stripe_customer_id=stripe_customer.id,
+            )
+            session.add(customer)
+            session.commit()
+            session.refresh(customer)
+
+        # Verify the price exists in Stripe
+        try:
+            price = stripe.Price.retrieve(checkout_data.price_id)
+        except stripe.error.InvalidRequestError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid price ID: {checkout_data.price_id}",
+            )
+
+        # Create the checkout session
         checkout_session = stripe.checkout.Session.create(
             customer=customer.stripe_customer_id,
             payment_method_types=["card"],
@@ -480,52 +491,38 @@ def create_checkout_session(
                 {
                     "price": checkout_data.price_id,
                     "quantity": 1,
-                },
+                }
             ],
             mode="subscription",
             success_url=checkout_data.success_url,
             cancel_url=checkout_data.cancel_url,
-            idempotency_key=idempotency_key,
+            # Optional parameters you might want to include:
+            # allow_promotion_codes=True,
+            # billing_address_collection="required",
+            # client_reference_id=str(current_user.id),
+            # customer_email=current_user.email,  # Only if customer doesn't exist yet
+            # subscription_data={
+            #     "trial_period_days": 14,  # If you want to offer a trial
+            # },
         )
 
-        return {"checkout_url": checkout_session.url}
+        # Return the session ID and URL
+        return {
+            "session_id": checkout_session.id,
+            "url": checkout_session.url,
+        }
+
     except stripe.error.StripeError as e:
+        logger.error(f"Stripe error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error creating checkout session: {str(e)}",
+            detail=f"Stripe error: {str(e)}",
         )
-
-
-# Create customer portal session (for subscription management)
-@router.post("/create-portal-session", response_model=dict)
-def create_portal_session(
-    return_url: str, session: SessionDep, current_user: CurrentUser
-) -> Any:
-    """
-    Create a customer portal session for managing subscriptions.
-    This allows users to update payment methods, cancel subscriptions, etc.
-    """
-    # Get customer
-    customer = session.exec(
-        select(Customer).where(Customer.user_id == current_user.id)
-    ).first()
-
-    if not customer:
+    except Exception as e:
+        logger.error(f"Error creating checkout session: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found"
-        )
-
-    try:
-        # Create portal session
-        portal_session = stripe.billing_portal.Session.create(
-            customer=customer.stripe_customer_id, return_url=return_url
-        )
-
-        return {"portal_url": portal_session.url}
-    except stripe.error.StripeError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error creating portal session: {str(e)}",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating the checkout session",
         )
 
 
@@ -872,3 +869,55 @@ def get_product_prices(
     except stripe.error.StripeError as e:
         logger.error(f"Error fetching prices: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/create-portal-session", response_model=dict)
+async def create_portal_session(
+    portal_data: PortalSessionCreate,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> dict:
+    """
+    Create a Stripe Customer Portal session for subscription management.
+
+    This endpoint creates a portal session that redirects the customer to the Stripe-hosted customer portal.
+    After managing their subscription, the customer will be redirected to the return_url.
+    """
+    try:
+        # Get the Stripe customer for the current user
+        customer = session.exec(
+            select(Customer).where(Customer.user_id == current_user.id)
+        ).first()
+
+        if not customer:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Customer not found",
+            )
+
+        # Create the portal session
+        portal_session = stripe.billing_portal.Session.create(
+            customer=customer.stripe_customer_id,
+            return_url=portal_data.return_url,
+            # Optional configuration
+            # configuration="your_portal_configuration_id",
+        )
+
+        # Return the session ID and URL
+        return {
+            "session_id": portal_session.id,
+            "url": portal_session.url,
+        }
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Stripe error: {str(e)}",
+        )
+    except Exception as e:
+        logger.error(f"Error creating portal session: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating the portal session",
+        )

@@ -93,6 +93,10 @@ class CheckoutSessionCreate(BaseModel):
     cancel_url: str
 
 
+class PortalSessionCreate(BaseModel):
+    return_url: str
+
+
 # Subscription Status Enum
 class SubscriptionStatus(str, Enum):
     ACTIVE = "active"

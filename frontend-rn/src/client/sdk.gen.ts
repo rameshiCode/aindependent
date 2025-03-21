@@ -607,8 +607,10 @@ export class StripeService {
 
   /**
    * Create Checkout Session
-   * Create a checkout session for a subscription.
-   * This is called when a user wants to subscribe after reaching the free request limit.
+   * Create a Stripe Checkout session for subscription purchase.
+   *
+   * This endpoint creates a Checkout session that redirects the customer to the Stripe-hosted checkout page.
+   * After successful payment, the customer will be redirected to the success_url.
    */
   public static createCheckoutSession<ThrowOnError extends boolean = false>(
     options: Options<StripeCreateCheckoutSessionData, ThrowOnError>,

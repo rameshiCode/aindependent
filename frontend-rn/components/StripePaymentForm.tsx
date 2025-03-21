@@ -1,30 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  TextInput,
-  Text,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-  Alert
-} from 'react-native';
+import { View, TextInput, Text, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { CardField, useStripe, CardFieldInput } from '@stripe/stripe-react-native';
+import { useRouter } from 'expo-router';
+import { StripeService } from '../src/client';
 
 interface StripePaymentFormProps {
-  onPaymentMethodCreated: (paymentMethodId: string) => void;
-  isLoading: boolean;
+  priceId: string;
+  onPaymentMethodCreated?: (paymentMethodId: string) => void;
+  isLoading?: boolean;
+  useCheckout?: boolean; // Whether to use Stripe Checkout or direct payment
 }
 
 const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
+  priceId,
   onPaymentMethodCreated,
-  isLoading
+  isLoading = false,
+  useCheckout = true,
 }) => {
   const stripe = useStripe();
+  const router = useRouter();
   const { createPaymentMethod } = stripe;
+
   const [cardComplete, setCardComplete] = useState(false);
   const [cardDetails, setCardDetails] = useState<CardFieldInput.Details | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isStripeReady, setIsStripeReady] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Check if Stripe SDK is initialized
   useEffect(() => {
@@ -36,6 +37,7 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
     }
   }, [stripe]);
 
+  // Debug logging
   useEffect(() => {
     console.log('=====================');
     console.log('Stripe Payment Form Debug');
@@ -51,10 +53,10 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
     console.log('=====================');
   }, [cardDetails, cardComplete, isStripeReady]);
 
-  const handlePayPress = async () => {
+  // Handle direct payment method creation
+  const handleDirectPayment = async () => {
     try {
       console.log('Card complete status:', cardComplete);
-
       if (!cardComplete) {
         console.log('Card is incomplete, showing error');
         setError('Please complete the card details');
@@ -62,25 +64,66 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
       }
 
       setError(null);
+      setIsSubmitting(true);
       console.log('Creating payment method...');
 
-      // Try this approach which works with newer Stripe versions
+      // Create payment method
       const result = await createPaymentMethod({
         paymentMethodType: 'Card',
       });
 
       console.log('Payment method result:', result);
-
       if (result.error) {
         console.log('Payment method error:', result.error);
         setError(result.error.message);
       } else if (result.paymentMethod) {
         console.log('Payment method created:', result.paymentMethod.id);
-        onPaymentMethodCreated(result.paymentMethod.id);
+        if (onPaymentMethodCreated) {
+          onPaymentMethodCreated(result.paymentMethod.id);
+        }
       }
     } catch (e: any) {
       console.error('Payment form error details:', e);
       setError(`An unexpected error occurred: ${e.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Stripe Checkout
+  const handleCheckout = async () => {
+    try {
+      setError(null);
+      setIsSubmitting(true);
+
+      // Create checkout session using StripeService
+      const stripeService = new StripeService();
+      const response = await stripeService.createCheckoutSession({
+        price_id: priceId,
+        success_url: `${window.location.origin}/subscription-success`,
+        cancel_url: `${window.location.origin}/subscription-cancel`,
+      });
+
+      // Redirect to checkout
+      if (response.url) {
+        router.push(`/web-view?url=${encodeURIComponent(response.url)}`);
+      } else {
+        setError('Failed to create checkout session');
+      }
+    } catch (e: any) {
+      console.error('Checkout error:', e);
+      setError(`Failed to start checkout: ${e.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle payment button press
+  const handlePayPress = async () => {
+    if (useCheckout) {
+      await handleCheckout();
+    } else {
+      await handleDirectPayment();
     }
   };
 
@@ -107,8 +150,6 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
               console.log('Using test card without form');
               // This simulates a successful card completion
               setCardComplete(true);
-              // Import ValidationState enum or use the string values directly
-              // CardFieldInput.ValidationState.Valid would be the proper enum value
               setCardDetails({
                 complete: true,
                 brand: 'Visa',
@@ -116,9 +157,9 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
                 expiryMonth: 12,
                 expiryYear: 2030,
                 postalCode: '12345',
-                validCVC: 'Valid',       // Use ValidationState.Valid or 'Valid' string
-                validExpiryDate: 'Valid', // Use ValidationState.Valid or 'Valid' string
-                validNumber: 'Valid'      // Use ValidationState.Valid or 'Valid' string
+                validCVC: 'Valid',
+                validExpiryDate: 'Valid',
+                validNumber: 'Valid'
               } as unknown as CardFieldInput.Details);
             }}
           >
@@ -137,44 +178,41 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
         </View>
       )}
 
-      <CardField
-        postalCodeEnabled={true}
-        placeholders={{
-          number: '4242 4242 4242 4242',
-          expiryDate: 'MM/YY',
-          cvc: 'CVC',
-          postalCode: 'ZIP',
-        }}
-        autofocus={true}
-        cardStyle={{
-          backgroundColor: '#FFFFFF',
-          textColor: '#000000',
-          borderWidth: 1,
-          borderColor: '#CCCCCC',
-          borderRadius: 8,
-          fontSize: 16,
-        }}
-        style={{
-          width: '100%',
-          height: 50,
-          marginVertical: 12,
-        }}
-        onCardChange={(cardDetails) => {
-          console.log('CARD DETAILS:', {
-            brand: cardDetails.brand,
-            last4: cardDetails.last4,
-            expiryMonth: cardDetails.expiryMonth,
-            expiryYear: cardDetails.expiryYear,
-            complete: cardDetails.complete,
-            validNumber: cardDetails.validNumber,
-            validExpiryDate: cardDetails.validExpiryDate,
-            validCVC: cardDetails.validCVC,
-          });
-
-          setCardDetails(cardDetails);
-          setCardComplete(cardDetails.complete);
-        }}
-      />
+      {!useCheckout && (
+        <CardField
+          postalCodeEnabled={true}
+          placeholders={{
+            number: '4242 4242 4242 4242',
+            expiryDate: 'MM/YY',
+            cvc: 'CVC',
+            postalCode: 'ZIP',
+          }}
+          autofocus={true}
+          cardStyle={{
+            backgroundColor: '#FFFFFF',
+            textColor: '#000000',
+            borderWidth: 1,
+            borderColor: '#CCCCCC',
+            borderRadius: 8,
+            fontSize: 16,
+          }}
+          style={{ width: '100%', height: 50, marginVertical: 12 }}
+          onCardChange={(cardDetails) => {
+            console.log('CARD DETAILS:', {
+              brand: cardDetails.brand,
+              last4: cardDetails.last4,
+              expiryMonth: cardDetails.expiryMonth,
+              expiryYear: cardDetails.expiryYear,
+              complete: cardDetails.complete,
+              validNumber: cardDetails.validNumber,
+              validExpiryDate: cardDetails.validExpiryDate,
+              validCVC: cardDetails.validCVC,
+            });
+            setCardDetails(cardDetails);
+            setCardComplete(cardDetails.complete);
+          }}
+        />
+      )}
 
       {error && (
         <Text style={styles.errorText}>{error}</Text>
@@ -184,46 +222,19 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
         style={({ pressed }) => [
           styles.button,
           pressed && styles.buttonPressed,
-          isLoading && styles.buttonDisabled
+          (isLoading || isSubmitting) && styles.buttonDisabled
         ]}
         onPress={handlePayPress}
-        disabled={isLoading || !cardComplete}
+        disabled={isLoading || isSubmitting || (!useCheckout && !cardComplete)}
       >
-        {isLoading ? (
+        {(isLoading || isSubmitting) ? (
           <ActivityIndicator size="small" color="#fff" />
         ) : (
           <Text style={styles.buttonText}>
-            {cardComplete ? 'Subscribe' : 'Complete Card Details'}
+            {useCheckout ? 'Proceed to Checkout' : (cardComplete ? 'Subscribe' : 'Complete Card Details')}
           </Text>
         )}
       </Pressable>
-
-      {__DEV__ && (
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugTitle}>Payment Form Debug</Text>
-          <Text style={styles.debugText}>Stripe Ready: {isStripeReady ? 'Yes' : 'No'}</Text>
-          <Text style={styles.debugText}>Card Complete: {cardComplete ? 'Yes' : 'No'}</Text>
-          {cardDetails && (
-            <>
-              <Text style={styles.debugText}>Brand: {cardDetails.brand || 'None'}</Text>
-              <Text style={styles.debugText}>Last 4: {cardDetails.last4 || 'None'}</Text>
-            </>
-          )}
-          <Pressable
-            style={styles.debugButton}
-            onPress={() => {
-              Alert.alert(
-                'Stripe Status',
-                `Stripe initialized: ${isStripeReady ? 'Yes' : 'No'}\n` +
-                `Card complete: ${cardComplete ? 'Yes' : 'No'}\n` +
-                `Card details: ${cardDetails ? 'Available' : 'None'}`
-              );
-            }}
-          >
-            <Text style={styles.debugButtonText}>Check Stripe Status</Text>
-          </Pressable>
-        </View>
-      )}
     </View>
   );
 };
@@ -320,36 +331,6 @@ const styles = StyleSheet.create({
   testModeButtonText: {
     color: 'white',
     fontWeight: 'bold',
-  },
-  debugContainer: {
-    marginTop: 24,
-    padding: 12,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  debugTitle: {
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#333',
-  },
-  debugText: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 4,
-  },
-  debugButton: {
-    marginTop: 12,
-    backgroundColor: '#5469D4',
-    padding: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  debugButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 14,
   },
 });
 
