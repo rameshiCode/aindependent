@@ -10,7 +10,6 @@ import type {
   LoginAuthGoogleData,
   LoginAuthGoogleResponse,
   LoginAuthGoogleError,
-  LoginLoginGoogle1Data,
   LoginAuthGoogle1Data,
   LoginAuthGoogle1Error,
   LoginLoginForAccessTokenData,
@@ -60,21 +59,38 @@ import type {
   UtilsTestEmailError,
   UtilsHealthCheckData,
   UtilsHealthCheckResponse,
-  ItemsReadItemsData,
-  ItemsReadItemsResponse,
-  ItemsReadItemsError,
-  ItemsCreateItemData,
-  ItemsCreateItemResponse,
-  ItemsCreateItemError,
-  ItemsDeleteItemData,
-  ItemsDeleteItemResponse,
-  ItemsDeleteItemError,
-  ItemsReadItemData,
-  ItemsReadItemResponse,
-  ItemsReadItemError,
-  ItemsUpdateItemData,
-  ItemsUpdateItemResponse,
-  ItemsUpdateItemError,
+  StripeStripeWebhookData,
+  StripeStripeWebhookResponse,
+  StripeStripeWebhookError,
+  StripeStripeHealthCheckData,
+  StripeGetSubscriptionStatusData,
+  StripeGetSubscriptionStatusResponse,
+  StripeCreateCheckoutSessionData,
+  StripeCreateCheckoutSessionResponse,
+  StripeCreateCheckoutSessionError,
+  StripeCreatePortalSessionData,
+  StripeCreatePortalSessionResponse,
+  StripeCreatePortalSessionError,
+  StripeGetUsageStatusData,
+  StripeGetUsageStatusResponse,
+  StripeIncrementUsageData,
+  StripeIncrementUsageResponse,
+  StripeGetAllSubscriptionsData,
+  StripeGetAllSubscriptionsResponse,
+  StripeGetAllSubscriptionsError,
+  StripeCreateSubscriptionWithPaymentMethodData,
+  StripeCreateSubscriptionWithPaymentMethodResponse,
+  StripeCreateSubscriptionWithPaymentMethodError,
+  StripeCancelSubscriptionData,
+  StripeCancelSubscriptionResponse,
+  StripeCancelSubscriptionError,
+  StripeListPaymentMethodsData,
+  StripeListPaymentMethodsResponse,
+  StripeGetProductsData,
+  StripeGetProductsResponse,
+  StripeGetProductPricesData,
+  StripeGetProductPricesResponse,
+  StripeGetProductPricesError,
 } from "./types.gen"
 import { client as _heyApiClient } from "./client.gen"
 
@@ -115,23 +131,6 @@ export class LoginService {
         "Content-Type": "application/json",
         ...options?.headers,
       },
-    })
-  }
-
-  /**
-   * Login Google1
-   * Redirect users to Google for authentication
-   */
-  public static loginGoogle1<ThrowOnError extends boolean = false>(
-    options?: Options<LoginLoginGoogle1Data, ThrowOnError>,
-  ) {
-    return (options?.client ?? _heyApiClient).get<
-      unknown,
-      unknown,
-      ThrowOnError
-    >({
-      url: "/api/v1/login/google1",
-      ...options,
     })
   }
 
@@ -703,10 +702,154 @@ export class StripeService {
       ],
       url: "/api/v1/stripe/increment-usage",
       ...options,
+    })
+  }
+
+  /**
+   * Get All Subscriptions
+   * Get all subscriptions across all customers.
+   * This is an admin endpoint and is restricted to superusers.
+   */
+  public static getAllSubscriptions<ThrowOnError extends boolean = false>(
+    options?: Options<StripeGetAllSubscriptionsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      StripeGetAllSubscriptionsResponse,
+      StripeGetAllSubscriptionsError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/admin/subscriptions",
+      ...options,
+    })
+  }
+
+  /**
+   * Create Subscription With Payment Method
+   * Create a subscription with an existing payment method.
+   */
+  public static createSubscriptionWithPaymentMethod<
+    ThrowOnError extends boolean = false,
+  >(
+    options: Options<
+      StripeCreateSubscriptionWithPaymentMethodData,
+      ThrowOnError
+    >,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      StripeCreateSubscriptionWithPaymentMethodResponse,
+      StripeCreateSubscriptionWithPaymentMethodError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/create-subscription-with-payment-method",
+      ...options,
       headers: {
         "Content-Type": "application/json",
         ...options?.headers,
       },
+    })
+  }
+
+  /**
+   * Cancel Subscription
+   * Cancel a subscription directly (without portal).
+   */
+  public static cancelSubscription<ThrowOnError extends boolean = false>(
+    options: Options<StripeCancelSubscriptionData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      StripeCancelSubscriptionResponse,
+      StripeCancelSubscriptionError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/cancel-subscription/{subscription_id}",
+      ...options,
+    })
+  }
+
+  /**
+   * List Payment Methods
+   * Get all payment methods for the current user.
+   */
+  public static listPaymentMethods<ThrowOnError extends boolean = false>(
+    options?: Options<StripeListPaymentMethodsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      StripeListPaymentMethodsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/payment-methods",
+      ...options,
+    })
+  }
+
+  /**
+   * Get Products
+   * Get all active products from Stripe
+   */
+  public static getProducts<ThrowOnError extends boolean = false>(
+    options?: Options<StripeGetProductsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      StripeGetProductsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/products",
+      ...options,
+    })
+  }
+
+  /**
+   * Get Product Prices
+   * Get all prices for a specific product
+   */
+  public static getProductPrices<ThrowOnError extends boolean = false>(
+    options: Options<StripeGetProductPricesData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).get<
+      StripeGetProductPricesResponse,
+      StripeGetProductPricesError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/products/{product_id}/prices",
+      ...options,
     })
   }
 }

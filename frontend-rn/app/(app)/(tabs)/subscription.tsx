@@ -25,7 +25,7 @@ import {
   StripeGetProductPricesResponse
 } from '@/src/client/types.gen';
 
-import StripePaymentForm from '../../components/StripePaymentForm';
+// import StripePaymentForm from '../../components/StripePaymentForm';
 import * as SecureStore from 'expo-secure-store';
 import { StripeService } from '@/src/client/sdk.gen';
 
@@ -619,16 +619,16 @@ function SubscriptionScreen() {
                 </View>
               )}
 
-              {/* Payment Form */}
+              {/* Payment Form
               {showPaymentForm && (
                 <View style={styles.paymentFormContainer}>
                   <Text style={styles.sectionTitle}>Payment Details</Text>
-                  <StripePaymentForm
+                   <StripePaymentForm
                     onPaymentMethodCreated={handlePaymentMethod}
                     isLoading={isCreatingSubscription}
                   />
                 </View>
-              )}
+              )} */}
             </>
           )}
         </View>

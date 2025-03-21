@@ -114,7 +114,7 @@ class Settings(BaseSettings):
     @property
     def GOOGLE_ANDROID_REDIRECT_URI(self) -> str:
         # TODO: this is hardcoded, need to change it and fix redirect to sign-in
-        return "com.anonymous.aindependent:/sign-in"
+        return "com.anonymous.aindependenta:/sign-in"
 
     # URLS
     GOOGLE_AUTH_URL: str = "https://accounts.google.com/o/oauth2/auth"

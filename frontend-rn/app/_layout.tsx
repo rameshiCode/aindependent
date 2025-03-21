@@ -2,7 +2,6 @@ import 'react-native-reanimated';
 import { useEffect } from 'react';
 import { Slot } from 'expo-router';
 import { StripeProvider } from '@stripe/stripe-react-native';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import Constants from 'expo-constants';
 import { StatusBar } from 'expo-status-bar';
@@ -12,7 +11,6 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { AuthProvider,  } from '@/context/authProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
-import { client } from '@/src/client/client.gen';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useReactQueryDevTools } from '@dev-plugins/react-query';
 import { getTokenFromStorage } from '@/context/useStorageState';

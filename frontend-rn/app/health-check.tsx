@@ -26,7 +26,7 @@ export default function HealthCheckScreen() {
   // Check immediately and set up interval
   useEffect(() => {
     checkHealth();
-    const interval = setInterval(checkHealth, 500);
+    const interval = setInterval(checkHealth, 5000);
     return () => clearInterval(interval);
   }, []);
 

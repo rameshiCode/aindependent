@@ -1,23 +1,23 @@
 {
   "expo": {
-    "name": "frontend-rn",
-    "slug": "frontend-rn",
+    "name": "aindependenta",
+    "slug": "aindependenta",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "com.anonymous.aindependent",
+    "scheme": "com.anonymous.aindependenta",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.frontendrn"
+      "bundleIdentifier": "com.anonymous.aindependenta"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.frontendrn"
+      "package": "com.anonymous.aindependenta"
     },
     "web": {
       "bundler": "metro",
