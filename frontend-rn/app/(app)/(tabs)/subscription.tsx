@@ -18,7 +18,7 @@ const fetchSubscription = async () => {
   try {
     setLoading(true);
     setError(null);
-    
+
     const { data } = await StripeService.getSubscriptionStatus({
       throwOnError: true
     });
@@ -37,10 +37,10 @@ const fetchSubscription = async () => {
 const openCustomerPortal = async () => {
   try {
     setPortalLoading(true);
-    
+
     // Use your app's scheme from app.json
     const baseUrl = "com.anonymous.aindependenta://";
-    
+
     // Use StripeService instead of api
     const { data } = await StripeService.createPortalSession({
       query: {
@@ -48,7 +48,7 @@ const openCustomerPortal = async () => {
       },
       throwOnError: true
     });
-    
+
     // Add type checking
     if (data && typeof data.url === 'string') {
       router.push(`/web-view?url=${encodeURIComponent(data.url)}`);
@@ -106,12 +106,12 @@ return (
   <ThemedView style={styles.container}>
     <ScrollView contentContainerStyle={styles.scrollContent}>
       <ThemedText style={styles.title}>Subscription</ThemedText>
-      
+
       {subscription?.has_subscription ? (
         // Active subscription view
         <View style={styles.subscriptionContainer}>
           <ThemedText style={styles.planName}>{subscription.plan?.name || 'Premium Plan'}</ThemedText>
-          
+
           <View style={styles.detailRow}>
             <ThemedText style={styles.detailLabel}>Status:</ThemedText>
             <ThemedText style={[
@@ -123,21 +123,21 @@ return (
               {subscription.subscription.status.charAt(0).toUpperCase() + subscription.subscription.status.slice(1)}
             </ThemedText>
           </View>
-          
+
           <View style={styles.detailRow}>
             <ThemedText style={styles.detailLabel}>Price:</ThemedText>
             <ThemedText style={styles.detailValue}>
               ${(subscription.price?.amount / 100).toFixed(2)} / {subscription.price?.interval}
             </ThemedText>
           </View>
-          
+
           <View style={styles.detailRow}>
             <ThemedText style={styles.detailLabel}>Current Period:</ThemedText>
             <ThemedText style={styles.detailValue}>
               {formatDate(subscription.subscription.current_period_start)} - {formatDate(subscription.subscription.current_period_end)}
             </ThemedText>
           </View>
-          
+
           {subscription.subscription.cancel_at_period_end && (
             <View style={styles.cancelNotice}>
               <ThemedText style={styles.cancelText}>
@@ -145,7 +145,7 @@ return (
               </ThemedText>
             </View>
           )}
-          
+
           <Pressable
             style={styles.portalButton}
             onPress={openCustomerPortal}
@@ -164,30 +164,30 @@ return (
           <ThemedText style={styles.noSubscriptionText}>
             You don't have an active subscription.
           </ThemedText>
-          
+
           <View style={styles.pricingContainer}>
             <ThemedText style={styles.pricingTitle}>Choose a Plan</ThemedText>
-            
+
             <View style={styles.planCard}>
               <ThemedText style={styles.planCardTitle}>Premium Plan</ThemedText>
               <ThemedText style={styles.planCardPrice}>$15/month</ThemedText>
               <ThemedText style={styles.planCardDescription}>
                 Get access to all premium features and priority support.
               </ThemedText>
-              
+
               <StripePaymentForm
                 priceId="price_1R4HTbK8wIdhxRomQmYkYDe1"
                 useCheckout={true}
               />
             </View>
-            
+
             <View style={styles.planCard}>
               <ThemedText style={styles.planCardTitle}>Basic Plan</ThemedText>
               <ThemedText style={styles.planCardPrice}>$5/month</ThemedText>
               <ThemedText style={styles.planCardDescription}>
                 Get access to basic features.
               </ThemedText>
-              
+
               <StripePaymentForm
                 priceId="price_1R4HTbK8wIdhxRomQmYkYDe1" // Replace with your actual price ID
                 useCheckout={true}

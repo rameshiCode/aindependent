@@ -99,10 +99,10 @@ const handleCheckout = async () => {
     try {
       setError(null);
       setIsSubmitting(true);
-      
+
       // Use your app's scheme from app.json
       const baseUrl = "com.anonymous.aindependenta://";
-      
+
       const { data } = await StripeService.createCheckoutSession({
         body: {
           price_id: priceId,
@@ -111,7 +111,7 @@ const handleCheckout = async () => {
         },
         throwOnError: true
       });
-      
+
       // Add type checking
       if (data && typeof data.url === 'string') {
         router.push(`/web-view?url=${encodeURIComponent(data.url)}`);
@@ -125,8 +125,8 @@ const handleCheckout = async () => {
       setIsSubmitting(false);
     }
   };
-  
-  
+
+
 
   // Handle payment button press
   const handlePayPress = async () => {

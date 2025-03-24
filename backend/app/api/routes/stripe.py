@@ -450,36 +450,44 @@ async def create_checkout_session(
     Create a Stripe Checkout session for subscription purchase.
     """
     try:
-        logger.info(f"Creating checkout session for user {current_user.id} with price {checkout_data.price_id}")
-        
+        logger.info(
+            f"Creating checkout session for user {current_user.id} with price {checkout_data.price_id}"
+        )
+
         # Get or create a Stripe customer for the current user
         customer = session.exec(
             select(Customer).where(Customer.user_id == current_user.id)
         ).first()
-        
+
         logger.info(f"Customer found: {customer is not None}")
-        
+
         # Customer verification and recreation logic
         if customer:
             # Verify the customer exists in Stripe
             try:
-                logger.info(f"Verifying customer {customer.stripe_customer_id} exists in Stripe")
+                logger.info(
+                    f"Verifying customer {customer.stripe_customer_id} exists in Stripe"
+                )
                 stripe_customer = stripe.Customer.retrieve(customer.stripe_customer_id)
                 logger.info(f"Customer verified in Stripe: {stripe_customer.id}")
-            except stripe.error.InvalidRequestError as e:
+            except stripe.error.InvalidRequestError:
                 # Customer doesn't exist in Stripe, create a new one
-                logger.warning(f"Customer {customer.stripe_customer_id} not found in Stripe, creating new customer")
+                logger.warning(
+                    f"Customer {customer.stripe_customer_id} not found in Stripe, creating new customer"
+                )
                 stripe_customer = stripe.Customer.create(
                     email=current_user.email,
                     metadata={"user_id": str(current_user.id)},
                 )
-                
+
                 # Update customer record with new Stripe ID
                 customer.stripe_customer_id = stripe_customer.id
                 session.add(customer)
                 session.commit()
                 session.refresh(customer)
-                logger.info(f"Customer record updated with new Stripe ID: {customer.stripe_customer_id}")
+                logger.info(
+                    f"Customer record updated with new Stripe ID: {customer.stripe_customer_id}"
+                )
         else:
             # Create a new Stripe customer if one doesn't exist
             logger.info(f"Creating new Stripe customer for user {current_user.id}")
@@ -487,7 +495,7 @@ async def create_checkout_session(
                 email=current_user.email,
                 metadata={"user_id": str(current_user.id)},
             )
-            
+
             # Save the customer in your database
             customer = Customer(
                 user_id=current_user.id,
@@ -496,7 +504,7 @@ async def create_checkout_session(
             session.add(customer)
             session.commit()
             session.refresh(customer)
-        
+
         # Verify the price exists in Stripe
         try:
             logger.info(f"Retrieving price {checkout_data.price_id} from Stripe")
@@ -508,9 +516,11 @@ async def create_checkout_session(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid price ID: {checkout_data.price_id}",
             )
-        
+
         # Create the checkout session
-        logger.info(f"Creating checkout session with customer {customer.stripe_customer_id} and price {checkout_data.price_id}")
+        logger.info(
+            f"Creating checkout session with customer {customer.stripe_customer_id} and price {checkout_data.price_id}"
+        )
         checkout_session = stripe.checkout.Session.create(
             customer=customer.stripe_customer_id,
             payment_method_types=["card"],
@@ -524,15 +534,15 @@ async def create_checkout_session(
             success_url=checkout_data.success_url,
             cancel_url=checkout_data.cancel_url,
         )
-        
+
         logger.info(f"Checkout session created: {checkout_session.id}")
-        
+
         # Return the session ID and URL
         return {
             "session_id": checkout_session.id,
             "url": checkout_session.url,
         }
-        
+
     except stripe.error.StripeError as e:
         logger.error(f"Stripe error: {str(e)}")
         raise HTTPException(
