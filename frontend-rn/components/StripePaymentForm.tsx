@@ -29,10 +29,10 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
 
   // Create payment intent mutation
   const paymentIntentMutation = useMutation(createPaymentIntentMutation());
-  
+
   // Confirm subscription mutation
   const subscriptionMutation = useMutation(confirmSubscriptionMutation());
-  
+
   // Check if Stripe is ready
   useEffect(() => {
     if (stripe) {
@@ -104,7 +104,7 @@ const handleCheckout = async () => {
   try {
     setError(null);
     setIsSubmitting(true);
-    
+
     // Use valid URLs for Stripe checkout
     const { data } = await StripeService.createCheckoutSession({
       body: {
@@ -114,22 +114,22 @@ const handleCheckout = async () => {
       },
       throwOnError: true
     }) ;
-    
+
     // Check what fields are actually in your response
     console.log("Checkout session response:", data);
     // Add this to your handleCheckout function
     console.log("Full checkout response:", JSON.stringify(data, null, 2));
 
-    
+
     // Try different possible field names
     const checkoutUrl = data?.checkout_url || data?.url || data?.session_url;
-    
+
     if (checkoutUrl && typeof checkoutUrl === 'string') {
       router.push(`/web-view?url=${encodeURIComponent(checkoutUrl)}`);
     } else {
       throw new Error("No checkout URL returned or URL is not a string");
     }
-    
+
     setIsSubmitting(false);
   } catch (e: any) {
     console.error('Checkout error:', e);
@@ -145,7 +145,7 @@ const handleCheckout = async () => {
       await handleCheckout();
       return;
     }
-    
+
     try {
       setError(null);
       setIsSubmitting(true);
@@ -169,17 +169,17 @@ const handleCheckout = async () => {
             payment_intent_id: paymentIntentId
           }
         });
-        
+
         if (result && onPaymentSuccess) {
           // Ensure we're passing a string to onPaymentSuccess
-          const subscriptionId = typeof result.subscription_id === 'string' 
-            ? result.subscription_id 
-            : typeof result.id === 'string' 
-              ? result.id 
+          const subscriptionId = typeof result.subscription_id === 'string'
+            ? result.subscription_id
+            : typeof result.id === 'string'
+              ? result.id
               : String(result.subscription_id || result.id || "");
           onPaymentSuccess(subscriptionId);
         }
-        
+
         Alert.alert(
           "Subscription Successful",
           "Your subscription has been activated successfully!",

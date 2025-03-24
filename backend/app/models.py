@@ -213,12 +213,14 @@ class PaymentIntentCreate(BaseModel):
     customer_id: str | None = None
     setup_future_usage: str | None = "off_session"  # For saving payment method
     metadata: dict | None = None
-    
+
+
 class PaymentIntentResponse(BaseModel):
     client_secret: str
     ephemeral_key: str
     customer_id: str
     publishable_key: str
+
 
 # class WebhookEvent(SQLModel):
 #     id: str
