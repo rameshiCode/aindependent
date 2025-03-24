@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Column, Field, Relationship, SQLModel, String
-from typing import Dict, Optional, List
+
 
 # Shared properties
 class UserBase(SQLModel):
@@ -45,7 +46,8 @@ class UpdatePassword(SQLModel):
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
-    conversations: List["Conversation"] = Relationship(back_populates="user")
+    conversations: list["Conversation"] = Relationship(back_populates="user")
+
 
 # Properties to return via API, id is always required
 class UserPublic(UserBase):
@@ -229,10 +231,11 @@ class Conversation(SQLModel, table=True):
     title: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     # Relationships
     user: Optional["User"] = Relationship(back_populates="conversations")
-    messages: List["Message"] = Relationship(back_populates="conversation")
+    messages: list["Message"] = Relationship(back_populates="conversation")
+
 
 # Message model
 class Message(SQLModel, table=True):
@@ -241,35 +244,40 @@ class Message(SQLModel, table=True):
     role: str  # "system", "user", or "assistant"
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     # Relationships
-    conversation: Optional[Conversation] = Relationship(back_populates="messages")
-    
+    conversation: Conversation | None = Relationship(back_populates="messages")
+
+
 # Pydantic models for API requests/responses
 class MessageSchema(BaseModel):
     role: str
     content: str
 
+
 class ChatCompletionRequest(SQLModel):
-    messages: List[MessageSchema]
+    messages: list[MessageSchema]
     model: str = "gpt-4o"
     temperature: float = 0.7
     max_tokens: int = 1000
     stream: bool = False
 
+
 class ChatCompletionResponse(BaseModel):
     message: MessageSchema
-    usage: Dict[str, int]
+    usage: dict[str, int]
+
 
 class ConversationCreate(BaseModel):
     title: str = "New Conversation"
+
 
 class ConversationWithMessages(SQLModel):
     id: uuid.UUID
     title: str
     created_at: datetime
     updated_at: datetime
-    messages: List[MessageSchema]
+    messages: list[MessageSchema]
 
 
 # class WebhookEvent(SQLModel):
