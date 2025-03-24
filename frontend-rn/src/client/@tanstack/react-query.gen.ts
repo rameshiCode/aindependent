@@ -66,9 +66,6 @@ import type {
   StripeCreateCheckoutSessionData,
   StripeCreateCheckoutSessionError,
   StripeCreateCheckoutSessionResponse,
-  StripeCreatePortalSessionData,
-  StripeCreatePortalSessionError,
-  StripeCreatePortalSessionResponse,
   StripeGetUsageStatusData,
   StripeIncrementUsageData,
   StripeIncrementUsageResponse,
@@ -82,6 +79,9 @@ import type {
   StripeListPaymentMethodsData,
   StripeGetProductsData,
   StripeGetProductPricesData,
+  StripeCreatePortalSessionData,
+  StripeCreatePortalSessionError,
+  StripeCreatePortalSessionResponse,
 } from "../types.gen"
 import { client as _heyApiClient } from "../client.gen"
 
@@ -791,47 +791,6 @@ export const createCheckoutSessionMutation = (
   return mutationOptions
 }
 
-export const createPortalSessionQueryKey = (
-  options: Options<StripeCreatePortalSessionData>,
-) => createQueryKey("stripeCreatePortalSession", options)
-
-export const createPortalSessionOptions = (
-  options: Options<StripeCreatePortalSessionData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await StripeService.createPortalSession({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: createPortalSessionQueryKey(options),
-  })
-}
-
-export const createPortalSessionMutation = (
-  options?: Partial<Options<StripeCreatePortalSessionData>>,
-) => {
-  const mutationOptions: UseMutationOptions<
-    StripeCreatePortalSessionResponse,
-    StripeCreatePortalSessionError,
-    Options<StripeCreatePortalSessionData>
-  > = {
-    mutationFn: async (localOptions) => {
-      const { data } = await StripeService.createPortalSession({
-        ...options,
-        ...localOptions,
-        throwOnError: true,
-      })
-      return data
-    },
-  }
-  return mutationOptions
-}
-
 export const getUsageStatusQueryKey = (
   options?: Options<StripeGetUsageStatusData>,
 ) => createQueryKey("stripeGetUsageStatus", options)
@@ -1057,4 +1016,45 @@ export const getProductPricesOptions = (
     },
     queryKey: getProductPricesQueryKey(options),
   })
+}
+
+export const createPortalSessionQueryKey = (
+  options: Options<StripeCreatePortalSessionData>,
+) => createQueryKey("stripeCreatePortalSession", options)
+
+export const createPortalSessionOptions = (
+  options: Options<StripeCreatePortalSessionData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.createPortalSession({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: createPortalSessionQueryKey(options),
+  })
+}
+
+export const createPortalSessionMutation = (
+  options?: Partial<Options<StripeCreatePortalSessionData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    StripeCreatePortalSessionResponse,
+    StripeCreatePortalSessionError,
+    Options<StripeCreatePortalSessionData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await StripeService.createPortalSession({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
 }

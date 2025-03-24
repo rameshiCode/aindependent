@@ -3,6 +3,9 @@ import { View, TextInput, Text, StyleSheet, Pressable, ActivityIndicator, Alert 
 import { CardField, useStripe, CardFieldInput } from '@stripe/stripe-react-native';
 import { useRouter } from 'expo-router';
 import { StripeService } from '../src/client';
+import { useMutation } from '@tanstack/react-query';
+import { createCheckoutSessionMutation } from '../src/client/@tanstack/react-query.gen';
+
 
 interface StripePaymentFormProps {
   priceId: string;
@@ -89,24 +92,29 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
       setIsSubmitting(false);
     }
   };
-
-  // Handle Stripe Checkout
-  const handleCheckout = async () => {
+const checkoutMutation = useMutation(createCheckoutSessionMutation());
+// Handle Stripe Checkout
+// Handle Stripe Checkout
+const handleCheckout = async () => {
     try {
       setError(null);
       setIsSubmitting(true);
-
-      // Create checkout session using StripeService
-      const stripeService = new StripeService();
-      const response = await stripeService.createCheckoutSession({
-        price_id: priceId,
-        success_url: `${window.location.origin}/subscription-success`,
-        cancel_url: `${window.location.origin}/subscription-cancel`,
+      
+      // Use your app's scheme from app.json
+      const baseUrl = "com.anonymous.aindependenta://";
+      
+      const { data } = await StripeService.createCheckoutSession({
+        body: {
+          price_id: priceId,
+          success_url: `${baseUrl}subscription-success`,
+          cancel_url: `${baseUrl}subscription-cancel`,
+        },
+        throwOnError: true
       });
-
-      // Redirect to checkout
-      if (response.url) {
-        router.push(`/web-view?url=${encodeURIComponent(response.url)}`);
+      
+      // Add type checking
+      if (data && typeof data.url === 'string') {
+        router.push(`/web-view?url=${encodeURIComponent(data.url)}`);
       } else {
         setError('Failed to create checkout session');
       }
@@ -117,6 +125,8 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
       setIsSubmitting(false);
     }
   };
+  
+  
 
   // Handle payment button press
   const handlePayPress = async () => {

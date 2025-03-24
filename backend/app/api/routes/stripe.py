@@ -448,23 +448,46 @@ async def create_checkout_session(
 ) -> dict:
     """
     Create a Stripe Checkout session for subscription purchase.
-
-    This endpoint creates a Checkout session that redirects the customer to the Stripe-hosted checkout page.
-    After successful payment, the customer will be redirected to the success_url.
     """
     try:
+        logger.info(f"Creating checkout session for user {current_user.id} with price {checkout_data.price_id}")
+        
         # Get or create a Stripe customer for the current user
         customer = session.exec(
             select(Customer).where(Customer.user_id == current_user.id)
         ).first()
-
-        if not customer:
+        
+        logger.info(f"Customer found: {customer is not None}")
+        
+        # Customer verification and recreation logic
+        if customer:
+            # Verify the customer exists in Stripe
+            try:
+                logger.info(f"Verifying customer {customer.stripe_customer_id} exists in Stripe")
+                stripe_customer = stripe.Customer.retrieve(customer.stripe_customer_id)
+                logger.info(f"Customer verified in Stripe: {stripe_customer.id}")
+            except stripe.error.InvalidRequestError as e:
+                # Customer doesn't exist in Stripe, create a new one
+                logger.warning(f"Customer {customer.stripe_customer_id} not found in Stripe, creating new customer")
+                stripe_customer = stripe.Customer.create(
+                    email=current_user.email,
+                    metadata={"user_id": str(current_user.id)},
+                )
+                
+                # Update customer record with new Stripe ID
+                customer.stripe_customer_id = stripe_customer.id
+                session.add(customer)
+                session.commit()
+                session.refresh(customer)
+                logger.info(f"Customer record updated with new Stripe ID: {customer.stripe_customer_id}")
+        else:
             # Create a new Stripe customer if one doesn't exist
+            logger.info(f"Creating new Stripe customer for user {current_user.id}")
             stripe_customer = stripe.Customer.create(
                 email=current_user.email,
                 metadata={"user_id": str(current_user.id)},
             )
-
+            
             # Save the customer in your database
             customer = Customer(
                 user_id=current_user.id,
@@ -473,17 +496,21 @@ async def create_checkout_session(
             session.add(customer)
             session.commit()
             session.refresh(customer)
-
+        
         # Verify the price exists in Stripe
         try:
+            logger.info(f"Retrieving price {checkout_data.price_id} from Stripe")
             price = stripe.Price.retrieve(checkout_data.price_id)
-        except stripe.error.InvalidRequestError:
+            logger.info(f"Price found: {price.id}")
+        except stripe.error.InvalidRequestError as e:
+            logger.error(f"Invalid price ID: {checkout_data.price_id}, error: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid price ID: {checkout_data.price_id}",
             )
-
+        
         # Create the checkout session
+        logger.info(f"Creating checkout session with customer {customer.stripe_customer_id} and price {checkout_data.price_id}")
         checkout_session = stripe.checkout.Session.create(
             customer=customer.stripe_customer_id,
             payment_method_types=["card"],
@@ -496,22 +523,16 @@ async def create_checkout_session(
             mode="subscription",
             success_url=checkout_data.success_url,
             cancel_url=checkout_data.cancel_url,
-            # Optional parameters you might want to include:
-            # allow_promotion_codes=True,
-            # billing_address_collection="required",
-            # client_reference_id=str(current_user.id),
-            # customer_email=current_user.email,  # Only if customer doesn't exist yet
-            # subscription_data={
-            #     "trial_period_days": 14,  # If you want to offer a trial
-            # },
         )
-
+        
+        logger.info(f"Checkout session created: {checkout_session.id}")
+        
         # Return the session ID and URL
         return {
             "session_id": checkout_session.id,
             "url": checkout_session.url,
         }
-
+        
     except stripe.error.StripeError as e:
         logger.error(f"Stripe error: {str(e)}")
         raise HTTPException(
@@ -519,7 +540,7 @@ async def create_checkout_session(
             detail=f"Stripe error: {str(e)}",
         )
     except Exception as e:
-        logger.error(f"Error creating checkout session: {str(e)}")
+        logger.error(f"Error creating checkout session: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while creating the checkout session",

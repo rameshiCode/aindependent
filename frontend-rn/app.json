@@ -40,7 +40,7 @@
         {
           "merchantIdentifier": "merchant.com.example",
           "publishableKey": "pk_test_123",
-          "urlScheme": "myapp"
+          "urlScheme": "com.anonymous.aindependenta" 
         }
       ]
     ],

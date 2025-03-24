@@ -34,6 +34,10 @@ export type NewPassword = {
   new_password: string
 }
 
+export type PortalSessionCreate = {
+  return_url: string
+}
+
 export type Token = {
   access_token: string
   token_type?: string
@@ -671,37 +675,6 @@ export type StripeCreateCheckoutSessionResponses = {
 export type StripeCreateCheckoutSessionResponse =
   StripeCreateCheckoutSessionResponses[keyof StripeCreateCheckoutSessionResponses]
 
-export type StripeCreatePortalSessionData = {
-  body?: never
-  path?: never
-  query: {
-    return_url: string
-  }
-  url: "/api/v1/stripe/create-portal-session"
-}
-
-export type StripeCreatePortalSessionErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError
-}
-
-export type StripeCreatePortalSessionError =
-  StripeCreatePortalSessionErrors[keyof StripeCreatePortalSessionErrors]
-
-export type StripeCreatePortalSessionResponses = {
-  /**
-   * Successful Response
-   */
-  200: {
-    [key: string]: unknown
-  }
-}
-
-export type StripeCreatePortalSessionResponse =
-  StripeCreatePortalSessionResponses[keyof StripeCreatePortalSessionResponses]
-
 export type StripeGetUsageStatusData = {
   body?: never
   path?: never
@@ -898,6 +871,35 @@ export type StripeGetProductPricesResponses = {
 
 export type StripeGetProductPricesResponse =
   StripeGetProductPricesResponses[keyof StripeGetProductPricesResponses]
+
+export type StripeCreatePortalSessionData = {
+  body: PortalSessionCreate
+  path?: never
+  query?: never
+  url: "/api/v1/stripe/create-portal-session"
+}
+
+export type StripeCreatePortalSessionErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type StripeCreatePortalSessionError =
+  StripeCreatePortalSessionErrors[keyof StripeCreatePortalSessionErrors]
+
+export type StripeCreatePortalSessionResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type StripeCreatePortalSessionResponse =
+  StripeCreatePortalSessionResponses[keyof StripeCreatePortalSessionResponses]
 
 export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})

@@ -68,9 +68,6 @@ import type {
   StripeCreateCheckoutSessionData,
   StripeCreateCheckoutSessionResponse,
   StripeCreateCheckoutSessionError,
-  StripeCreatePortalSessionData,
-  StripeCreatePortalSessionResponse,
-  StripeCreatePortalSessionError,
   StripeGetUsageStatusData,
   StripeGetUsageStatusResponse,
   StripeIncrementUsageData,
@@ -91,6 +88,9 @@ import type {
   StripeGetProductPricesData,
   StripeGetProductPricesResponse,
   StripeGetProductPricesError,
+  StripeCreatePortalSessionData,
+  StripeCreatePortalSessionResponse,
+  StripeCreatePortalSessionError,
 } from "./types.gen"
 import { client as _heyApiClient } from "./client.gen"
 
@@ -608,9 +608,6 @@ export class StripeService {
   /**
    * Create Checkout Session
    * Create a Stripe Checkout session for subscription purchase.
-   *
-   * This endpoint creates a Checkout session that redirects the customer to the Stripe-hosted checkout page.
-   * After successful payment, the customer will be redirected to the success_url.
    */
   public static createCheckoutSession<ThrowOnError extends boolean = false>(
     options: Options<StripeCreateCheckoutSessionData, ThrowOnError>,
@@ -632,30 +629,6 @@ export class StripeService {
         "Content-Type": "application/json",
         ...options?.headers,
       },
-    })
-  }
-
-  /**
-   * Create Portal Session
-   * Create a customer portal session for managing subscriptions.
-   * This allows users to update payment methods, cancel subscriptions, etc.
-   */
-  public static createPortalSession<ThrowOnError extends boolean = false>(
-    options: Options<StripeCreatePortalSessionData, ThrowOnError>,
-  ) {
-    return (options.client ?? _heyApiClient).post<
-      StripeCreatePortalSessionResponse,
-      StripeCreatePortalSessionError,
-      ThrowOnError
-    >({
-      security: [
-        {
-          scheme: "bearer",
-          type: "http",
-        },
-      ],
-      url: "/api/v1/stripe/create-portal-session",
-      ...options,
     })
   }
 
@@ -852,6 +825,36 @@ export class StripeService {
       ],
       url: "/api/v1/stripe/products/{product_id}/prices",
       ...options,
+    })
+  }
+
+  /**
+   * Create Portal Session
+   * Create a Stripe Customer Portal session for subscription management.
+   *
+   * This endpoint creates a portal session that redirects the customer to the Stripe-hosted customer portal.
+   * After managing their subscription, the customer will be redirected to the return_url.
+   */
+  public static createPortalSession<ThrowOnError extends boolean = false>(
+    options: Options<StripeCreatePortalSessionData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      StripeCreatePortalSessionResponse,
+      StripeCreatePortalSessionError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/create-portal-session",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
     })
   }
 }

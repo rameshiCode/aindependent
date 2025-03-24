@@ -48,7 +48,7 @@ SplashScreen.preventAutoHideAsync();
 
 export default function Root() {
   // TODO: this is only used for debugging, delete this in production.
-  useReactQueryDevTools(queryClient);
+  // useReactQueryDevTools(queryClient);
 
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
