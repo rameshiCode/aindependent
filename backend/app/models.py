@@ -207,6 +207,19 @@ class PaymentMethod(SQLModel, table=True):
     customer: Customer = Relationship(back_populates="payment_methods")
 
 
+# Add to models.py
+class PaymentIntentCreate(BaseModel):
+    price_id: str
+    customer_id: str | None = None
+    setup_future_usage: str | None = "off_session"  # For saving payment method
+    metadata: dict | None = None
+    
+class PaymentIntentResponse(BaseModel):
+    client_secret: str
+    ephemeral_key: str
+    customer_id: str
+    publishable_key: str
+
 # class WebhookEvent(SQLModel):
 #     id: str
 #     type: str

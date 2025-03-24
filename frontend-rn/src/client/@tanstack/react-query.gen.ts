@@ -82,6 +82,12 @@ import type {
   StripeCreatePortalSessionData,
   StripeCreatePortalSessionError,
   StripeCreatePortalSessionResponse,
+  StripeCreatePaymentIntentData,
+  StripeCreatePaymentIntentError,
+  StripeCreatePaymentIntentResponse,
+  StripeConfirmSubscriptionData,
+  StripeConfirmSubscriptionError,
+  StripeConfirmSubscriptionResponse,
 } from "../types.gen"
 import { client as _heyApiClient } from "../client.gen"
 
@@ -1049,6 +1055,88 @@ export const createPortalSessionMutation = (
   > = {
     mutationFn: async (localOptions) => {
       const { data } = await StripeService.createPortalSession({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const createPaymentIntentQueryKey = (
+  options: Options<StripeCreatePaymentIntentData>,
+) => createQueryKey("stripeCreatePaymentIntent", options)
+
+export const createPaymentIntentOptions = (
+  options: Options<StripeCreatePaymentIntentData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.createPaymentIntent({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: createPaymentIntentQueryKey(options),
+  })
+}
+
+export const createPaymentIntentMutation = (
+  options?: Partial<Options<StripeCreatePaymentIntentData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    StripeCreatePaymentIntentResponse,
+    StripeCreatePaymentIntentError,
+    Options<StripeCreatePaymentIntentData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await StripeService.createPaymentIntent({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const confirmSubscriptionQueryKey = (
+  options: Options<StripeConfirmSubscriptionData>,
+) => createQueryKey("stripeConfirmSubscription", options)
+
+export const confirmSubscriptionOptions = (
+  options: Options<StripeConfirmSubscriptionData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.confirmSubscription({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: confirmSubscriptionQueryKey(options),
+  })
+}
+
+export const confirmSubscriptionMutation = (
+  options?: Partial<Options<StripeConfirmSubscriptionData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    StripeConfirmSubscriptionResponse,
+    StripeConfirmSubscriptionError,
+    Options<StripeConfirmSubscriptionData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await StripeService.confirmSubscription({
         ...options,
         ...localOptions,
         throwOnError: true,

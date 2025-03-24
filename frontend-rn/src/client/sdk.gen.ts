@@ -91,6 +91,12 @@ import type {
   StripeCreatePortalSessionData,
   StripeCreatePortalSessionResponse,
   StripeCreatePortalSessionError,
+  StripeCreatePaymentIntentData,
+  StripeCreatePaymentIntentResponse,
+  StripeCreatePaymentIntentError,
+  StripeConfirmSubscriptionData,
+  StripeConfirmSubscriptionResponse,
+  StripeConfirmSubscriptionError,
 } from "./types.gen"
 import { client as _heyApiClient } from "./client.gen"
 
@@ -855,6 +861,56 @@ export class StripeService {
         "Content-Type": "application/json",
         ...options?.headers,
       },
+    })
+  }
+
+  /**
+   * Create Payment Intent
+   * Create a payment intent for subscription setup using Stripe PaymentSheet
+   */
+  public static createPaymentIntent<ThrowOnError extends boolean = false>(
+    options: Options<StripeCreatePaymentIntentData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      StripeCreatePaymentIntentResponse,
+      StripeCreatePaymentIntentError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/create-payment-intent",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Confirm Subscription
+   * Confirm subscription creation after successful payment
+   */
+  public static confirmSubscription<ThrowOnError extends boolean = false>(
+    options: Options<StripeConfirmSubscriptionData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      StripeConfirmSubscriptionResponse,
+      StripeConfirmSubscriptionError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/confirm-subscription",
+      ...options,
     })
   }
 }

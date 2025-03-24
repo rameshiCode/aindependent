@@ -19,6 +19,8 @@ from app.api.deps import (
 from app.models import (
     CheckoutSessionCreate,
     Customer,
+    PaymentIntentCreate,
+    PaymentIntentResponse,
     Plan,
     PortalSessionCreate,
     Price,
@@ -951,4 +953,175 @@ async def create_portal_session(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while creating the portal session",
+        )
+
+@router.post("/create-payment-intent", response_model=PaymentIntentResponse)
+async def create_payment_intent(
+    payment_intent_data: PaymentIntentCreate,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> dict:
+    """
+    Create a payment intent for subscription setup using Stripe PaymentSheet
+    """
+    try:
+        logger.info(f"Creating payment intent for user {current_user.id} with price {payment_intent_data.price_id}")
+        
+        # Get or create a Stripe customer for the current user
+        customer = session.exec(
+            select(Customer).where(Customer.user_id == current_user.id)
+        ).first()
+        
+        if not customer:
+            # Create a new customer record
+            stripe_customer = stripe.Customer.create(
+                email=current_user.email,
+                metadata={"user_id": str(current_user.id)},
+            )
+            
+            customer = Customer(
+                user_id=current_user.id,
+                stripe_customer_id=stripe_customer.id,
+            )
+            session.add(customer)
+            session.commit()
+            session.refresh(customer)
+        
+        # Verify the price exists in Stripe
+        price = session.exec(
+            select(Price).where(Price.stripe_price_id == payment_intent_data.price_id)
+        ).first()
+        
+        if not price:
+            # Retrieve price from Stripe and create in database
+            stripe_price = stripe.Price.retrieve(payment_intent_data.price_id)
+            
+            # Ensure plan exists
+            plan = session.exec(
+                select(Plan).where(Plan.stripe_product_id == stripe_price.product)
+            ).first()
+            
+            if not plan:
+                product_data = stripe.Product.retrieve(stripe_price.product)
+                plan = Plan(
+                    name=product_data.name,
+                    description=product_data.get("description", ""),
+                    stripe_product_id=product_data.id,
+                )
+                session.add(plan)
+                session.commit()
+                session.refresh(plan)
+            
+            # Create price
+            price = Price(
+                plan_id=plan.id,
+                stripe_price_id=payment_intent_data.price_id,
+                amount=stripe_price.unit_amount,
+                currency=stripe_price.currency,
+                interval=stripe_price.recurring.interval,
+                interval_count=stripe_price.recurring.interval_count,
+            )
+            session.add(price)
+            session.commit()
+            session.refresh(price)
+        
+        # Create ephemeral key for the customer
+        ephemeral_key = stripe.EphemeralKey.create(
+            customer=customer.stripe_customer_id,
+            stripe_version=stripe.api_version,
+        )
+        
+        # Create a payment intent
+        payment_intent = stripe.PaymentIntent.create(
+            amount=price.amount,
+            currency=price.currency,
+            customer=customer.stripe_customer_id,
+            setup_future_usage=payment_intent_data.setup_future_usage,
+            metadata={
+                "price_id": price.stripe_price_id,
+                "user_id": str(current_user.id),
+                **(payment_intent_data.metadata if payment_intent_data.metadata else {}),
+            },
+            automatic_payment_methods={"enabled": True},
+        )
+        
+        return {
+            "client_secret": payment_intent.client_secret,
+            "ephemeral_key": ephemeral_key.secret,
+            "customer_id": customer.stripe_customer_id,
+            "publishable_key": os.environ.get("STRIPE_PUBLISHABLE_KEY"),
+        }
+    
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Stripe error: {str(e)}",
+        )
+    except Exception as e:
+        logger.error(f"Error creating payment intent: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating the payment intent",
+        )
+
+@router.post("/confirm-subscription", status_code=status.HTTP_201_CREATED)
+async def confirm_subscription(
+    payment_intent_id: str,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> dict:
+    """
+    Confirm subscription creation after successful payment
+    """
+    try:
+        # Retrieve the payment intent
+        payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+        
+        if payment_intent.status != "succeeded":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Payment not successful. Status: {payment_intent.status}",
+            )
+        
+        # Get price_id from metadata
+        price_id = payment_intent.metadata.get("price_id")
+        if not price_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Price ID not found in payment intent metadata",
+            )
+        
+        # Get customer
+        customer = session.exec(
+            select(Customer).where(Customer.user_id == current_user.id)
+        ).first()
+        
+        if not customer:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Customer not found",
+            )
+        
+        # Create subscription in Stripe
+        subscription = stripe.Subscription.create(
+            customer=customer.stripe_customer_id,
+            items=[{"price": price_id}],
+            expand=["latest_invoice.payment_intent"],
+        )
+        
+        # Webhook will handle database updates, but we can return the subscription ID
+        return {"subscription_id": subscription.id}
+    
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Stripe error: {str(e)}",
+        )
+    except Exception as e:
+        logger.error(f"Error confirming subscription: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while confirming the subscription",
         )

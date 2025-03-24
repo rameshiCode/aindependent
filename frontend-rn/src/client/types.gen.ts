@@ -34,6 +34,22 @@ export type NewPassword = {
   new_password: string
 }
 
+export type PaymentIntentCreate = {
+  price_id: string
+  customer_id?: string | null
+  setup_future_usage?: string | null
+  metadata?: {
+    [key: string]: unknown
+  } | null
+}
+
+export type PaymentIntentResponse = {
+  client_secret: string
+  ephemeral_key: string
+  customer_id: string
+  publishable_key: string
+}
+
 export type PortalSessionCreate = {
   return_url: string
 }
@@ -900,6 +916,64 @@ export type StripeCreatePortalSessionResponses = {
 
 export type StripeCreatePortalSessionResponse =
   StripeCreatePortalSessionResponses[keyof StripeCreatePortalSessionResponses]
+
+export type StripeCreatePaymentIntentData = {
+  body: PaymentIntentCreate
+  path?: never
+  query?: never
+  url: "/api/v1/stripe/create-payment-intent"
+}
+
+export type StripeCreatePaymentIntentErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type StripeCreatePaymentIntentError =
+  StripeCreatePaymentIntentErrors[keyof StripeCreatePaymentIntentErrors]
+
+export type StripeCreatePaymentIntentResponses = {
+  /**
+   * Successful Response
+   */
+  200: PaymentIntentResponse
+}
+
+export type StripeCreatePaymentIntentResponse =
+  StripeCreatePaymentIntentResponses[keyof StripeCreatePaymentIntentResponses]
+
+export type StripeConfirmSubscriptionData = {
+  body?: never
+  path?: never
+  query: {
+    payment_intent_id: string
+  }
+  url: "/api/v1/stripe/confirm-subscription"
+}
+
+export type StripeConfirmSubscriptionErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type StripeConfirmSubscriptionError =
+  StripeConfirmSubscriptionErrors[keyof StripeConfirmSubscriptionErrors]
+
+export type StripeConfirmSubscriptionResponses = {
+  /**
+   * Successful Response
+   */
+  201: {
+    [key: string]: unknown
+  }
+}
+
+export type StripeConfirmSubscriptionResponse =
+  StripeConfirmSubscriptionResponses[keyof StripeConfirmSubscriptionResponses]
 
 export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})

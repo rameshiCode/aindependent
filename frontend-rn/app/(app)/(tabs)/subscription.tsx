@@ -33,21 +33,18 @@ const fetchSubscription = async () => {
 
 
 
- // Open customer portal
+// Update the openCustomerPortal function in Subscription.tsx
 const openCustomerPortal = async () => {
   try {
     setPortalLoading(true);
 
-    // Use your app's scheme from app.json
-    const baseUrl = "com.anonymous.aindependenta://";
-
-    // Use StripeService instead of api
+    // Use a valid URL for Stripe portal
     const { data } = await StripeService.createPortalSession({
-      query: {
-        return_url: `${baseUrl}subscription`,
+      body: {
+        return_url: `https://example.com/return`, // Use a valid URL here
       },
       throwOnError: true
-    });
+    }) ;
 
     // Add type checking
     if (data && typeof data.url === 'string') {
@@ -62,6 +59,7 @@ const openCustomerPortal = async () => {
     setPortalLoading(false);
   }
 };
+
 
 
 // Load subscription data on mount

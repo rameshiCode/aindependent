@@ -1,144 +1,204 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
-import { CardField, useStripe, CardFieldInput } from '@stripe/stripe-react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { useStripe, initPaymentSheet, presentPaymentSheet } from '@stripe/stripe-react-native';
 import { useRouter } from 'expo-router';
 import { StripeService } from '../src/client';
 import { useMutation } from '@tanstack/react-query';
-import { createCheckoutSessionMutation } from '../src/client/@tanstack/react-query.gen';
-
+import { createPaymentIntentMutation, confirmSubscriptionMutation } from '../src/client/@tanstack/react-query.gen';
 
 interface StripePaymentFormProps {
   priceId: string;
-  onPaymentMethodCreated?: (paymentMethodId: string) => void;
+  onPaymentSuccess?: (subscriptionId: string) => void;
   isLoading?: boolean;
-  useCheckout?: boolean; // Whether to use Stripe Checkout or direct payment
+  useCheckout?: boolean; // Add this prop to support both approaches
 }
 
 const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
   priceId,
-  onPaymentMethodCreated,
+  onPaymentSuccess,
   isLoading = false,
-  useCheckout = true,
+  useCheckout = false, // Default to false (use PaymentSheet)
 }) => {
   const stripe = useStripe();
   const router = useRouter();
-  const { createPaymentMethod } = stripe;
-
-  const [cardComplete, setCardComplete] = useState(false);
-  const [cardDetails, setCardDetails] = useState<CardFieldInput.Details | null>(null);
+  const [isStripeInitialized, setIsStripeInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isStripeReady, setIsStripeReady] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false); // Add this to prevent infinite loop
 
-  // Check if Stripe SDK is initialized
+  // Create payment intent mutation
+  const paymentIntentMutation = useMutation(createPaymentIntentMutation());
+  
+  // Confirm subscription mutation
+  const subscriptionMutation = useMutation(confirmSubscriptionMutation());
+  
+  // Check if Stripe is ready
   useEffect(() => {
     if (stripe) {
-      console.log('Stripe SDK is ready');
-      setIsStripeReady(true);
-    } else {
-      console.log('Stripe SDK is not initialized');
+      setIsStripeInitialized(true);
     }
   }, [stripe]);
 
-  // Debug logging
+  // Initialize payment sheet when Stripe is ready and not already initialized
   useEffect(() => {
-    console.log('=====================');
-    console.log('Stripe Payment Form Debug');
-    console.log('Stripe initialized:', isStripeReady ? 'Yes' : 'No');
-    console.log('Card Complete:', cardComplete);
-    console.log('Card Details:', cardDetails ? {
-      brand: cardDetails.brand,
-      last4: cardDetails.last4,
-      expiryMonth: cardDetails.expiryMonth,
-      expiryYear: cardDetails.expiryYear,
-      complete: cardDetails.complete,
-    } : 'None');
-    console.log('=====================');
-  }, [cardDetails, cardComplete, isStripeReady]);
-
-  // Handle direct payment method creation
-  const handleDirectPayment = async () => {
-    try {
-      console.log('Card complete status:', cardComplete);
-      if (!cardComplete) {
-        console.log('Card is incomplete, showing error');
-        setError('Please complete the card details');
-        return;
-      }
-
-      setError(null);
-      setIsSubmitting(true);
-      console.log('Creating payment method...');
-
-      // Create payment method
-      const result = await createPaymentMethod({
-        paymentMethodType: 'Card',
-      });
-
-      console.log('Payment method result:', result);
-      if (result.error) {
-        console.log('Payment method error:', result.error);
-        setError(result.error.message);
-      } else if (result.paymentMethod) {
-        console.log('Payment method created:', result.paymentMethod.id);
-        if (onPaymentMethodCreated) {
-          onPaymentMethodCreated(result.paymentMethod.id);
-        }
-      }
-    } catch (e: any) {
-      console.error('Payment form error details:', e);
-      setError(`An unexpected error occurred: ${e.message}`);
-    } finally {
-      setIsSubmitting(false);
+    // Only initialize if Stripe is ready and we haven't initialized yet
+    if (isStripeInitialized && !isInitialized && !useCheckout) {
+      setIsInitialized(true); // Mark as initialized to prevent repeated calls
+      initializePaymentSheet();
     }
-  };
-const checkoutMutation = useMutation(createCheckoutSessionMutation());
-// Handle Stripe Checkout
-// Handle Stripe Checkout
-const handleCheckout = async () => {
+  }, [isStripeInitialized, isInitialized, priceId, useCheckout]);
+
+  const initializePaymentSheet = async () => {
     try {
       setError(null);
       setIsSubmitting(true);
 
-      // Use your app's scheme from app.json
-      const baseUrl = "com.anonymous.aindependenta://";
-
-      const { data } = await StripeService.createCheckoutSession({
+      // Create payment intent
+      const data = await paymentIntentMutation.mutateAsync({
         body: {
           price_id: priceId,
-          success_url: `${baseUrl}subscription-success`,
-          cancel_url: `${baseUrl}subscription-cancel`,
-        },
-        throwOnError: true
+          setup_future_usage: "off_session",
+          metadata: {
+            source: "mobile_app"
+          }
+        }
       });
 
-      // Add type checking
-      if (data && typeof data.url === 'string') {
-        router.push(`/web-view?url=${encodeURIComponent(data.url)}`);
-      } else {
-        setError('Failed to create checkout session');
+      if (!data) {
+        throw new Error("Failed to create payment intent");
       }
+
+      // Save payment intent ID for later confirmation
+      if (data.client_secret) {
+        setPaymentIntentId(data.client_secret.split('_secret_')[0]);
+      }
+
+      // Initialize payment sheet
+      const { error: initError } = await initPaymentSheet({
+        merchantDisplayName: "AI Independent",
+        customerId: data.customer_id,
+        customerEphemeralKeySecret: data.ephemeral_key,
+        paymentIntentClientSecret: data.client_secret,
+        allowsDelayedPaymentMethods: false,
+        defaultBillingDetails: {
+          name: 'Default Name', // You can customize this with user data
+        }
+      });
+
+      if (initError) {
+        throw new Error(initError.message);
+      }
+
+      setIsSubmitting(false);
     } catch (e: any) {
-      console.error('Checkout error:', e);
-      setError(`Failed to start checkout: ${e.message}`);
-    } finally {
+      console.error('Payment sheet initialization error:', e);
+      setError(`Failed to initialize payment: ${e.message}`);
       setIsSubmitting(false);
     }
   };
 
+  // Handle checkout approach (for backward compatibility)
+// In StripePaymentForm.tsx
+const handleCheckout = async () => {
+  try {
+    setError(null);
+    setIsSubmitting(true);
+    
+    // Use valid URLs for Stripe checkout
+    const { data } = await StripeService.createCheckoutSession({
+      body: {
+        price_id: priceId,
+        success_url: `https://example.com/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `https://example.com/cancel`,
+      },
+      throwOnError: true
+    }) ;
+    
+    // Check what fields are actually in your response
+    console.log("Checkout session response:", data);
+    // Add this to your handleCheckout function
+    console.log("Full checkout response:", JSON.stringify(data, null, 2));
+
+    
+    // Try different possible field names
+    const checkoutUrl = data?.checkout_url || data?.url || data?.session_url;
+    
+    if (checkoutUrl && typeof checkoutUrl === 'string') {
+      router.push(`/web-view?url=${encodeURIComponent(checkoutUrl)}`);
+    } else {
+      throw new Error("No checkout URL returned or URL is not a string");
+    }
+    
+    setIsSubmitting(false);
+  } catch (e: any) {
+    console.error('Checkout error:', e);
+    setError(`Failed to start checkout: ${e.message}`);
+    setIsSubmitting(false);
+  }
+};
 
 
-  // Handle payment button press
   const handlePayPress = async () => {
+    // If using checkout approach, use that instead of PaymentSheet
     if (useCheckout) {
       await handleCheckout();
-    } else {
-      await handleDirectPayment();
+      return;
+    }
+    
+    try {
+      setError(null);
+      setIsSubmitting(true);
+
+      // Present payment sheet
+      const { error: presentError } = await presentPaymentSheet();
+
+      if (presentError) {
+        if (presentError.code === 'Canceled') {
+          // User canceled the payment - not an error
+          setIsSubmitting(false);
+          return;
+        }
+        throw new Error(presentError.message);
+      }
+
+      // Payment successful, confirm subscription
+      if (paymentIntentId) {
+        const result = await subscriptionMutation.mutateAsync({
+          query: {
+            payment_intent_id: paymentIntentId
+          }
+        });
+        
+        if (result && onPaymentSuccess) {
+          // Ensure we're passing a string to onPaymentSuccess
+          const subscriptionId = typeof result.subscription_id === 'string' 
+            ? result.subscription_id 
+            : typeof result.id === 'string' 
+              ? result.id 
+              : String(result.subscription_id || result.id || "");
+          onPaymentSuccess(subscriptionId);
+        }
+        
+        Alert.alert(
+          "Subscription Successful",
+          "Your subscription has been activated successfully!",
+          [{ text: "OK" }]
+        );
+      } else {
+        throw new Error("Payment intent ID not found");
+      }
+
+      setIsSubmitting(false);
+    } catch (e: any) {
+      console.error('Payment error:', e);
+      setError(`Payment failed: ${e.message}`);
+      setIsSubmitting(false);
     }
   };
 
-  // Show loading state if Stripe is not initialized
-  if (!isStripeReady) {
+  // Show loading state if Stripe is not initialized and we're not using checkout
+  if (!isStripeInitialized && !useCheckout) {
     return (
       <View style={styles.container}>
         <Text style={styles.loadingText}>Initializing payment system...</Text>
@@ -149,79 +209,13 @@ const handleCheckout = async () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Card Information</Text>
-
       {__DEV__ && (
         <View style={styles.testModeContainer}>
-          <Text style={styles.testModeTitle}>⚠️ Test Mode Shortcut</Text>
-          <Pressable
-            style={styles.testModeButton}
-            onPress={() => {
-              console.log('Using test card without form');
-              // This simulates a successful card completion
-              setCardComplete(true);
-              setCardDetails({
-                complete: true,
-                brand: 'Visa',
-                last4: '4242',
-                expiryMonth: 12,
-                expiryYear: 2030,
-                postalCode: '12345',
-                validCVC: 'Valid',
-                validExpiryDate: 'Valid',
-                validNumber: 'Valid'
-              } as unknown as CardFieldInput.Details);
-            }}
-          >
-            <Text style={styles.testModeButtonText}>Use Test Card (4242)</Text>
-          </Pressable>
+          <Text style={styles.testModeTitle}>⚠️ Test Mode</Text>
+          <Text style={styles.testCardText}>
+            You can use test card 4242 4242 4242 4242 with any future expiry date and CVC.
+          </Text>
         </View>
-      )}
-
-      {__DEV__ && (
-        <View style={styles.testCardContainer}>
-          <Text style={styles.testCardTitle}>Test Card Details:</Text>
-          <Text style={styles.testCardText}>• Number: 4242 4242 4242 4242</Text>
-          <Text style={styles.testCardText}>• Expiry: Any future date (e.g., 12/30)</Text>
-          <Text style={styles.testCardText}>• CVC: Any 3 digits</Text>
-          <Text style={styles.testCardText}>• ZIP: Any 5 digits</Text>
-        </View>
-      )}
-
-      {!useCheckout && (
-        <CardField
-          postalCodeEnabled={true}
-          placeholders={{
-            number: '4242 4242 4242 4242',
-            expiryDate: 'MM/YY',
-            cvc: 'CVC',
-            postalCode: 'ZIP',
-          }}
-          autofocus={true}
-          cardStyle={{
-            backgroundColor: '#FFFFFF',
-            textColor: '#000000',
-            borderWidth: 1,
-            borderColor: '#CCCCCC',
-            borderRadius: 8,
-            fontSize: 16,
-          }}
-          style={{ width: '100%', height: 50, marginVertical: 12 }}
-          onCardChange={(cardDetails) => {
-            console.log('CARD DETAILS:', {
-              brand: cardDetails.brand,
-              last4: cardDetails.last4,
-              expiryMonth: cardDetails.expiryMonth,
-              expiryYear: cardDetails.expiryYear,
-              complete: cardDetails.complete,
-              validNumber: cardDetails.validNumber,
-              validExpiryDate: cardDetails.validExpiryDate,
-              validCVC: cardDetails.validCVC,
-            });
-            setCardDetails(cardDetails);
-            setCardComplete(cardDetails.complete);
-          }}
-        />
       )}
 
       {error && (
@@ -232,17 +226,15 @@ const handleCheckout = async () => {
         style={({ pressed }) => [
           styles.button,
           pressed && styles.buttonPressed,
-          (isLoading || isSubmitting) && styles.buttonDisabled
+          (isLoading || isSubmitting || paymentIntentMutation.isPending) && styles.buttonDisabled
         ]}
         onPress={handlePayPress}
-        disabled={isLoading || isSubmitting || (!useCheckout && !cardComplete)}
+        disabled={isLoading || isSubmitting || paymentIntentMutation.isPending}
       >
-        {(isLoading || isSubmitting) ? (
+        {(isLoading || isSubmitting || paymentIntentMutation.isPending) ? (
           <ActivityIndicator size="small" color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>
-            {useCheckout ? 'Proceed to Checkout' : (cardComplete ? 'Subscribe' : 'Complete Card Details')}
-          </Text>
+          <Text style={styles.buttonText}>Subscribe Now</Text>
         )}
       </Pressable>
     </View>
@@ -253,32 +245,16 @@ const styles = StyleSheet.create({
   container: {
     marginVertical: 10,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#555',
-  },
   loadingText: {
     fontSize: 16,
     color: '#555',
     marginBottom: 12,
     textAlign: 'center',
   },
-  cardFieldContainer: {
-    height: 50,
-    marginVertical: 8,
-  },
-  cardField: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    fontSize: 16,
-  },
   errorText: {
     color: '#FF4444',
     marginTop: 8,
+    marginBottom: 16,
     fontSize: 14,
   },
   button: {
@@ -301,24 +277,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  testCardContainer: {
-    padding: 12,
-    backgroundColor: '#f0f9ff',
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e0f2fe',
-  },
-  testCardTitle: {
-    fontWeight: 'bold',
-    marginBottom: 6,
-    color: '#0369a1',
-  },
-  testCardText: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#334155',
-  },
   testModeContainer: {
     backgroundColor: '#FEF3C7',
     padding: 12,
@@ -329,18 +287,13 @@ const styles = StyleSheet.create({
   },
   testModeTitle: {
     fontWeight: 'bold',
+    marginBottom: 6,
     color: '#92400E',
-    marginBottom: 8,
   },
-  testModeButton: {
-    backgroundColor: '#F59E0B',
-    padding: 10,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  testModeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  testCardText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#78350F',
   },
 });
 
