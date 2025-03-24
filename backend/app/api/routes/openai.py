@@ -91,10 +91,11 @@ async def create_conversation(
     current_user: CurrentUser
 ):
     new_conversation = Conversation(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),  # Changed from str(uuid.uuid4())
         user_id=current_user.id,
         title=conversation.title
     )
+
     session.add(new_conversation)
     session.commit()
     session.refresh(new_conversation)
@@ -145,7 +146,7 @@ async def get_conversations(
 # Get a specific conversation with messages
 @router.get("/conversations/{conversation_id}", response_model=ConversationWithMessages)
 async def get_conversation(
-    conversation_id: str,
+    conversation_id: uuid.UUID,  # Changed from str to uuid.UUID
     session: SessionDep,
     current_user: CurrentUser
 ):

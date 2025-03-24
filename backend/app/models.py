@@ -224,8 +224,8 @@ class PaymentIntentResponse(BaseModel):
 
 # Conversation model
 class Conversation(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    user_id: str = Field(foreign_key="user.id", index=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
     title: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -236,21 +236,21 @@ class Conversation(SQLModel, table=True):
 
 # Message model
 class Message(SQLModel, table=True):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    conversation_id: str = Field(foreign_key="conversation.id", index=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    conversation_id: uuid.UUID = Field(foreign_key="conversation.id", index=True)
     role: str  # "system", "user", or "assistant"
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
     conversation: Optional[Conversation] = Relationship(back_populates="messages")
-
+    
 # Pydantic models for API requests/responses
 class MessageSchema(BaseModel):
     role: str
     content: str
 
-class ChatCompletionRequest(BaseModel):
+class ChatCompletionRequest(SQLModel):
     messages: List[MessageSchema]
     model: str = "gpt-4o"
     temperature: float = 0.7
@@ -264,12 +264,13 @@ class ChatCompletionResponse(BaseModel):
 class ConversationCreate(BaseModel):
     title: str = "New Conversation"
 
-class ConversationWithMessages(BaseModel):
-    id: str
+class ConversationWithMessages(SQLModel):
+    id: uuid.UUID
     title: str
     created_at: datetime
     updated_at: datetime
     messages: List[MessageSchema]
+
 
 # class WebhookEvent(SQLModel):
 #     id: str
