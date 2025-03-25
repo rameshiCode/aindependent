@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import sys
@@ -111,10 +112,33 @@ try:
 except Exception as e:
     logger.error(f"❌ Failed to initialize OpenAI client: {str(e)}")
     logger.exception("Detailed exception:")
-
 logger.info("======== OPENAI CLIENT SETUP COMPLETE ========")
 
+
+async def call_openai_with_retry(messages, max_retries=3):
+    """Call OpenAI API with retry logic for transient errors"""
+    retries = 0
+    while retries < max_retries:
+        try:
+            completion = await openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",  # Default model, could be parameterized
+                messages=messages,
+            )
+            return completion
+        except Exception as e:
+            retries += 1
+            logger.warning(
+                f"OpenAI API call failed (attempt {retries}/{max_retries}): {str(e)}"
+            )
+            if retries >= max_retries:
+                logger.error(f"Max retries reached. Last error: {str(e)}")
+                raise
+            # Add a small delay before retrying
+            await asyncio.sleep(1)
+
+
 try:
+    # Initialize OpenAI client at module load
     # Initialize OpenAI client at module load
     api_key = os.environ.get("OPENAI_API_KEY")
     if api_key:
@@ -382,29 +406,27 @@ async def create_message(
     session: SessionDep,
 ) -> MessageSchema:
     """Create a new message and get a response from OpenAI"""
+    # Add this line to reference the global variable
+    global openai_client
+
     # Enhanced error logging
     logger.info(f"Creating message in conversation {conversation_id}")
 
     try:
-        # Check if conversation exists and belongs to user
+        # Add this code to fetch conversation
         conversation = session.exec(
-            select(Conversation).where(
-                Conversation.id == conversation_id,
-                Conversation.user_id == current_user.id,
-            )
+            select(Conversation)
+            .where(Conversation.id == conversation_id)
+            .where(Conversation.user_id == current_user.id)
         ).first()
 
         if not conversation:
             logger.error(
-                f"Conversation {conversation_id} not found for user {current_user.id}"
+                f"Conversation {conversation_id} not found or doesn't belong to user {current_user.id}"
             )
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Conversation not found",
+                status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
             )
-
-        # Log message info (without content for privacy)
-        logger.info(f"User message with role: {message.role}")
 
         # Save user message to database
         db_message = Message(
@@ -457,11 +479,7 @@ async def create_message(
 
         # Call OpenAI API with error handling
         try:
-            completion = await openai_client.chat.completions.create(
-                model="gpt-4o",  # Or your preferred model
-                messages=messages_for_api,
-                temperature=0.7,
-            )
+            completion = await call_openai_with_retry(messages_for_api)
 
             # Log success
             logger.info(f"OpenAI API response received: {completion.model}")
