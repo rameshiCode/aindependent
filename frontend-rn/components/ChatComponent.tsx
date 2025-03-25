@@ -20,7 +20,8 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-const API_URL = 'http://100.78.104.99:8000';
+const API_URL = process.env.API_URL || 'http://100.78.104.99:8000';
+console.log('ChatComponent using API URL:', API_URL);
 
 interface Message {
   role: string;

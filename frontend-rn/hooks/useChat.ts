@@ -21,22 +21,40 @@ export function useChat() {
   const queryClient = useQueryClient();
   const { session } = useAuth();
 
+  // Debug API URL from environment
+  console.log('API_URL from env:', process.env.API_URL);
+  const apiUrl = process.env.API_URL || 'http://localhost:8000';
+  console.log('Using API URL:', apiUrl);
+
   // Fetch conversations
   const { data: conversations, isLoading: isLoadingConversations } = useQuery({
     queryKey: ['conversations'],
     queryFn: async () => {
-      const response = await fetch(`${process.env.API_URL}/api/v1/openai/conversations`, {
-        headers: {
-          'Authorization': `Bearer ${session}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      console.log('Fetching conversations with session token:', session ? `${session.substring(0, 10)}...` : 'none');
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch conversations');
+      try {
+        const response = await fetch(`${apiUrl}/api/v1/openai/conversations`, {
+          headers: {
+            'Authorization': `Bearer ${session}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        console.log('Conversations API response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('API error response:', errorText);
+          throw new Error(`Failed to fetch conversations: ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('Received conversations:', data.length);
+        return data;
+      } catch (error) {
+        console.error('Error in conversations fetch:', error);
+        throw error;
       }
-
-      return response.json();
     },
     enabled: !!session,
   });
@@ -44,7 +62,7 @@ export function useChat() {
   // Create conversation mutation
   const createConversation = useMutation({
     mutationFn: async (title: string = 'New Conversation') => {
-      const response = await fetch(`${process.env.API_URL}/api/v1/openai/conversations`, {
+      const response = await fetch(`${apiUrl}/api/v1/openai/conversations`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session}`,
@@ -75,7 +93,7 @@ export function useChat() {
         content,
       };
 
-      const response = await fetch(`${process.env.API_URL}/api/v1/openai/conversations/${conversationId}/messages`, {
+      const response = await fetch(`${apiUrl}/api/v1/openai/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session}`,

@@ -22,18 +22,32 @@ from app.models import (
 
 router = APIRouter(prefix="/openai", tags=["openai"])
 
-# Set up logging
+# Enhanced logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Use only environment variables
+# More detailed environment variable debugging
+logger.info("Loading OpenAI configuration...")
+logger.info(f"Environment variables: {list(os.environ.keys())}")
+
+# Check if OPENAI_API_KEY exists and log its status
 api_key = os.environ.get("OPENAI_API_KEY")
 if not api_key:
-    logger.error("OpenAI API key not found in environment variables")
+    logger.error("⚠️ OPENAI_API_KEY not found in environment variables!")
+    logger.info(
+        "Available environment variables: %s", ", ".join(sorted(os.environ.keys()))
+    )
+else:
+    logger.info(f"✅ OPENAI_API_KEY found (first 4 chars): {api_key[:4]}...")
 
-# Initialize client
-logger.info(f"OpenAI API Key (first 4 chars): {api_key[:4]}...")
-openai_client = AsyncOpenAI(api_key=api_key)
+# Initialize client with additional logging
+try:
+    logger.info("Initializing OpenAI client...")
+    openai_client = AsyncOpenAI(api_key=api_key)
+    logger.info("✅ OpenAI client initialized successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize OpenAI client: {str(e)}")
+    raise
 
 
 # Helper functions for OpenAI API
