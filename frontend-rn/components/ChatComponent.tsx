@@ -19,9 +19,15 @@ import { useAuth } from '@/context/authProvider';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 
-const API_URL = process.env.API_URL || 'http://100.78.104.99:8000';
-console.log('ChatComponent using API URL:', API_URL);
+// Debug API configuration
+const API_URL = Constants.expoConfig?.extra?.API_URL || 'http://100.78.104.99:8000';
+console.log('=== CHAT COMPONENT API CONFIG ===');
+console.log('API_URL from app.config:', Constants.expoConfig?.extra?.API_URL);
+console.log('Using API URL:', API_URL);
+console.log('All extra config:', JSON.stringify(Constants.expoConfig?.extra));
+console.log('================================');
 
 interface Message {
   role: string;

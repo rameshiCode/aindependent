@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
@@ -26,28 +27,91 @@ router = APIRouter(prefix="/openai", tags=["openai"])
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# More detailed environment variable debugging
-logger.info("Loading OpenAI configuration...")
-logger.info(f"Environment variables: {list(os.environ.keys())}")
+# Extra debugging: Check .env loading
+try:
+    from dotenv import load_dotenv
 
-# Check if OPENAI_API_KEY exists and log its status
-api_key = os.environ.get("OPENAI_API_KEY")
+    logger.info("Attempting to load .env file explicitly...")
+    load_dotenv()
+    logger.info("dotenv.load_dotenv() called")
+except ImportError:
+    logger.warning("python-dotenv not installed, skipping explicit .env loading")
+
+# More detailed environment variable debugging
+logger.info("=================== OPENAI CONFIG DEBUG ===================")
+logger.info(f"Python version: {sys.version}")
+logger.info(f"Current working directory: {os.getcwd()}")
+logger.info(f"Environment variable count: {len(os.environ)}")
+
+# Check all possible env var names for OpenAI
+possible_key_names = [
+    "OPENAI_API_KEY",
+    "OPENAI_KEY",
+    "OPENAI_SECRET_KEY",
+    "OPENAI_TOKEN",
+    "openai_api_key",  # Try lowercase too
+]
+
+# Show ALL environment variables for debugging (careful with security!)
+all_env_keys = list(os.environ.keys())
+logger.info(f"All environment variable names: {all_env_keys}")
+
+# Check for any OpenAI-related keys
+openai_related_keys = [k for k in all_env_keys if "openai" in k.lower()]
+logger.info(f"OpenAI-related keys found: {openai_related_keys}")
+
+# Try different methods to get the API key
+api_key = None
+for key_name in possible_key_names:
+    # Try both methods of accessing env vars
+    value = os.environ.get(key_name)
+    if value:
+        logger.info(f"✅ Found key using name: {key_name}")
+        api_key = value
+        break
+
 if not api_key:
-    logger.error("⚠️ OPENAI_API_KEY not found in environment variables!")
-    logger.info(
-        "Available environment variables: %s", ", ".join(sorted(os.environ.keys()))
-    )
+    logger.error("❌ OpenAI API key not found in any expected variable names!")
+
+    # Check .env files
+    env_paths = [".env", "/.env", "../.env", "../..//.env", "/app/.env"]
+    for path in env_paths:
+        if os.path.exists(path):
+            logger.info(f"Found .env file at: {path}")
+            with open(path) as f:
+                content = f.read().strip()
+                if "OPENAI_API_KEY" in content:
+                    logger.info("✅ .env file contains OPENAI_API_KEY")
+                    # DO NOT log the actual key content
+                else:
+                    logger.error("❌ .env file doesn't contain OPENAI_API_KEY")
+        else:
+            logger.info(f"No .env file at {path}")
 else:
-    logger.info(f"✅ OPENAI_API_KEY found (first 4 chars): {api_key[:4]}...")
+    # Safely log key info without revealing the full key
+    key_length = len(api_key) if api_key else 0
+    key_prefix = api_key[:4] + "..." if api_key and len(api_key) > 4 else ""
+    logger.info(f"✅ OpenAI API key found: length={key_length}, prefix={key_prefix}")
+
+# Add this near the beginning of your openai.py file
+api_key = os.environ.get("OPENAI_API_KEY")
+logger.info(
+    f"Direct API key test: {'✅ Found (length: ' + str(len(api_key)) + ')' if api_key else '❌ Not found'}"
+)
 
 # Initialize client with additional logging
 try:
     logger.info("Initializing OpenAI client...")
-    openai_client = AsyncOpenAI(api_key=api_key)
-    logger.info("✅ OpenAI client initialized successfully")
+    if not api_key:
+        logger.error("Cannot initialize OpenAI client without API key")
+    else:
+        openai_client = AsyncOpenAI(api_key=api_key)
+        logger.info("✅ OpenAI client initialized successfully")
 except Exception as e:
     logger.error(f"❌ Failed to initialize OpenAI client: {str(e)}")
-    raise
+    logger.exception("Detailed exception:")
+
+logger.info("======== OPENAI CLIENT SETUP COMPLETE ========")
 
 
 # Helper functions for OpenAI API

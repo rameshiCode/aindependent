@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/authProvider';
+import Constants from 'expo-constants';
 
 interface Message {
   role: string;
@@ -23,8 +24,8 @@ export function useChat() {
 
   // Debug API URL from environment
   console.log('API_URL from env:', process.env.API_URL);
-  const apiUrl = process.env.API_URL || 'http://localhost:8000';
-  console.log('Using API URL:', apiUrl);
+  const apiUrl = Constants.expoConfig?.extra?.API_URL || 'http://localhost:8000';
+  console.log('useChat hook using API URL:', apiUrl);
 
   // Fetch conversations
   const { data: conversations, isLoading: isLoadingConversations } = useQuery({
