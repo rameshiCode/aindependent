@@ -105,8 +105,6 @@ import type {
   OpenaiGetConversationData,
   OpenaiGetConversationResponse,
   OpenaiGetConversationError,
-  OpenaiStreamMessageData,
-  OpenaiStreamMessageError,
   OpenaiCreateMessageData,
   OpenaiCreateMessageResponse,
   OpenaiCreateMessageError,
@@ -996,32 +994,6 @@ export class OpenaiService {
       ],
       url: "/api/v1/openai/conversations/{conversation_id}",
       ...options,
-    })
-  }
-
-  /**
-   * Stream Message
-   */
-  public static streamMessage<ThrowOnError extends boolean = false>(
-    options: Options<OpenaiStreamMessageData, ThrowOnError>,
-  ) {
-    return (options.client ?? _heyApiClient).post<
-      unknown,
-      OpenaiStreamMessageError,
-      ThrowOnError
-    >({
-      security: [
-        {
-          scheme: "bearer",
-          type: "http",
-        },
-      ],
-      url: "/api/v1/openai/conversations/{conversation_id}/messages/stream",
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
     })
   }
 

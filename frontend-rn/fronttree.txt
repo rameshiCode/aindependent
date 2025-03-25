@@ -1,117 +1,18 @@
 .
 ├── app
 │   ├── (app)
-│   │   ├── _layout.tsx
-│   │   └── (tabs)
-│   │       ├── index.tsx
-│   │       ├── _layout.tsx
-│   │       ├── profile.tsx
-│   │       └── subscription.tsx
+│   │   └── _layout.tsx
 │   ├── (auth)
 │   │   ├── _layout.tsx
 │   │   ├── sign-in.tsx
 │   │   └── sign-up.tsx
-│   ├── health-check.tsx
-│   ├── _layout.tsx
-│   ├── +not-found.tsx
-│   ├── subscription-cancel.tsx
-│   ├── subscription-success.tsx
-│   ├── (tabs)
-│   │   └── health-check.tsx
-│   └── web-view.tsx
-├── app.config.ts
-├── app.json
-├── assets
-│   ├── fonts
-│   │   └── SpaceMono-Regular.ttf
-│   └── images
-│       ├── adaptive-icon.png
-│       ├── favicon.png
-│       ├── icon.png
-│       ├── partial-react-logo.png
-│       ├── pfp.png
-│       ├── react-logo@2x.png
-│       ├── react-logo@3x.png
-│       ├── react-logo.png
-│       └── splash-icon.png
-├── biome.json
-├── components
-│   ├── BackendLogin.tsx
-│   ├── BackendSignUp.tsx
-│   ├── Collapsible.tsx
-│   ├── ExternalLink.tsx
-│   ├── GoogleLogin.tsx
-│   ├── HapticTab.tsx
-│   ├── HelloWave.tsx
-│   ├── ParallaxScrollView.tsx
-│   ├── StripePaymentForm.tsx
-│   ├── __tests__
-│   │   ├── __snapshots__
-│   │   │   └── ThemedText-test.tsx.snap
-│   │   └── ThemedText-test.tsx
-│   ├── ThemedText.tsx
-│   ├── ThemedView.tsx
-│   └── ui
-│       ├── IconSymbol.ios.tsx
-│       ├── IconSymbol.tsx
-│       ├── TabBarBackground.ios.tsx
-│       └── TabBarBackground.tsx
-├── constants
-│   └── Colors.ts
-├── context
-│   ├── authProvider.tsx
-│   └── useStorageState.tsx
-├── Dockerfile
-├── expo-env.d.ts
-├── fix-openapi.js
-├── fronttree.txt
-├── hooks
-│   ├── useColorScheme.ts
-│   ├── useColorScheme.web.ts
-│   └── useThemeColor.ts
-├── openapi.json
-├── openapi-ts.config.ts
-├── openapi-ts-error-1742456859511.log
-├── openapi-ts-error-1742457054450.log
-├── openapi-ts-error-1742457507964.log
-├── openapi-ts-error-1742457732452.log
-├── openapi-ts-error-1742458035428.log
-├── openapi-ts-error-1742458104502.log
-├── openapi-ts-error-1742458680238.log
-├── openapi-ts-error-1742458926237.log
-├── package.json
-├── package-lock.json
-├── README.md
-├── scripts
-│   └── reset-project.js
-├── src
-│   └── client
-│       ├── client.gen.ts
-│       ├── index.ts
-│       ├── sdk.gen.ts
-│       ├── @tanstack
-│       │   └── react-query.gen.ts
-│       └── types.gen.ts
-├── tests
-│   └── subscription.test.tsx
-├── tsconfig.json
-└── utils
-    └── utils.ts
-
-22 directories, 77 files
-.
-├── app
-│   ├── (app)
-│   │   ├── _layout.tsx
+│   ├── (drawer)
 │   │   └── (tabs)
+│   │       ├── chat.tsx
 │   │       ├── index.tsx
 │   │       ├── _layout.tsx
 │   │       ├── profile.tsx
 │   │       └── subscription.tsx
-│   ├── (auth)
-│   │   ├── _layout.tsx
-│   │   ├── sign-in.tsx
-│   │   └── sign-up.tsx
 │   ├── health-check.tsx
 │   ├── _layout.tsx
 │   ├── +not-found.tsx
@@ -137,12 +38,15 @@
 ├── components
 │   ├── BackendLogin.tsx
 │   ├── BackendSignUp.tsx
+│   ├── ChatComponent.tsx
 │   ├── Collapsible.tsx
+│   ├── CustomDrawerContent.tsx
 │   ├── ExternalLink.tsx
 │   ├── GoogleLogin.tsx
 │   ├── HapticTab.tsx
 │   ├── HelloWave.tsx
 │   ├── ParallaxScrollView.tsx
+│   ├── Sidebar.tsx
 │   ├── StripePaymentForm.tsx
 │   ├── __tests__
 │   │   ├── __snapshots__
@@ -165,6 +69,7 @@
 ├── fix-openapi.js
 ├── fronttree.txt
 ├── hooks
+│   ├── useChat.ts
 │   ├── useColorScheme.ts
 │   ├── useColorScheme.web.ts
 │   └── useThemeColor.ts
@@ -190,4 +95,4 @@
 └── utils
     └── utils.ts
 
-21 directories, 69 files
+22 directories, 74 files

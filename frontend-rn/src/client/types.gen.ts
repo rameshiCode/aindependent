@@ -1069,32 +1069,6 @@ export type OpenaiGetConversationResponses = {
 export type OpenaiGetConversationResponse =
   OpenaiGetConversationResponses[keyof OpenaiGetConversationResponses]
 
-export type OpenaiStreamMessageData = {
-  body: MessageSchema
-  path: {
-    conversation_id: string
-  }
-  query?: never
-  url: "/api/v1/openai/conversations/{conversation_id}/messages/stream"
-}
-
-export type OpenaiStreamMessageErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError
-}
-
-export type OpenaiStreamMessageError =
-  OpenaiStreamMessageErrors[keyof OpenaiStreamMessageErrors]
-
-export type OpenaiStreamMessageResponses = {
-  /**
-   * Successful Response
-   */
-  200: unknown
-}
-
 export type OpenaiCreateMessageData = {
   body: MessageSchema
   path: {

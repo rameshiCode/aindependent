@@ -94,8 +94,6 @@ import type {
   OpenaiCreateConversationError,
   OpenaiCreateConversationResponse,
   OpenaiGetConversationData,
-  OpenaiStreamMessageData,
-  OpenaiStreamMessageError,
   OpenaiCreateMessageData,
   OpenaiCreateMessageError,
   OpenaiCreateMessageResponse,
@@ -1241,47 +1239,6 @@ export const getConversationOptions = (
   })
 }
 
-export const streamMessageQueryKey = (
-  options: Options<OpenaiStreamMessageData>,
-) => createQueryKey("openaiStreamMessage", options)
-
-export const streamMessageOptions = (
-  options: Options<OpenaiStreamMessageData>,
-) => {
-  return queryOptions({
-    queryFn: async ({ queryKey, signal }) => {
-      const { data } = await OpenaiService.streamMessage({
-        ...options,
-        ...queryKey[0],
-        signal,
-        throwOnError: true,
-      })
-      return data
-    },
-    queryKey: streamMessageQueryKey(options),
-  })
-}
-
-export const streamMessageMutation = (
-  options?: Partial<Options<OpenaiStreamMessageData>>,
-) => {
-  const mutationOptions: UseMutationOptions<
-    unknown,
-    OpenaiStreamMessageError,
-    Options<OpenaiStreamMessageData>
-  > = {
-    mutationFn: async (localOptions) => {
-      const { data } = await OpenaiService.streamMessage({
-        ...options,
-        ...localOptions,
-        throwOnError: true,
-      })
-      return data
-    },
-  }
-  return mutationOptions
-}
-
 export const createMessageQueryKey = (
   options: Options<OpenaiCreateMessageData>,
 ) => createQueryKey("openaiCreateMessage", options)
@@ -1322,3 +1279,5 @@ export const createMessageMutation = (
   }
   return mutationOptions
 }
+
+export { OpenaiService }

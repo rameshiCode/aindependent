@@ -7,8 +7,8 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
 
+import httpx
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI
 from sqlmodel import select
 
@@ -101,29 +101,48 @@ logger.info(
     f"Direct API key test: {'✅ Found (length: ' + str(len(api_key)) + ')' if api_key else '❌ Not found'}"
 )
 
-# Initialize client with additional logging
+# Initialize client with additional logging and improved SSL handling
 try:
-    logger.info("Initializing OpenAI client...")
+    logger.info("Initializing OpenAI client with enhanced settings...")
     if not api_key:
         logger.error("Cannot initialize OpenAI client without API key")
+        openai_client = None
     else:
-        openai_client = AsyncOpenAI(api_key=api_key)
-        logger.info("✅ OpenAI client initialized successfully")
+        # Create custom HTTP client with improved settings for proxy environments
+        http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=30.0),
+            verify=True,  # WARNING: Security risk! Only for testing
+        )
+
+        openai_client = AsyncOpenAI(api_key=api_key, http_client=http_client)
+
+        logger.info("✅ OpenAI client initialized successfully with enhanced settings")
 except Exception as e:
     logger.error(f"❌ Failed to initialize OpenAI client: {str(e)}")
     logger.exception("Detailed exception:")
+    openai_client = None
 logger.info("======== OPENAI CLIENT SETUP COMPLETE ========")
 
 
-async def call_openai_with_retry(messages, max_retries=3):
+# Models to try in order of preference (fallback mechanism)
+MODELS_TO_TRY = [
+    "gpt-3.5-turbo",  # Most reliable model for proxy environments
+    "gpt-4",  # Alternative if available
+    "gpt-4o",  # Try this last as it might be blocked
+]
+
+
+async def call_openai_with_retry(messages, model="gpt-3.5-turbo", max_retries=3):
     """Call OpenAI API with retry logic for transient errors"""
     retries = 0
     while retries < max_retries:
         try:
+            logger.info(f"Calling OpenAI API with model: {model}")
             completion = await openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",  # Default model, could be parameterized
+                model=model,  # Use the model parameter instead of hardcoding
                 messages=messages,
             )
+            logger.info(f"OpenAI API call successful with model: {model}")
             return completion
         except Exception as e:
             retries += 1
@@ -133,19 +152,59 @@ async def call_openai_with_retry(messages, max_retries=3):
             if retries >= max_retries:
                 logger.error(f"Max retries reached. Last error: {str(e)}")
                 raise
-            # Add a small delay before retrying
-            await asyncio.sleep(1)
+            # Add a small delay before retrying with exponential backoff
+            delay = 1 * (2 ** (retries - 1))  # 1, 2, 4 seconds
+            logger.info(f"Retrying in {delay} seconds...")
+            await asyncio.sleep(delay)
+
+
+async def call_openai_with_fallback(
+    messages, requested_model="gpt-3.5-turbo", max_retries=3
+):
+    """Call OpenAI API with model fallback for proxy restrictions"""
+    # Start with the requested model, then try fallbacks
+    models_to_try = [requested_model]
+
+    # Add other models from MODELS_TO_TRY if they're not already included
+    for model in MODELS_TO_TRY:
+        if model not in models_to_try:
+            models_to_try.append(model)
+
+    last_error = None
+
+    for model in models_to_try:
+        try:
+            logger.info(f"Attempting to use {model} model...")
+            completion = await call_openai_with_retry(
+                messages, model=model, max_retries=max_retries
+            )
+            logger.info(f"Successfully used {model} model")
+            return completion
+        except Exception as e:
+            logger.warning(f"Failed with {model} model: {str(e)}")
+            last_error = e
+
+    # If all models fail, raise the last error
+    logger.error("All models failed, raising last error")
+    raise last_error
 
 
 try:
-    # Initialize OpenAI client at module load
     # Initialize OpenAI client at module load
     api_key = os.environ.get("OPENAI_API_KEY")
     if api_key:
         logger.info(
             f"Initializing OpenAI client with API key (first 4 chars): {api_key[:4]}..."
         )
-        openai_client = AsyncOpenAI(api_key=api_key)
+        # Create custom HTTP client with improved settings for proxy environments
+        http_client = httpx.AsyncClient(
+            # Increase timeouts to handle slow connections
+            timeout=httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=30.0),
+            # SSL verification settings - adjust if needed for your proxy environment
+            verify=True,  # Set to False only if absolutely necessary
+        )
+
+        openai_client = AsyncOpenAI(api_key=api_key, http_client=http_client)
         logger.info("OpenAI client initialized successfully")
     else:
         logger.error("OpenAI API key not found in environment variables")
@@ -165,13 +224,23 @@ async def create_chat_completion(
             {"role": msg.role, "content": msg.content} for msg in request.messages
         ]
 
-        response = await openai_client.chat.completions.create(
-            model=request.model,
-            messages=messages,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
-            stream=False,
-        )
+        # Use the model from the request, but allow fallback if it fails
+        try:
+            response = await openai_client.chat.completions.create(
+                model=request.model,
+                messages=messages,
+                temperature=request.temperature,
+                max_tokens=request.max_tokens,
+                stream=True,
+            )
+        except Exception as model_error:
+            logger.warning(
+                f"Failed with requested model {request.model}: {str(model_error)}"
+            )
+            logger.info("Falling back to alternative models...")
+            response = await call_openai_with_fallback(
+                messages, requested_model=request.model
+            )
 
         # Extract the response message
         message = MessageSchema(
@@ -203,13 +272,28 @@ async def create_chat_completion_stream(
             {"role": msg.role, "content": msg.content} for msg in request.messages
         ]
 
-        stream = await openai_client.chat.completions.create(
-            model=request.model,
-            messages=messages,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
-            stream=True,
-        )
+        # Try with requested model first
+        try:
+            stream = await openai_client.chat.completions.create(
+                model=request.model,
+                messages=messages,
+                temperature=request.temperature,
+                max_tokens=request.max_tokens,
+                stream=True,
+            )
+        except Exception as model_error:
+            logger.warning(
+                f"Failed with requested model {request.model}: {str(model_error)}"
+            )
+            # For streaming, we'll try with a reliable fallback model
+            logger.info("Falling back to gpt-3.5-turbo for streaming...")
+            stream = await openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                temperature=request.temperature,
+                max_tokens=request.max_tokens,
+                stream=True,
+            )
 
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
@@ -317,87 +401,6 @@ async def get_conversation(
     )
 
 
-# Stream a message completion
-@router.post("/conversations/{conversation_id}/messages/stream")
-async def stream_message(
-    conversation_id: uuid.UUID,  # Changed from str to uuid.UUID
-    message: MessageSchema,
-    session: SessionDep,
-    current_user: CurrentUser,
-):
-    # Verify conversation exists and belongs to user
-    conversation = session.exec(
-        select(Conversation)
-        .where(Conversation.id == conversation_id)
-        .where(Conversation.user_id == current_user.id)
-    ).first()
-
-    if not conversation:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
-        )
-
-    # Save user message to database
-    db_message = Message(
-        id=str(uuid.uuid4()),
-        conversation_id=conversation_id,
-        role=message.role,
-        content=message.content,
-    )
-    session.add(db_message)
-    session.commit()
-
-    # Get conversation history
-    messages = session.exec(
-        select(Message)
-        .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at)
-    ).all()
-
-    # Add system message for therapy context if it's the first message
-    chat_messages = [
-        MessageSchema(role=msg.role, content=msg.content) for msg in messages
-    ]
-    if not any(msg.role == "system" for msg in chat_messages):
-        system_message = MessageSchema(
-            role="system",
-            content="You are a therapy assistant specializing in motivational interviewing. "
-            "Your goal is to help users explore and resolve ambivalence about behavior change. "
-            "Use open-ended questions, affirmations, reflective listening, and summaries. "
-            "Be empathetic, non-judgmental, and focus on eliciting the user's own motivations for change.",
-        )
-        chat_messages.insert(0, system_message)
-
-    # Create streaming request
-    request = ChatCompletionRequest(messages=chat_messages, stream=True)
-
-    # This will collect the full response to save to the database
-    full_response = []
-
-    async def response_generator():
-        async for text_chunk in create_chat_completion_stream(request):
-            full_response.append(text_chunk)
-            yield f"data: {text_chunk}\n\n"
-
-        # After streaming is complete, save the full response to the database
-        assistant_message = Message(
-            id=str(uuid.uuid4()),
-            conversation_id=conversation_id,
-            role="assistant",
-            content="".join(full_response),
-        )
-        session.add(assistant_message)
-
-        # Update conversation timestamp
-        conversation.updated_at = datetime.utcnow()
-        session.add(conversation)
-        session.commit()
-
-        yield "data: [DONE]\n\n"
-
-    return StreamingResponse(response_generator(), media_type="text/event-stream")
-
-
 @router.post("/conversations/{conversation_id}/messages", response_model=MessageSchema)
 async def create_message(
     message: MessageSchema,
@@ -450,7 +453,15 @@ async def create_message(
                 )
             try:
                 logger.info("Initializing OpenAI client")
-                openai_client = AsyncOpenAI(api_key=api_key)
+                # Create custom HTTP client with improved settings
+                http_client = httpx.AsyncClient(
+                    timeout=httpx.Timeout(
+                        connect=10.0, read=30.0, write=30.0, pool=30.0
+                    ),
+                    verify=True,  # Adjust if needed for your proxy environment
+                )
+
+                openai_client = AsyncOpenAI(api_key=api_key, http_client=http_client)
             except Exception as e:
                 logger.error(f"Failed to initialize OpenAI client: {str(e)}")
                 raise HTTPException(
@@ -477,9 +488,14 @@ async def create_message(
 
         logger.info(f"Sending {len(messages_for_api)} messages to OpenAI API")
 
-        # Call OpenAI API with error handling
+        # Call OpenAI API with error handling and fallback
         try:
-            completion = await call_openai_with_retry(messages_for_api)
+            # Try with fallback mechanism instead of just retries
+            completion = await call_openai_with_fallback(
+                messages_for_api,
+                requested_model="gpt-3.5-turbo",  # Start with a reliable model
+                max_retries=3,
+            )
 
             # Log success
             logger.info(f"OpenAI API response received: {completion.model}")
