@@ -97,6 +97,19 @@ import type {
   StripeConfirmSubscriptionData,
   StripeConfirmSubscriptionResponse,
   StripeConfirmSubscriptionError,
+  OpenaiGetConversationsData,
+  OpenaiGetConversationsResponse,
+  OpenaiCreateConversationData,
+  OpenaiCreateConversationResponse,
+  OpenaiCreateConversationError,
+  OpenaiGetConversationData,
+  OpenaiGetConversationResponse,
+  OpenaiGetConversationError,
+  OpenaiStreamMessageData,
+  OpenaiStreamMessageError,
+  OpenaiCreateMessageData,
+  OpenaiCreateMessageResponse,
+  OpenaiCreateMessageError,
 } from "./types.gen"
 import { client as _heyApiClient } from "./client.gen"
 
@@ -911,6 +924,131 @@ export class StripeService {
       ],
       url: "/api/v1/stripe/confirm-subscription",
       ...options,
+    })
+  }
+}
+
+export class OpenaiService {
+  /**
+   * Get Conversations
+   */
+  public static getConversations<ThrowOnError extends boolean = false>(
+    options?: Options<OpenaiGetConversationsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      OpenaiGetConversationsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/openai/conversations",
+      ...options,
+    })
+  }
+
+  /**
+   * Create Conversation
+   */
+  public static createConversation<ThrowOnError extends boolean = false>(
+    options: Options<OpenaiCreateConversationData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      OpenaiCreateConversationResponse,
+      OpenaiCreateConversationError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/openai/conversations",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Get Conversation
+   */
+  public static getConversation<ThrowOnError extends boolean = false>(
+    options: Options<OpenaiGetConversationData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).get<
+      OpenaiGetConversationResponse,
+      OpenaiGetConversationError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/openai/conversations/{conversation_id}",
+      ...options,
+    })
+  }
+
+  /**
+   * Stream Message
+   */
+  public static streamMessage<ThrowOnError extends boolean = false>(
+    options: Options<OpenaiStreamMessageData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      unknown,
+      OpenaiStreamMessageError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/openai/conversations/{conversation_id}/messages/stream",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Create Message
+   * Create a new message and get a response from OpenAI
+   */
+  public static createMessage<ThrowOnError extends boolean = false>(
+    options: Options<OpenaiCreateMessageData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      OpenaiCreateMessageResponse,
+      OpenaiCreateMessageError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/openai/conversations/{conversation_id}/messages",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
     })
   }
 }

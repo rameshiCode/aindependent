@@ -6,6 +6,7 @@ import {
   UsersService,
   UtilsService,
   StripeService,
+  OpenaiService,
 } from "../sdk.gen"
 import {
   queryOptions,
@@ -88,6 +89,16 @@ import type {
   StripeConfirmSubscriptionData,
   StripeConfirmSubscriptionError,
   StripeConfirmSubscriptionResponse,
+  OpenaiGetConversationsData,
+  OpenaiCreateConversationData,
+  OpenaiCreateConversationError,
+  OpenaiCreateConversationResponse,
+  OpenaiGetConversationData,
+  OpenaiStreamMessageData,
+  OpenaiStreamMessageError,
+  OpenaiCreateMessageData,
+  OpenaiCreateMessageError,
+  OpenaiCreateMessageResponse,
 } from "../types.gen"
 import { client as _heyApiClient } from "../client.gen"
 
@@ -1137,6 +1148,171 @@ export const confirmSubscriptionMutation = (
   > = {
     mutationFn: async (localOptions) => {
       const { data } = await StripeService.confirmSubscription({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getConversationsQueryKey = (
+  options?: Options<OpenaiGetConversationsData>,
+) => createQueryKey("openaiGetConversations", options)
+
+export const getConversationsOptions = (
+  options?: Options<OpenaiGetConversationsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await OpenaiService.getConversations({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getConversationsQueryKey(options),
+  })
+}
+
+export const createConversationQueryKey = (
+  options: Options<OpenaiCreateConversationData>,
+) => createQueryKey("openaiCreateConversation", options)
+
+export const createConversationOptions = (
+  options: Options<OpenaiCreateConversationData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await OpenaiService.createConversation({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: createConversationQueryKey(options),
+  })
+}
+
+export const createConversationMutation = (
+  options?: Partial<Options<OpenaiCreateConversationData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    OpenaiCreateConversationResponse,
+    OpenaiCreateConversationError,
+    Options<OpenaiCreateConversationData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await OpenaiService.createConversation({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getConversationQueryKey = (
+  options: Options<OpenaiGetConversationData>,
+) => createQueryKey("openaiGetConversation", options)
+
+export const getConversationOptions = (
+  options: Options<OpenaiGetConversationData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await OpenaiService.getConversation({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getConversationQueryKey(options),
+  })
+}
+
+export const streamMessageQueryKey = (
+  options: Options<OpenaiStreamMessageData>,
+) => createQueryKey("openaiStreamMessage", options)
+
+export const streamMessageOptions = (
+  options: Options<OpenaiStreamMessageData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await OpenaiService.streamMessage({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: streamMessageQueryKey(options),
+  })
+}
+
+export const streamMessageMutation = (
+  options?: Partial<Options<OpenaiStreamMessageData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    OpenaiStreamMessageError,
+    Options<OpenaiStreamMessageData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await OpenaiService.streamMessage({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const createMessageQueryKey = (
+  options: Options<OpenaiCreateMessageData>,
+) => createQueryKey("openaiCreateMessage", options)
+
+export const createMessageOptions = (
+  options: Options<OpenaiCreateMessageData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await OpenaiService.createMessage({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: createMessageQueryKey(options),
+  })
+}
+
+export const createMessageMutation = (
+  options?: Partial<Options<OpenaiCreateMessageData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    OpenaiCreateMessageResponse,
+    OpenaiCreateMessageError,
+    Options<OpenaiCreateMessageData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await OpenaiService.createMessage({
         ...options,
         ...localOptions,
         throwOnError: true,

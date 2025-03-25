@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import traceback
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
@@ -112,6 +113,22 @@ except Exception as e:
     logger.exception("Detailed exception:")
 
 logger.info("======== OPENAI CLIENT SETUP COMPLETE ========")
+
+try:
+    # Initialize OpenAI client at module load
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if api_key:
+        logger.info(
+            f"Initializing OpenAI client with API key (first 4 chars): {api_key[:4]}..."
+        )
+        openai_client = AsyncOpenAI(api_key=api_key)
+        logger.info("OpenAI client initialized successfully")
+    else:
+        logger.error("OpenAI API key not found in environment variables")
+        openai_client = None
+except Exception as e:
+    logger.error(f"Failed to initialize OpenAI client: {str(e)}")
+    openai_client = None
 
 
 # Helper functions for OpenAI API
@@ -276,78 +293,6 @@ async def get_conversation(
     )
 
 
-# Send a message and get a completion
-@router.post("/conversations/{conversation_id}/messages", response_model=MessageSchema)
-async def send_message(
-    conversation_id: str,
-    message: MessageSchema,
-    session: SessionDep,
-    current_user: CurrentUser,
-):
-    # Verify conversation exists and belongs to user
-    conversation = session.exec(
-        select(Conversation)
-        .where(Conversation.id == conversation_id)
-        .where(Conversation.user_id == current_user.id)
-    ).first()
-
-    if not conversation:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
-        )
-
-    # Save user message to database
-    db_message = Message(
-        id=str(uuid.uuid4()),
-        conversation_id=conversation_id,
-        role=message.role,
-        content=message.content,
-    )
-    session.add(db_message)
-
-    # Get conversation history
-    messages = session.exec(
-        select(Message)
-        .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at)
-    ).all()
-
-    # Add system message for therapy context if it's the first message
-    chat_messages = [
-        MessageSchema(role=msg.role, content=msg.content) for msg in messages
-    ]
-    if not any(msg.role == "system" for msg in chat_messages):
-        system_message = MessageSchema(
-            role="system",
-            content="You are a therapy assistant specializing in motivational interviewing. "
-            "Your goal is to help users explore and resolve ambivalence about behavior change. "
-            "Use open-ended questions, affirmations, reflective listening, and summaries. "
-            "Be empathetic, non-judgmental, and focus on eliciting the user's own motivations for change.",
-        )
-        chat_messages.insert(0, system_message)
-
-    # Get completion from OpenAI
-    request = ChatCompletionRequest(messages=chat_messages)
-    response = await create_chat_completion(request)
-
-    # Save assistant response to database
-    assistant_message = Message(
-        id=str(uuid.uuid4()),
-        conversation_id=conversation_id,
-        role="assistant",
-        content=response.message.content,
-    )
-    session.add(assistant_message)
-
-    # Update conversation timestamp
-    conversation.updated_at = datetime.utcnow()
-    session.add(conversation)
-
-    session.commit()
-
-    return response.message
-
-
 # Stream a message completion
 @router.post("/conversations/{conversation_id}/messages/stream")
 async def stream_message(
@@ -427,3 +372,136 @@ async def stream_message(
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(response_generator(), media_type="text/event-stream")
+
+
+@router.post("/conversations/{conversation_id}/messages", response_model=MessageSchema)
+async def create_message(
+    message: MessageSchema,
+    conversation_id: uuid.UUID,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> MessageSchema:
+    """Create a new message and get a response from OpenAI"""
+    # Enhanced error logging
+    logger.info(f"Creating message in conversation {conversation_id}")
+
+    try:
+        # Check if conversation exists and belongs to user
+        conversation = session.exec(
+            select(Conversation).where(
+                Conversation.id == conversation_id,
+                Conversation.user_id == current_user.id,
+            )
+        ).first()
+
+        if not conversation:
+            logger.error(
+                f"Conversation {conversation_id} not found for user {current_user.id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found",
+            )
+
+        # Log message info (without content for privacy)
+        logger.info(f"User message with role: {message.role}")
+
+        # Save user message to database
+        db_message = Message(
+            conversation_id=conversation_id,
+            role=message.role,
+            content=message.content,
+        )
+        session.add(db_message)
+        session.commit()
+
+        # Log OpenAI client status
+        logger.info("Checking OpenAI client")
+        if not openai_client:
+            # Initialize OpenAI client if not already done
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key:
+                logger.error("OpenAI API key not found")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="OpenAI API key not configured",
+                )
+            try:
+                logger.info("Initializing OpenAI client")
+                openai_client = AsyncOpenAI(api_key=api_key)
+            except Exception as e:
+                logger.error(f"Failed to initialize OpenAI client: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to initialize OpenAI client",
+                )
+
+        # Get conversation history
+        history = session.exec(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at)
+        ).all()
+
+        messages_for_api = [
+            {"role": msg.role, "content": msg.content} for msg in history
+        ]
+
+        # Add system message if not present
+        if not any(msg["role"] == "system" for msg in messages_for_api):
+            messages_for_api.insert(
+                0, {"role": "system", "content": "You are a helpful assistant."}
+            )
+
+        logger.info(f"Sending {len(messages_for_api)} messages to OpenAI API")
+
+        # Call OpenAI API with error handling
+        try:
+            completion = await openai_client.chat.completions.create(
+                model="gpt-4o",  # Or your preferred model
+                messages=messages_for_api,
+                temperature=0.7,
+            )
+
+            # Log success
+            logger.info(f"OpenAI API response received: {completion.model}")
+
+            # Extract assistant message
+            assistant_message = completion.choices[0].message.content
+
+            # Save assistant response to database
+            db_assistant_message = Message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content=assistant_message,
+            )
+            session.add(db_assistant_message)
+
+            # Update conversation timestamp
+            conversation.updated_at = datetime.utcnow()
+
+            # Commit changes
+            session.commit()
+
+            # Return assistant message
+            return MessageSchema(role="assistant", content=assistant_message)
+
+        except Exception as e:
+            logger.error(f"OpenAI API error: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error calling OpenAI API: {str(e)}",
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log unexpected errors
+        logger.error(f"Unexpected error: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}",
+        )

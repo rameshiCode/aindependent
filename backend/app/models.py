@@ -46,6 +46,10 @@ class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
 
+    conversations: list["Conversation"] = Relationship(
+        back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
 
 # Properties to return via API, id is always required
 class UserPublic(UserBase):
@@ -58,7 +62,7 @@ class UsersPublic(SQLModel):
 
 
 # Generic message
-class Message(SQLModel):
+class GenericMessage(SQLModel):
     message: str
 
 
@@ -220,6 +224,65 @@ class PaymentIntentResponse(BaseModel):
     ephemeral_key: str
     customer_id: str
     publishable_key: str
+
+
+# Conversation model
+class Conversation(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    title: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    user: User = Relationship(back_populates="conversations")
+    messages: list["Message"] = Relationship(
+        back_populates="conversation",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+
+
+# Message model
+class Message(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    conversation_id: uuid.UUID = Field(foreign_key="conversation.id", index=True)
+    role: str  # "system", "user", or "assistant"
+    content: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    conversation: Conversation | None = Relationship(back_populates="messages")
+
+
+# Pydantic models for API requests/responses
+class MessageSchema(BaseModel):
+    role: str
+    content: str
+
+
+class ChatCompletionRequest(SQLModel):
+    messages: list[MessageSchema]
+    model: str = "gpt-4o"
+    temperature: float = 0.7
+    max_tokens: int = 1000
+    stream: bool = False
+
+
+class ChatCompletionResponse(BaseModel):
+    message: MessageSchema
+    usage: dict[str, int]
+
+
+class ConversationCreate(BaseModel):
+    title: str = "New Conversation"
+
+
+class ConversationWithMessages(SQLModel):
+    id: uuid.UUID
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    messages: list[MessageSchema]
 
 
 # class WebhookEvent(SQLModel):

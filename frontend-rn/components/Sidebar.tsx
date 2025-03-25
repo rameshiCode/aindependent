@@ -158,10 +158,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* New Chat Button */}
       <TouchableOpacity
         style={styles.newChatButton}
-        onPress={handleNewChat}
+        onPress={onCreateNewChat}
       >
-        <Ionicons name="add" size={20} color="#FFF" />
-        <Text style={styles.newChatText}>New chat</Text>
+        <Ionicons name="add-circle-outline" size={22} color="#10a37f" />
+        <Text style={styles.newChatText}>New Chat</Text>
       </TouchableOpacity>
 
       {/* Chats List */}

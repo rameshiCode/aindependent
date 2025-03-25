@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-  Pressable
+  Pressable,
+  AppState,  // Added for app state monitoring
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChatComponent from '@/components/ChatComponent';
@@ -37,6 +38,7 @@ export default function ChatScreen() {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const appState = useRef(AppState.currentState);
 
   // Default to dark theme for ChatGPT look
   const isDark = true;
@@ -50,6 +52,36 @@ export default function ChatScreen() {
 
   // Active conversation state
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+
+  // Flag to ensure we only create one new conversation on app start
+  const [hasCreatedInitialConversation, setHasCreatedInitialConversation] = useState(false);
+
+  // Replace useFocusEffect with useEffect
+  useEffect(() => {
+    // Create new conversation on initial mount
+    if (!hasCreatedInitialConversation) {
+      console.log("Creating new conversation on app start");
+      setActiveConversation(null);
+      setHasCreatedInitialConversation(true);
+    }
+
+    // Optional: Add AppState listener to handle app resuming from background
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        console.log('App has come to the foreground!');
+        // You could reset conversation here too if desired
+      }
+
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [hasCreatedInitialConversation]);
 
   // Handle sidebar open/close animations
   useEffect(() => {
@@ -95,7 +127,8 @@ export default function ChatScreen() {
 
   // Handle creating a new chat
   const handleCreateNewChat = () => {
-    // This will be triggered from the sidebar when a new chat is created
+    // When user explicitly creates a new chat from sidebar
+    setActiveConversation(null);
     setSidebarVisible(false);
   };
 
@@ -104,7 +137,7 @@ export default function ChatScreen() {
       style={[styles.container, { backgroundColor: isDark ? '#000' : Colors[colorScheme ?? 'light'].background }]}
       edges={['right', 'left']}
     >
-      {/* Custom Header */}
+      {/* Header with new chat button */}
       <View style={[styles.header, { backgroundColor: headerBgColor, paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.menuButton} onPress={toggleSidebar}>
           <Ionicons name="menu-outline" size={24} color={headerTextColor} />
@@ -113,11 +146,13 @@ export default function ChatScreen() {
         <Text style={[styles.headerTitle, { color: headerTextColor }]}>ChatGPT</Text>
 
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.refreshButton}>
-            <Ionicons name="refresh-outline" size={24} color={headerTextColor} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="ellipsis-vertical" size={24} color={headerTextColor} />
+          <TouchableOpacity
+            style={styles.newChatButton}
+            onPress={() => {
+              setActiveConversation(null);
+            }}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={headerTextColor} />
           </TouchableOpacity>
         </View>
       </View>
@@ -127,6 +162,7 @@ export default function ChatScreen() {
         <ChatComponent
           initialConversation={activeConversation}
           onConversationChange={setActiveConversation}
+          forceNewConversation={activeConversation === null}
         />
       </View>
 
@@ -191,13 +227,7 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
   },
-  refreshButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  moreButton: {
+  newChatButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',

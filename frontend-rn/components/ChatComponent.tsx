@@ -45,11 +45,13 @@ interface Conversation {
 interface ChatComponentProps {
   initialConversation?: Conversation | null;
   onConversationChange?: (conversation: Conversation | null) => void;
+  forceNewConversation?: boolean; // Add this new prop
 }
 
 const ChatComponent: React.FC<ChatComponentProps> = ({
   initialConversation,
-  onConversationChange
+  onConversationChange,
+  forceNewConversation
 }) => {
   const [input, setInput] = useState('');
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(initialConversation || null);
@@ -173,12 +175,15 @@ const ChatComponent: React.FC<ChatComponentProps> = ({
 
   // Initialize by creating a new conversation if none exists
   useEffect(() => {
-    if (!initialConversation && conversations && conversations.length > 0 && !activeConversation) {
+    if (forceNewConversation) {
+      // Always create a new conversation when forced
+      createConversation.mutate();
+    } else if (!initialConversation && conversations && conversations.length > 0 && !activeConversation) {
       setActiveConversation(conversations[0]);
     } else if (!initialConversation && conversations && conversations.length === 0 && !activeConversation && !isLoadingConversations) {
       createConversation.mutate();
     }
-  }, [conversations, isLoadingConversations, initialConversation]);
+  }, [conversations, isLoadingConversations, initialConversation, forceNewConversation]);
 
   // Handle sending a message
   const handleSendMessage = async () => {

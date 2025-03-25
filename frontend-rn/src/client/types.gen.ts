@@ -15,6 +15,18 @@ export type CheckoutSessionCreate = {
   cancel_url: string
 }
 
+export type ConversationCreate = {
+  title?: string
+}
+
+export type ConversationWithMessages = {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+  messages: Array<MessageSchema>
+}
+
 export type GoogleAuthRequest = {
   code: string
   codeVerifier: string
@@ -26,7 +38,16 @@ export type HttpValidationError = {
 }
 
 export type Message = {
-  message: string
+  id?: string
+  conversation_id: string
+  role: string
+  content: string
+  created_at?: string
+}
+
+export type MessageSchema = {
+  role: string
+  content: string
 }
 
 export type NewPassword = {
@@ -974,6 +995,134 @@ export type StripeConfirmSubscriptionResponses = {
 
 export type StripeConfirmSubscriptionResponse =
   StripeConfirmSubscriptionResponses[keyof StripeConfirmSubscriptionResponses]
+
+export type OpenaiGetConversationsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/openai/conversations"
+}
+
+export type OpenaiGetConversationsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<ConversationWithMessages>
+}
+
+export type OpenaiGetConversationsResponse =
+  OpenaiGetConversationsResponses[keyof OpenaiGetConversationsResponses]
+
+export type OpenaiCreateConversationData = {
+  body: ConversationCreate
+  path?: never
+  query?: never
+  url: "/api/v1/openai/conversations"
+}
+
+export type OpenaiCreateConversationErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type OpenaiCreateConversationError =
+  OpenaiCreateConversationErrors[keyof OpenaiCreateConversationErrors]
+
+export type OpenaiCreateConversationResponses = {
+  /**
+   * Successful Response
+   */
+  200: ConversationWithMessages
+}
+
+export type OpenaiCreateConversationResponse =
+  OpenaiCreateConversationResponses[keyof OpenaiCreateConversationResponses]
+
+export type OpenaiGetConversationData = {
+  body?: never
+  path: {
+    conversation_id: string
+  }
+  query?: never
+  url: "/api/v1/openai/conversations/{conversation_id}"
+}
+
+export type OpenaiGetConversationErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type OpenaiGetConversationError =
+  OpenaiGetConversationErrors[keyof OpenaiGetConversationErrors]
+
+export type OpenaiGetConversationResponses = {
+  /**
+   * Successful Response
+   */
+  200: ConversationWithMessages
+}
+
+export type OpenaiGetConversationResponse =
+  OpenaiGetConversationResponses[keyof OpenaiGetConversationResponses]
+
+export type OpenaiStreamMessageData = {
+  body: MessageSchema
+  path: {
+    conversation_id: string
+  }
+  query?: never
+  url: "/api/v1/openai/conversations/{conversation_id}/messages/stream"
+}
+
+export type OpenaiStreamMessageErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type OpenaiStreamMessageError =
+  OpenaiStreamMessageErrors[keyof OpenaiStreamMessageErrors]
+
+export type OpenaiStreamMessageResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type OpenaiCreateMessageData = {
+  body: MessageSchema
+  path: {
+    conversation_id: string
+  }
+  query?: never
+  url: "/api/v1/openai/conversations/{conversation_id}/messages"
+}
+
+export type OpenaiCreateMessageErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type OpenaiCreateMessageError =
+  OpenaiCreateMessageErrors[keyof OpenaiCreateMessageErrors]
+
+export type OpenaiCreateMessageResponses = {
+  /**
+   * Successful Response
+   */
+  200: MessageSchema
+}
+
+export type OpenaiCreateMessageResponse =
+  OpenaiCreateMessageResponses[keyof OpenaiCreateMessageResponses]
 
 export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})
