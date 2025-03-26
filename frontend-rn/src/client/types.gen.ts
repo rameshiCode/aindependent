@@ -1040,6 +1040,35 @@ export type OpenaiCreateConversationResponses = {
 export type OpenaiCreateConversationResponse =
   OpenaiCreateConversationResponses[keyof OpenaiCreateConversationResponses]
 
+export type OpenaiDeleteConversationData = {
+  body?: never
+  path: {
+    conversation_id: string
+  }
+  query?: never
+  url: "/api/v1/openai/conversations/{conversation_id}"
+}
+
+export type OpenaiDeleteConversationErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type OpenaiDeleteConversationError =
+  OpenaiDeleteConversationErrors[keyof OpenaiDeleteConversationErrors]
+
+export type OpenaiDeleteConversationResponses = {
+  /**
+   * Successful Response
+   */
+  204: void
+}
+
+export type OpenaiDeleteConversationResponse =
+  OpenaiDeleteConversationResponses[keyof OpenaiDeleteConversationResponses]
+
 export type OpenaiGetConversationData = {
   body?: never
   path: {
@@ -1068,6 +1097,37 @@ export type OpenaiGetConversationResponses = {
 
 export type OpenaiGetConversationResponse =
   OpenaiGetConversationResponses[keyof OpenaiGetConversationResponses]
+
+export type OpenaiUpdateConversationData = {
+  body?: never
+  path: {
+    conversation_id: string
+  }
+  query: {
+    title: string
+  }
+  url: "/api/v1/openai/conversations/{conversation_id}"
+}
+
+export type OpenaiUpdateConversationErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type OpenaiUpdateConversationError =
+  OpenaiUpdateConversationErrors[keyof OpenaiUpdateConversationErrors]
+
+export type OpenaiUpdateConversationResponses = {
+  /**
+   * Successful Response
+   */
+  200: ConversationWithMessages
+}
+
+export type OpenaiUpdateConversationResponse =
+  OpenaiUpdateConversationResponses[keyof OpenaiUpdateConversationResponses]
 
 export type OpenaiCreateMessageData = {
   body: MessageSchema

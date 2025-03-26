@@ -93,7 +93,13 @@ import type {
   OpenaiCreateConversationData,
   OpenaiCreateConversationError,
   OpenaiCreateConversationResponse,
+  OpenaiDeleteConversationData,
+  OpenaiDeleteConversationError,
+  OpenaiDeleteConversationResponse,
   OpenaiGetConversationData,
+  OpenaiUpdateConversationData,
+  OpenaiUpdateConversationError,
+  OpenaiUpdateConversationResponse,
   OpenaiCreateMessageData,
   OpenaiCreateMessageError,
   OpenaiCreateMessageResponse,
@@ -1218,6 +1224,26 @@ export const createConversationMutation = (
   return mutationOptions
 }
 
+export const deleteConversationMutation = (
+  options?: Partial<Options<OpenaiDeleteConversationData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    OpenaiDeleteConversationResponse,
+    OpenaiDeleteConversationError,
+    Options<OpenaiDeleteConversationData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await OpenaiService.deleteConversation({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
 export const getConversationQueryKey = (
   options: Options<OpenaiGetConversationData>,
 ) => createQueryKey("openaiGetConversation", options)
@@ -1237,6 +1263,26 @@ export const getConversationOptions = (
     },
     queryKey: getConversationQueryKey(options),
   })
+}
+
+export const updateConversationMutation = (
+  options?: Partial<Options<OpenaiUpdateConversationData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    OpenaiUpdateConversationResponse,
+    OpenaiUpdateConversationError,
+    Options<OpenaiUpdateConversationData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await OpenaiService.updateConversation({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
 }
 
 export const createMessageQueryKey = (

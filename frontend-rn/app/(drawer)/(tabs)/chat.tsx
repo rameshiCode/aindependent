@@ -1,6 +1,6 @@
 // app/(drawer)/(tabs)/chat.tsx
-import { useLocalSearchParams, router } from 'expo-router';
-import React, { useState } from 'react';
+import { useLocalSearchParams, router, useNavigation } from 'expo-router';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +22,8 @@ export default function ChatScreen() {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
   const queryClient = useQueryClient();
-  const insets = useSafeAreaInsets(); // Get safe area insets
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
 
   // Use React Query to fetch conversation data
   const {
@@ -37,6 +38,45 @@ export default function ChatScreen() {
     staleTime: 1000 * 60, // 1 minute
   });
 
+  // Mutation for deleting a conversation
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      const response = await OpenaiService.deleteConversation({
+        path: { conversation_id: conversationId }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch conversations
+      queryClient.invalidateQueries({
+        queryKey: getConversationsOptions().queryKey
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to delete conversation:', error);
+    }
+  });
+
+  // Mutation for updating conversation title
+  const updateConversationTitleMutation = useMutation({
+    mutationFn: async ({ id, title }: { id: string; title: string }) => {
+      const response = await OpenaiService.updateConversation({
+        path: { conversation_id: id },
+        query: { title }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch conversations
+      queryClient.invalidateQueries({
+        queryKey: getConversationsOptions().queryKey
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to update conversation title:', error);
+    }
+  });
+
   // Use React Query mutation for sending messages
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -46,13 +86,18 @@ export default function ChatScreen() {
       });
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidate and refetch the conversation to get the updated messages
       queryClient.invalidateQueries({
         queryKey: getConversationOptions({
           path: { conversation_id: id as string }
         }).queryKey
       });
+
+      // If this is the first message, generate a title based on the content
+      if (chatData && chatData.messages && chatData.messages.length === 0) {
+        generateTitleFromContent(inputText);
+      }
     }
   });
 
@@ -80,6 +125,25 @@ export default function ChatScreen() {
       console.error('Failed to create conversation:', error);
     }
   });
+
+  // Function to generate a title from the first message content
+  const generateTitleFromContent = async (content: string) => {
+    if (!id || !content) return;
+
+    try {
+      // Generate a title based on the first message
+      // This is a simple implementation - you could use AI to generate a more meaningful title
+      let title = content.substring(0, 30);
+      if (content.length > 30) title += '...';
+
+      // Update the conversation title
+      updateConversationTitleMutation.mutate({ id: id as string, title });
+    } catch (error) {
+      console.error('Error generating title:', error);
+    }
+  };
+
+  // Auto-delete functionality has been removed
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !id) return;
@@ -111,8 +175,6 @@ export default function ChatScreen() {
         styles.container,
         {
           backgroundColor: isDarkMode ? '#000' : '#fff',
-          // We don't need paddingTop here since SafeAreaView from react-native-safe-area-context
-          // automatically handles the insets
         }
       ]}
     >
@@ -189,7 +251,6 @@ export default function ChatScreen() {
       {id && (
         <View style={[
           styles.inputContainer,
-          // Add bottom padding based on safe area insets
           { paddingBottom: Math.max(10, insets.bottom) }
         ]}>
           <TextInput

@@ -102,9 +102,15 @@ import type {
   OpenaiCreateConversationData,
   OpenaiCreateConversationResponse,
   OpenaiCreateConversationError,
+  OpenaiDeleteConversationData,
+  OpenaiDeleteConversationResponse,
+  OpenaiDeleteConversationError,
   OpenaiGetConversationData,
   OpenaiGetConversationResponse,
   OpenaiGetConversationError,
+  OpenaiUpdateConversationData,
+  OpenaiUpdateConversationResponse,
+  OpenaiUpdateConversationError,
   OpenaiCreateMessageData,
   OpenaiCreateMessageResponse,
   OpenaiCreateMessageError,
@@ -976,6 +982,28 @@ export class OpenaiService {
   }
 
   /**
+   * Delete Conversation
+   */
+  public static deleteConversation<ThrowOnError extends boolean = false>(
+    options: Options<OpenaiDeleteConversationData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).delete<
+      OpenaiDeleteConversationResponse,
+      OpenaiDeleteConversationError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/openai/conversations/{conversation_id}",
+      ...options,
+    })
+  }
+
+  /**
    * Get Conversation
    */
   public static getConversation<ThrowOnError extends boolean = false>(
@@ -984,6 +1012,28 @@ export class OpenaiService {
     return (options.client ?? _heyApiClient).get<
       OpenaiGetConversationResponse,
       OpenaiGetConversationError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/openai/conversations/{conversation_id}",
+      ...options,
+    })
+  }
+
+  /**
+   * Update Conversation
+   */
+  public static updateConversation<ThrowOnError extends boolean = false>(
+    options: Options<OpenaiUpdateConversationData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).put<
+      OpenaiUpdateConversationResponse,
+      OpenaiUpdateConversationError,
       ThrowOnError
     >({
       security: [

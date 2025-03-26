@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, FlatList, ActivityIndicator, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Drawer } from 'expo-router/drawer';
-import { usePathname, router } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getConversationsOptions, OpenaiService } from '@/src/client/@tanstack/react-query.gen';
+import { usePathname, router, useNavigation } from 'expo-router';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { getConversationsOptions, getConversationOptions, OpenaiService } from '@/src/client/@tanstack/react-query.gen';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
 import Constants from 'expo-constants';
@@ -17,22 +17,40 @@ function CustomDrawerContent() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
 
   // Fetch conversations using React Query with error handling
-  const conversationsOptions = getConversationsOptions();
   const { data: conversations, isLoading, error } = useQuery({
-    queryKey: conversationsOptions.queryKey,
-    queryFn: conversationsOptions.queryFn,
+    ...getConversationsOptions(),
     staleTime: 1000 * 60, // 1 minute
     retry: 3
   });
 
-  // Handle errors with useEffect
-  React.useEffect(() => {
+  // Handle errors from the query
+  useEffect(() => {
     if (error) {
       console.error('Error fetching conversations:', error);
     }
   }, [error]);
+
+  // Mutation for deleting a conversation
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      const response = await OpenaiService.deleteConversation({
+        path: { conversation_id: conversationId }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch conversations
+      queryClient.invalidateQueries({
+        queryKey: getConversationsOptions().queryKey
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to delete conversation:', error);
+    }
+  });
 
   // Create a new conversation with error handling
   const handleNewConversation = async () => {
@@ -65,6 +83,23 @@ function CustomDrawerContent() {
 
   // Navigate to a conversation
   const handleConversationPress = (id: string) => {
+    // Check if we're navigating away from an empty conversation
+    const currentConversationId = pathname.includes('id=')
+      ? pathname.split('id=')[1].split('&')[0]
+      : null;
+
+    if (currentConversationId) {
+      // Check if the current conversation is empty
+      const conversationData = queryClient.getQueryData(
+        getConversationOptions({ path: { conversation_id: currentConversationId } }).queryKey
+      );
+
+      if (conversationData && conversationData.messages && conversationData.messages.length === 0) {
+        // Delete the empty conversation
+        deleteConversationMutation.mutate(currentConversationId);
+      }
+    }
+
     router.push({
       pathname: '/(drawer)/(tabs)/chat',
       params: { id }
@@ -109,7 +144,6 @@ function CustomDrawerContent() {
       styles.container,
       {
         backgroundColor: isDarkMode ? '#121212' : '#f5f5f5',
-        // Use the insets from useSafeAreaInsets
         paddingTop: insets.top,
       }
     ]}>
@@ -177,7 +211,6 @@ export default function DrawerLayout() {
             drawerStyle: {
               width: '75%',
             },
-            // Add these options to fix the bleeding issue
             drawerStatusBarAnimation: 'fade',
             overlayColor: 'rgba(0,0,0,0.5)',
           }}

@@ -539,3 +539,72 @@ async def create_message(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}",
         )
+
+
+@router.put("/conversations/{conversation_id}", response_model=ConversationWithMessages)
+async def update_conversation(
+    conversation_id: uuid.UUID,
+    title: str,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    conversation = session.exec(
+        select(Conversation)
+        .where(Conversation.id == conversation_id)
+        .where(Conversation.user_id == current_user.id)
+    ).first()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
+        )
+
+    conversation.title = title
+    conversation.updated_at = datetime.utcnow()
+    session.commit()
+
+    messages = session.exec(
+        select(Message)
+        .where(Message.conversation_id == conversation_id)
+        .order_by(Message.created_at)
+    ).all()
+
+    return ConversationWithMessages(
+        id=conversation.id,
+        title=conversation.title,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        messages=[
+            MessageSchema(role=msg.role, content=msg.content) for msg in messages
+        ],
+    )
+
+
+@router.delete(
+    "/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_conversation(
+    conversation_id: uuid.UUID, session: SessionDep, current_user: CurrentUser
+):
+    conversation = session.exec(
+        select(Conversation)
+        .where(Conversation.id == conversation_id)
+        .where(Conversation.user_id == current_user.id)
+    ).first()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
+        )
+
+    # Delete associated messages first
+    messages = session.exec(
+        select(Message).where(Message.conversation_id == conversation_id)
+    ).all()
+
+    for message in messages:
+        session.delete(message)
+
+    # Delete the conversation
+    session.delete(conversation)
+    session.commit()
