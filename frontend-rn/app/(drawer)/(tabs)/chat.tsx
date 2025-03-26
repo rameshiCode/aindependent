@@ -1,7 +1,7 @@
 // app/(drawer)/(tabs)/chat.tsx
 import { useLocalSearchParams, router } from 'expo-router';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getConversationOptions, getConversationsOptions, OpenaiService } from '@/src/client/@tanstack/react-query.gen';
 import ChatHeader from '../../../components/ChatHeader';
 import { ConversationWithMessages } from '@/src/client';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Message {
   role: string;
@@ -21,6 +22,7 @@ export default function ChatScreen() {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets(); // Get safe area insets
 
   // Use React Query to fetch conversation data
   const {
@@ -104,7 +106,16 @@ export default function ChatScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#000' : '#fff' }]}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        {
+          backgroundColor: isDarkMode ? '#000' : '#fff',
+          // We don't need paddingTop here since SafeAreaView from react-native-safe-area-context
+          // automatically handles the insets
+        }
+      ]}
+    >
       {/* Hide the default Stack header */}
       <Stack.Screen options={{ headerShown: false }} />
 
@@ -176,7 +187,11 @@ export default function ChatScreen() {
       )}
 
       {id && (
-        <View style={styles.inputContainer}>
+        <View style={[
+          styles.inputContainer,
+          // Add bottom padding based on safe area insets
+          { paddingBottom: Math.max(10, insets.bottom) }
+        ]}>
           <TextInput
             style={[
               styles.input,
