@@ -7,6 +7,7 @@
 │   │   ├── sign-in.tsx
 │   │   └── sign-up.tsx
 │   ├── (drawer)
+│   │   ├── _layout.tsx
 │   │   └── (tabs)
 │   │       ├── chat.tsx
 │   │       ├── index.tsx
@@ -39,6 +40,7 @@
 │   ├── BackendLogin.tsx
 │   ├── BackendSignUp.tsx
 │   ├── ChatComponent.tsx
+│   ├── ChatHeader.tsx
 │   ├── Collapsible.tsx
 │   ├── CustomDrawerContent.tsx
 │   ├── ExternalLink.tsx
@@ -77,6 +79,7 @@
 ├── openapi-ts.config.ts
 ├── package.json
 ├── package-lock.json
+├── readme4Implementation.md
 ├── README.md
 ├── scripts
 │   └── reset-project.js
@@ -95,4 +98,4 @@
 └── utils
     └── utils.ts
 
-22 directories, 74 files
+22 directories, 77 files

@@ -7,7 +7,7 @@ import { ActivityIndicator } from 'react-native';
 
 export default function WebViewScreen() {
   const router = useRouter();
-  const { url } = useLocalSearchParams();
+  const { url, redirect_to } = useLocalSearchParams();
 
   if (!url) {
     router.back();
@@ -16,12 +16,19 @@ export default function WebViewScreen() {
 
   const handleNavigationStateChange = (navState: any) => {
     // Check if we've been redirected to success or cancel URLs
-    if (navState.url.includes('subscription-success')) {
-      // Redirect to subscription page after successful payment
-      setTimeout(() => {
-        router.push('/subscription');
-      }, 1000);
-    } else if (navState.url.includes('subscription-cancel')) {
+    if (navState.url.includes('subscription-success') || navState.url.includes('/success')) {
+      // If redirect_to is specified, use that destination
+      if (redirect_to === 'chat') {
+        setTimeout(() => {
+          router.push('/(drawer)/(tabs)/chat');
+        }, 1000);
+      } else {
+        // Default behavior - redirect to subscription page after successful payment
+        setTimeout(() => {
+          router.push('/subscription');
+        }, 1000);
+      }
+    } else if (navState.url.includes('subscription-cancel') || navState.url.includes('/cancel')) {
       // Go back to subscription page if payment was canceled
       router.back();
     }

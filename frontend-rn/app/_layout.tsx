@@ -7,15 +7,13 @@ import Constants from 'expo-constants';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-
-import { AuthProvider,  } from '@/context/authProvider';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider } from '@/context/authProvider';
 import { useColorScheme } from '@/hooks/useColorScheme';
-
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useReactQueryDevTools } from '@dev-plugins/react-query';
 import { getTokenFromStorage } from '@/context/useStorageState';
 import { client } from '@/src/client/client.gen';
-
 
 // set up @hey-api/client-fetch client
 client.setConfig({
@@ -36,7 +34,6 @@ client.interceptors.response.use((response) => {
   return response;
 });
 
-
 // set up tanstack/react-query client
 const queryClient = new QueryClient();
 
@@ -51,6 +48,7 @@ export default function Root() {
   // useReactQueryDevTools(queryClient);
 
   const colorScheme = useColorScheme();
+
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -67,13 +65,15 @@ export default function Root() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        <AuthProvider>
-          <Slot />
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+          <AuthProvider>
+            <Slot />
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }

@@ -99,45 +99,43 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({
   };
 
   // Handle checkout approach (for backward compatibility)
-// In StripePaymentForm.tsx
-const handleCheckout = async () => {
-  try {
-    setError(null);
-    setIsSubmitting(true);
+  const handleCheckout = async () => {
+    try {
+      setError(null);
+      setIsSubmitting(true);
 
-    // Use valid URLs for Stripe checkout
-    const { data } = await StripeService.createCheckoutSession({
-      body: {
-        price_id: priceId,
-        success_url: `https://example.com/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `https://example.com/cancel`,
-      },
-      throwOnError: true
-    }) ;
+      // Update success_url to include redirect parameter for chat page redirection
+      const { data } = await StripeService.createCheckoutSession({
+        body: {
+          price_id: priceId,
+          // Use existing URLs or update with your working ones
+          success_url: `https://example.com/subscription-success`,
+          cancel_url: `https://example.com/subscription-cancel`,
+        },
+        throwOnError: true
+      });
 
-    // Check what fields are actually in your response
-    console.log("Checkout session response:", data);
-    // Add this to your handleCheckout function
-    console.log("Full checkout response:", JSON.stringify(data, null, 2));
+      // Log response for debugging
+      console.log("Checkout session response:", data);
+      console.log("Full checkout response:", JSON.stringify(data, null, 2));
 
+      // Try different possible field names
+      const checkoutUrl = data?.checkout_url || data?.url || data?.session_url;
 
-    // Try different possible field names
-    const checkoutUrl = data?.checkout_url || data?.url || data?.session_url;
+      if (checkoutUrl && typeof checkoutUrl === 'string') {
+        // Include redirect_to parameter for WebView to know where to redirect after success
+        router.push(`/web-view?url=${encodeURIComponent(checkoutUrl)}&redirect_to=chat`);
+      } else {
+        throw new Error("No checkout URL returned or URL is not a string");
+      }
 
-    if (checkoutUrl && typeof checkoutUrl === 'string') {
-      router.push(`/web-view?url=${encodeURIComponent(checkoutUrl)}`);
-    } else {
-      throw new Error("No checkout URL returned or URL is not a string");
+      setIsSubmitting(false);
+    } catch (e: any) {
+      console.error('Checkout error:', e);
+      setError(`Failed to start checkout: ${e.message}`);
+      setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
-  } catch (e: any) {
-    console.error('Checkout error:', e);
-    setError(`Failed to start checkout: ${e.message}`);
-    setIsSubmitting(false);
-  }
-};
-
+  };
 
   const handlePayPress = async () => {
     // If using checkout approach, use that instead of PaymentSheet
@@ -180,10 +178,17 @@ const handleCheckout = async () => {
           onPaymentSuccess(subscriptionId);
         }
 
+        // Show success alert and then navigate to chat page
         Alert.alert(
           "Subscription Successful",
           "Your subscription has been activated successfully!",
-          [{ text: "OK" }]
+          [{
+            text: "OK",
+            onPress: () => {
+              // Navigate to chat page after successful subscription
+              router.push("/(drawer)/(tabs)/chat");
+            }
+          }]
         );
       } else {
         throw new Error("Payment intent ID not found");
