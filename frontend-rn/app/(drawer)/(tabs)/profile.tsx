@@ -1,15 +1,17 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, useColorScheme, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, useColorScheme, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { useAuth } from '@/context/authProvider';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/ThemedView';
-import { useQuery } from '@tanstack/react-query';
-import { getSubscriptionStatusOptions } from '@/src/client/@tanstack/react-query.gen';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { getSubscriptionStatusOptions, createPortalSessionMutation, cancelSubscriptionMutation } from '@/src/client/@tanstack/react-query.gen';
+import Constants from 'expo-constants';
 
 // Define TypeScript interfaces for subscription data
 interface SubscriptionPlan {
   name?: string;
+  description?: string;
 }
 
 interface SubscriptionDetails {
@@ -17,18 +19,24 @@ interface SubscriptionDetails {
   current_period_start?: string;
   current_period_end?: string;
   cancel_at_period_end?: boolean;
+  stripe_subscription_id?: string;
 }
 
 interface SubscriptionPrice {
   amount?: number;
+  currency?: string;
   interval?: string;
 }
 
 interface SubscriptionData {
-  has_subscription?: boolean;
+  has_active_subscription?: boolean;
   plan?: SubscriptionPlan;
   subscription?: SubscriptionDetails;
   price?: SubscriptionPrice;
+  status?: string;
+  current_period_end?: string;
+  cancel_at_period_end?: boolean;
+  stripe_subscription_id?: string;
 }
 
 export default function Profile() {
@@ -41,6 +49,18 @@ export default function Profile() {
   const buttonBackground = useThemeColor({}, 'buttonBackground');
   const buttonTextColor = useThemeColor({}, 'buttonText');
   const theme = useColorScheme();
+
+  // Format date function
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
 
   // Fetch subscription data using React Query with proper typing
   const {
@@ -57,16 +77,79 @@ export default function Profile() {
     refetch: () => Promise<any>;
   };
 
-  // Format date function
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
+  // Define portal session response type
+    interface PortalSessionResponse {
+      url: string;
+    }
 
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+  // Mutations for subscription management
+  const createPortalMutation = useMutation(createPortalSessionMutation());
+  const cancelSubMutation = useMutation(cancelSubscriptionMutation());
+
+  // Handle manage subscription button
+  const handleManageSubscription = async () => {
+    try {
+      const result = await createPortalMutation.mutateAsync({
+        body: {
+          return_url: `${Constants.expoConfig?.extra?.FRONTEND_URL || 'https://example.com'}/profile`,
+        }
+      });
+
+      const data = result.data as PortalSessionResponse;
+
+      if (data?.url) {
+        router.push({
+          pathname: '/web-view',
+          params: { url: data.url }
+        });
+      } else {
+        Alert.alert('Error', 'Unable to open subscription management portal');
+      }
+    } catch (error) {
+      console.error('Error opening portal:', error);
+      Alert.alert('Error', 'Failed to open subscription management portal');
+    }
+  };
+
+  // Handle cancel subscription button
+  const handleCancelSubscription = (subscriptionId?: string) => {
+    if (!subscriptionId) {
+      Alert.alert('Error', 'Subscription ID not found');
+      return;
+    }
+
+    Alert.alert(
+      'Cancel Subscription',
+      'Are you sure you want to cancel your subscription? You will still have access until the end of your billing period.',
+      [
+        {
+          text: 'No',
+          style: 'cancel',
+        },
+        {
+          text: 'Yes',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancelSubMutation.mutateAsync({
+                path: { subscription_id: subscriptionId }
+              });
+
+              // Refetch subscription data to update the UI
+              refetch();
+
+              Alert.alert(
+                'Subscription Canceled',
+                'Your subscription has been canceled and will end at the current billing period.'
+              );
+            } catch (error) {
+              console.error('Error canceling subscription:', error);
+              Alert.alert('Error', 'Failed to cancel subscription');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -103,7 +186,7 @@ export default function Profile() {
                 <Text style={[styles.retryButtonText, { color: buttonTextColor }]}>Retry</Text>
               </TouchableOpacity>
             </View>
-          ) : subscription?.has_subscription ? (
+          ) : subscription?.has_active_subscription ? (
             <>
               <View style={styles.subscriptionItem}>
                 <Text style={[styles.settingText, { color: textColor }]}>Plan</Text>
@@ -116,14 +199,14 @@ export default function Profile() {
                 <Text style={[styles.settingText, { color: textColor }]}>Status</Text>
                 <View style={[
                   styles.statusBadge,
-                  subscription.subscription?.status === 'active' && styles.activeBadge,
-                  subscription.subscription?.status === 'past_due' && styles.pastDueBadge,
-                  subscription.subscription?.status === 'canceled' && styles.canceledBadge,
+                  subscription.status === 'active' && styles.activeBadge,
+                  subscription.status === 'past_due' && styles.pastDueBadge,
+                  subscription.status === 'canceled' && styles.canceledBadge,
                 ]}>
                   <Text style={styles.statusText}>
-                    {subscription.subscription?.status
-                      ? subscription.subscription.status.charAt(0).toUpperCase() +
-                        subscription.subscription.status.slice(1)
+                    {subscription.status
+                      ? subscription.status.charAt(0).toUpperCase() +
+                        subscription.status.slice(1)
                       : 'Unknown'}
                   </Text>
                 </View>
@@ -139,24 +222,33 @@ export default function Profile() {
               <View style={styles.subscriptionItem}>
                 <Text style={[styles.settingText, { color: textColor }]}>Renewal Date</Text>
                 <Text style={[styles.subscriptionValue, { color: textColor }]}>
-                  {formatDate(subscription.subscription?.current_period_end)}
+                  {formatDate(subscription.current_period_end)}
                 </Text>
               </View>
 
-              {subscription.subscription?.cancel_at_period_end && (
+              {subscription.cancel_at_period_end && (
                 <View style={styles.cancelNotice}>
                   <Text style={styles.cancelText}>
-                    Your subscription will end on {formatDate(subscription.subscription.current_period_end)}
+                    Your subscription will end on {formatDate(subscription.current_period_end)}
                   </Text>
                 </View>
               )}
 
               <TouchableOpacity
                 style={[styles.manageButton, { backgroundColor: buttonBackground }]}
-                onPress={() => router.push('/subscription')}
+                onPress={handleManageSubscription}
               >
                 <Text style={[styles.manageButtonText, { color: buttonTextColor }]}>Manage Subscription</Text>
               </TouchableOpacity>
+
+              {!subscription.cancel_at_period_end && (
+                <TouchableOpacity
+                  style={[styles.cancelButton, { borderColor: '#FF4444' }]}
+                  onPress={() => handleCancelSubscription(subscription.stripe_subscription_id)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+                </TouchableOpacity>
+              )}
             </>
           ) : (
             <View style={styles.noSubscriptionContainer}>
@@ -262,31 +354,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  loadingText: {
-    marginTop: 8,
-    fontSize: 14,
-  },
-  errorContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  errorText: {
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  retryButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   subscriptionItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -340,6 +407,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  cancelButton: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FF4444',
+  },
   noSubscriptionContainer: {
     alignItems: 'center',
     paddingVertical: 20,
@@ -355,6 +435,31 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   subscribeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  retryButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  retryButtonText: {
     fontSize: 14,
     fontWeight: '600',
   },

@@ -877,7 +877,7 @@ def list_payment_methods(session: SessionDep, current_user: CurrentUser) -> Any:
 
 
 @router.get("/products", status_code=status.HTTP_200_OK)
-def get_products(session: SessionDep, current_user: CurrentUser) -> list:
+def get_products() -> list:
     """
     Get all active products from Stripe
     """
@@ -890,9 +890,7 @@ def get_products(session: SessionDep, current_user: CurrentUser) -> list:
 
 
 @router.get("/products/{product_id}/prices", status_code=status.HTTP_200_OK)
-def get_product_prices(
-    product_id: str, session: SessionDep, current_user: CurrentUser
-) -> list:
+def get_product_prices(product_id: str) -> list:
     """
     Get all prices for a specific product
     """
