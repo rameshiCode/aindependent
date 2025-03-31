@@ -48,7 +48,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
   };
 
   const signOut = () => {
+    // Clear token from storage
     setToken(null);
+
+    // Clear specific user-related queries
+    queryClient.invalidateQueries({ queryKey: readUserMeOptions().queryKey });
+    queryClient.invalidateQueries({ queryKey: readUsersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: ['subscription'] });
+
+    // Redirect to login/sign-in page
+    router.replace('/sign-in');
   };
 
   const signInWithBackendMutation = useMutation({

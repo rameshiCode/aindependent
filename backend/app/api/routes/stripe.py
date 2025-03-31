@@ -1129,3 +1129,125 @@ async def confirm_subscription(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while confirming the subscription",
         )
+
+
+# SUBSCRIPTION HANDLER ENDPOINTS
+# @router.post("/cancel", status_code=status.HTTP_200_OK)
+# async def cancel_subscription(
+#     session: SessionDep,
+#     current_user: CurrentUser,
+# ) -> dict[str, Any]:
+#     """
+#     Cancel the user's subscription at the end of the current billing period.
+
+#     The user will maintain access until the end of their current billing period.
+#     """
+#     # Get customer record for current user
+#     customer = session.exec(
+#         select(Customer).where(Customer.user_id == current_user.id)
+#     ).first()
+
+#     if not customer:
+#         logger.error(f"Customer not found for user ID: {current_user.id}")
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND, detail="Customer record not found"
+#         )
+
+#     # Get active subscription for customer
+#     subscription = session.exec(
+#         select(Subscription)
+#         .where(Subscription.customer_id == customer.id)
+#         .where(Subscription.status == SubscriptionStatus.ACTIVE)
+#     ).first()
+
+#     if not subscription:
+#         logger.error(f"No active subscription found for customer ID: {customer.id}")
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND, detail="No active subscription found"
+#         )
+
+#     try:
+#         # Cancel subscription in Stripe at period end
+#         stripe_subscription = stripe.Subscription.modify(
+#             subscription.stripe_subscription_id, cancel_at_period_end=True
+#         )
+
+#         # Update local subscription record
+#         subscription.cancel_at_period_end = True
+#         session.add(subscription)
+#         session.commit()
+
+#         logger.info(f"Subscription {subscription.id} set to cancel at period end")
+
+#         return {
+#             "status": "success",
+#             "message": "Subscription will be canceled at the end of the current billing period",
+#             "subscription_id": str(subscription.id),
+#             "current_period_end": subscription.current_period_end.isoformat(),
+#         }
+
+#     except stripe.error.StripeError as e:
+#         logger.error(f"Stripe error when canceling subscription: {str(e)}")
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail=f"Error canceling subscription: {str(e)}",
+#         )
+
+
+@router.get("/details", status_code=status.HTTP_200_OK)
+async def get_subscription_details(
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> dict[str, Any]:
+    """
+    Get detailed information about the user's active subscription.
+
+    This endpoint provides comprehensive information about the subscription,
+    including status, billing period, and plan details.
+    """
+    # Get customer record for current user
+    customer = session.exec(
+        select(Customer).where(Customer.user_id == current_user.id)
+    ).first()
+
+    if not customer:
+        logger.error(f"Customer not found for user ID: {current_user.id}")
+        return {"has_active_subscription": False}
+
+    # Get active subscription for customer
+    subscription = session.exec(
+        select(Subscription)
+        .where(Subscription.customer_id == customer.id)
+        .where(Subscription.status == SubscriptionStatus.ACTIVE)
+    ).first()
+
+    if not subscription:
+        logger.info(f"No active subscription found for customer ID: {customer.id}")
+        return {"has_active_subscription": False}
+
+    # Get plan and price details
+    price = session.get(subscription.price_id)
+    plan = session.get(price.plan_id) if price else None
+
+    return {
+        "has_active_subscription": True,
+        "subscription_id": str(subscription.id),
+        "stripe_subscription_id": subscription.stripe_subscription_id,
+        "status": subscription.status,
+        "current_period_start": subscription.current_period_start.isoformat(),
+        "current_period_end": subscription.current_period_end.isoformat(),
+        "cancel_at_period_end": subscription.cancel_at_period_end,
+        "plan": {
+            "name": plan.name if plan else None,
+            "description": plan.description if plan else None,
+        }
+        if plan
+        else None,
+        "price": {
+            "amount": price.amount if price else None,
+            "currency": price.currency if price else None,
+            "interval": price.interval if price else None,
+        }
+        if price
+        else None,
+    }
