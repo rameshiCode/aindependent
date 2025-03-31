@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedView } from '../../../components/ThemedView';
 import { ThemedText } from '../../../components/ThemedText';
 import { StripeService } from '../../../src/client';
 import StripePaymentForm from '../../../components/StripePaymentForm';
-import { SubscriptionManager } from '../../../components/SubscriptionManager';
-
-
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { getProductsOptions, getProductPricesOptions, cancelSubscriptionOptions } from '../../../src/client/@tanstack/react-query.gen';
 
 export default function SubscriptionScreen() {
   const router = useRouter();
@@ -16,197 +15,361 @@ export default function SubscriptionScreen() {
   const [error, setError] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<any>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [showUpgradeOptions, setShowUpgradeOptions] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
 
-// Fetch subscription data
-const fetchSubscription = async () => {
-  try {
-    setLoading(true);
-    setError(null);
+  // Fetch subscription data
+  const fetchSubscription = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-    const { data } = await StripeService.getSubscriptionStatus({
-      throwOnError: true
-    });
-    setSubscription(data);
-  } catch (e: any) {
-    console.error('Error fetching subscription:', e);
-    setError('Failed to load subscription data');
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-
-// Update the openCustomerPortal function in Subscription.tsx
-const openCustomerPortal = async () => {
-  try {
-    setPortalLoading(true);
-
-    // Use a valid URL for Stripe portal
-    const { data } = await StripeService.createPortalSession({
-      body: {
-        return_url: `https://example.com/return`, // Use a valid URL here
-      },
-      throwOnError: true
-    }) ;
-
-    // Add type checking
-    if (data && typeof data.url === 'string') {
-      router.push(`/web-view?url=${encodeURIComponent(data.url)}`);
-    } else {
-      setError('Failed to open customer portal');
+      const { data } = await StripeService.getSubscriptionStatus({
+        throwOnError: true
+      });
+      setSubscription(data);
+      console.log("Subscription data:", JSON.stringify(data, null, 2));
+    } catch (e: any) {
+      console.error('Error fetching subscription:', e);
+      setError('Failed to load subscription data');
+    } finally {
+      setLoading(false);
     }
-  } catch (e: any) {
-    console.error('Error opening customer portal:', e);
-    setError(`Failed to open customer portal: ${e.message}`);
-  } finally {
-    setPortalLoading(false);
-  }
-};
+  };
 
-
-
-// Load subscription data on mount
-useEffect(() => {
-  fetchSubscription();
-}, []);
-
-// Format date
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+  // Fetch products for upgrade
+  const {
+    data: products,
+    isLoading: isLoadingProducts,
+    error: productsError
+  } = useQuery({
+    ...getProductsOptions(),
+    enabled: showUpgradeOptions
   });
-};
 
-// Render loading state
-if (loading) {
+  // Log product errors
+  useEffect(() => {
+    if (productsError) {
+      console.error('Error fetching products:', productsError);
+    }
+  }, [productsError]);
+
+  // Fetch prices for selected product
+  const {
+    data: prices,
+    isLoading: isLoadingPrices,
+    error: pricesError
+  } = useQuery({
+    ...getProductPricesOptions({
+      path: { product_id: selectedProductId || '' }
+    }),
+    enabled: !!selectedProductId
+  });
+
+  // Log price errors
+  useEffect(() => {
+    if (pricesError) {
+      console.error('Error fetching prices:', pricesError);
+    }
+  }, [pricesError]);
+
+  // Cancel subscription mutation
+  const { mutate: cancelSubscription, isPending: isCanceling } = useMutation({
+    mutationFn: (subscriptionId: string) => {
+      return StripeService.cancelSubscription({
+        path: { subscription_id: subscriptionId },
+        throwOnError: true
+      });
+    },
+    onSuccess: () => {
+      Alert.alert(
+        'Subscription Canceled',
+        'Your subscription has been canceled and will end at the current billing period.',
+        [{ text: 'OK', onPress: fetchSubscription }]
+      );
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', `Failed to cancel subscription: ${error.message}`);
+    }
+  });
+
+  // Update the openCustomerPortal function in Subscription.tsx
+  const openCustomerPortal = async () => {
+    try {
+      setPortalLoading(true);
+
+      // Use a valid URL for Stripe portal
+      const { data } = await StripeService.createPortalSession({
+        body: {
+          return_url: `https://example.com/return`, // Use a valid URL here
+        },
+        throwOnError: true
+      });
+
+      // Add type checking
+      if (data && typeof data.url === 'string') {
+        router.push(`/web-view?url=${encodeURIComponent(data.url)}`);
+      } else {
+        setError('Failed to open customer portal');
+      }
+    } catch (e: any) {
+      console.error('Error opening customer portal:', e);
+      setError(`Failed to open customer portal: ${e.message}`);
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
+  // Handle cancel subscription
+  const handleCancelSubscription = () => {
+    if (!subscription?.stripe_subscription_id) return;
+
+    Alert.alert(
+      'Cancel Subscription',
+      'Are you sure you want to cancel your subscription? You will still have access until the end of your current billing period.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: () => cancelSubscription(subscription.stripe_subscription_id)
+        }
+      ]
+    );
+  };
+
+  // Handle upgrade options toggle
+  const handleUpgradeToggle = () => {
+    setShowUpgradeOptions(!showUpgradeOptions);
+    setSelectedProductId(null);
+    setSelectedPriceId(null);
+  };
+
+  // Handle product selection
+  const handleSelectProduct = (productId: string) => {
+    setSelectedProductId(productId);
+    setSelectedPriceId(null);
+  };
+
+  // Load subscription data on mount
+  useEffect(() => {
+    fetchSubscription();
+  }, []);
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  // Render loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ThemedView style={styles.container}>
+          <ActivityIndicator size="large" color="#5469D4" />
+          <ThemedText style={styles.loadingText}>Loading subscription data...</ThemedText>
+        </ThemedView>
+      </SafeAreaView>
+    );
+  }
+
+  // Render error state
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ThemedView style={styles.container}>
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <Pressable style={styles.button} onPress={fetchSubscription}>
+            <Text style={styles.buttonText}>Retry</Text>
+          </Pressable>
+        </ThemedView>
+      </SafeAreaView>
+    );
+  }
+
+  // Render subscription details or subscription form
   return (
     <SafeAreaView style={styles.safeArea}>
       <ThemedView style={styles.container}>
-        <ActivityIndicator size="large" color="#5469D4" />
-        <ThemedText style={styles.loadingText}>Loading subscription data...</ThemedText>
-      </ThemedView>
-    </SafeAreaView>
-  );
-}
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ThemedText style={styles.title}>Subscription</ThemedText>
 
-// Render error state
-if (error) {
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ThemedView style={styles.container}>
-        <ThemedText style={styles.errorText}>{error}</ThemedText>
-        <Pressable style={styles.button} onPress={fetchSubscription}>
-          <Text style={styles.buttonText}>Retry</Text>
-        </Pressable>
-      </ThemedView>
-    </SafeAreaView>
-  );
-}
+          {subscription?.has_active_subscription ? (
+            // Active subscription view
+            <View style={styles.subscriptionContainer}>
+              <ThemedText style={styles.planName}>{subscription.plan?.name || 'Premium Plan'}</ThemedText>
 
-// Render subscription details or subscription form
-return (
-  <SafeAreaView style={styles.safeArea}>
-    <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <ThemedText style={styles.title}>Subscription</ThemedText>
-
-        {subscription?.has_subscription ? (
-          // Active subscription view
-          <View style={styles.subscriptionContainer}>
-            <ThemedText style={styles.planName}>{subscription.plan?.name || 'Premium Plan'}</ThemedText>
-
-            <View style={styles.detailRow}>
-              <ThemedText style={styles.detailLabel}>Status:</ThemedText>
-              <ThemedText style={[
-                styles.detailValue,
-                subscription.subscription.status === 'active' && styles.activeStatus,
-                subscription.subscription.status === 'past_due' && styles.pastDueStatus,
-                subscription.subscription.status === 'canceled' && styles.canceledStatus,
-              ]}>
-                {subscription.subscription.status.charAt(0).toUpperCase() + subscription.subscription.status.slice(1)}
-              </ThemedText>
-            </View>
-
-            <View style={styles.detailRow}>
-              <ThemedText style={styles.detailLabel}>Price:</ThemedText>
-              <ThemedText style={styles.detailValue}>
-                ${(subscription.price?.amount / 100).toFixed(2)} / {subscription.price?.interval}
-              </ThemedText>
-            </View>
-
-            <View style={styles.detailRow}>
-              <ThemedText style={styles.detailLabel}>Current Period:</ThemedText>
-              <ThemedText style={styles.detailValue}>
-                {formatDate(subscription.subscription.current_period_start)} - {formatDate(subscription.subscription.current_period_end)}
-              </ThemedText>
-            </View>
-
-            {subscription.subscription.cancel_at_period_end && (
-              <View style={styles.cancelNotice}>
-                <ThemedText style={styles.cancelText}>
-                  Your subscription will end on {formatDate(subscription.subscription.current_period_end)}
+              <View style={styles.detailRow}>
+                <ThemedText style={styles.detailLabel}>Status:</ThemedText>
+                <ThemedText style={[
+                  styles.detailValue,
+                  subscription.status === 'active' && styles.activeStatus,
+                  subscription.status === 'past_due' && styles.pastDueStatus,
+                  subscription.status === 'canceled' && styles.canceledStatus,
+                ]}>
+                  {subscription.status?.charAt(0).toUpperCase() + subscription.status?.slice(1) || 'Active'}
                 </ThemedText>
               </View>
-            )}
 
-            <Pressable
-              style={styles.portalButton}
-              onPress={openCustomerPortal}
-              disabled={portalLoading}
-            >
-              {portalLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.portalButtonText}>Manage Subscription</Text>
+              <View style={styles.detailRow}>
+                <ThemedText style={styles.detailLabel}>Price:</ThemedText>
+                <ThemedText style={styles.detailValue}>
+                  ${(subscription.price?.amount / 100).toFixed(2)} / {subscription.price?.interval}
+                </ThemedText>
+              </View>
+
+              <View style={styles.detailRow}>
+                <ThemedText style={styles.detailLabel}>Current Period:</ThemedText>
+                <ThemedText style={styles.detailValue}>
+                  Ends on {formatDate(subscription.current_period_end)}
+                </ThemedText>
+              </View>
+
+              {subscription.cancel_at_period_end && (
+                <View style={styles.cancelNotice}>
+                  <ThemedText style={styles.cancelText}>
+                    Your subscription will end on {formatDate(subscription.current_period_end)}
+                  </ThemedText>
+                </View>
               )}
-            </Pressable>
-          </View>
-        ) : (
-          // No subscription view
-          <View style={styles.noSubscriptionContainer}>
-            <ThemedText style={styles.noSubscriptionText}>
-              You don't have an active subscription.
-            </ThemedText>
 
-            <View style={styles.pricingContainer}>
-              <ThemedText style={styles.pricingTitle}>Choose a Plan</ThemedText>
+              <Pressable
+                style={styles.portalButton}
+                onPress={openCustomerPortal}
+                disabled={portalLoading}
+              >
+                {portalLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.portalButtonText}>Manage in Stripe Portal</Text>
+                )}
+              </Pressable>
 
-              <View style={styles.planCard}>
-                <ThemedText style={styles.planCardTitle}>Premium Plan</ThemedText>
-                <ThemedText style={styles.planCardPrice}>$15/month</ThemedText>
-                <ThemedText style={styles.planCardDescription}>
-                  Get access to all premium features and priority support.
-                </ThemedText>
+              <Pressable
+                style={styles.upgradeButton}
+                onPress={handleUpgradeToggle}
+              >
+                <Text style={styles.buttonText}>
+                  {showUpgradeOptions ? 'Hide Upgrade Options' : 'Upgrade Plan'}
+                </Text>
+              </Pressable>
 
-                <StripePaymentForm
-                  priceId="price_1R4HTbK8wIdhxRomQmYkYDe1"
-                  useCheckout={true}
-                />
-              </View>
+              {!subscription.cancel_at_period_end && (
+                <Pressable
+                  style={styles.cancelButton}
+                  onPress={handleCancelSubscription}
+                  disabled={isCanceling}
+                >
+                  {isCanceling ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+                  )}
+                </Pressable>
+              )}
 
-              <View style={styles.planCard}>
-                <ThemedText style={styles.planCardTitle}>Basic Plan</ThemedText>
-                <ThemedText style={styles.planCardPrice}>$5/month</ThemedText>
-                <ThemedText style={styles.planCardDescription}>
-                  Get access to basic features.
-                </ThemedText>
+              {/* Upgrade options */}
+              {showUpgradeOptions && (
+                <View style={styles.upgradeOptions}>
+                  <ThemedText style={styles.upgradeTitle}>Available Plans</ThemedText>
 
-                <StripePaymentForm
-                  priceId="price_1R4HTbK8wIdhxRomQmYkYDe1" // Replace with your actual price ID
-                  useCheckout={true}
-                />
+                  {isLoadingProducts ? (
+                    <ActivityIndicator size="small" color="#5469D4" />
+                  ) : productsError ? (
+                    <ThemedText style={styles.errorText}>Error loading plans</ThemedText>
+                  ) : (
+                    products?.map((product: any) => (
+                      <Pressable
+                        key={product.id}
+                        style={[
+                          styles.productItem,
+                          selectedProductId === product.id && styles.selectedProductItem
+                        ]}
+                        onPress={() => handleSelectProduct(product.id)}
+                      >
+                        <ThemedText style={styles.productName}>{product.name}</ThemedText>
+                        <ThemedText style={styles.productDescription}>{product.description}</ThemedText>
+                      </Pressable>
+                    ))
+                  )}
+
+                  {selectedProductId && (
+                    <View style={styles.priceOptions}>
+                      <ThemedText style={styles.pricesTitle}>Select a Plan:</ThemedText>
+
+                      {isLoadingPrices ? (
+                        <ActivityIndicator size="small" color="#5469D4" />
+                      ) : pricesError ? (
+                        <ThemedText style={styles.errorText}>Error loading prices</ThemedText>
+                      ) : (
+                        prices?.map((price: any) => (
+                          <View key={price.id} style={styles.priceItem}>
+                            <ThemedText style={styles.priceText}>
+                              ${(price.unit_amount / 100).toFixed(2)} {price.currency.toUpperCase()} / {price.recurring.interval}
+                            </ThemedText>
+                            <StripePaymentForm
+                              priceId={price.id}
+                              useCheckout={true}
+                              onPaymentSuccess={fetchSubscription}
+                            />
+                          </View>
+                        ))
+                      )}
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          ) : (
+            // No subscription view
+            <View style={styles.noSubscriptionContainer}>
+              <ThemedText style={styles.noSubscriptionText}>
+                You don't have an active subscription.
+              </ThemedText>
+
+              <View style={styles.pricingContainer}>
+                <ThemedText style={styles.pricingTitle}>Choose a Plan</ThemedText>
+
+                <View style={styles.planCard}>
+                  <ThemedText style={styles.planCardTitle}>Premium Plan</ThemedText>
+                  <ThemedText style={styles.planCardPrice}>$15/month</ThemedText>
+                  <ThemedText style={styles.planCardDescription}>
+                    Get access to all premium features and priority support.
+                  </ThemedText>
+
+                  <StripePaymentForm
+                    priceId="price_1R4HTbK8wIdhxRomQmYkYDe1"
+                    useCheckout={true}
+                    onPaymentSuccess={fetchSubscription}
+                  />
+                </View>
+
+                <View style={styles.planCard}>
+                  <ThemedText style={styles.planCardTitle}>Basic Plan</ThemedText>
+                  <ThemedText style={styles.planCardPrice}>$5/month</ThemedText>
+                  <ThemedText style={styles.planCardDescription}>
+                    Get access to basic features.
+                  </ThemedText>
+
+                  <StripePaymentForm
+                    priceId="price_1R4HTbK8wIdhxRomQmYkYDe1" // Replace with your actual price ID
+                    useCheckout={true}
+                    onPaymentSuccess={fetchSubscription}
+                  />
+                </View>
               </View>
             </View>
-          </View>
-        )}
-      </ScrollView>
-    </ThemedView>
-  </SafeAreaView>
-);
+          )}
+        </ScrollView>
+      </ThemedView>
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -301,6 +464,85 @@ portalButtonText: {
   color: 'white',
   fontSize: 16,
   fontWeight: '600',
+},
+upgradeButton: {
+  backgroundColor: '#4f46e5',
+  paddingVertical: 14,
+  borderRadius: 8,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 12,
+},
+cancelButton: {
+  backgroundColor: '#ef4444',
+  paddingVertical: 14,
+  borderRadius: 8,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 12,
+},
+cancelButtonText: {
+  color: 'white',
+  fontSize: 16,
+  fontWeight: '600',
+},
+upgradeOptions: {
+  marginTop: 20,
+  paddingTop: 16,
+  borderTopWidth: 1,
+  borderTopColor: '#e2e8f0',
+},
+upgradeTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  marginBottom: 12,
+  color: '#334155',
+},
+productItem: {
+  padding: 14,
+  borderWidth: 1,
+  borderColor: '#e2e8f0',
+  borderRadius: 8,
+  marginBottom: 10,
+  backgroundColor: '#fff',
+},
+selectedProductItem: {
+  borderColor: '#5469D4',
+  borderWidth: 2,
+  backgroundColor: '#EEF2FF',
+},
+productName: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: '#334155',
+  marginBottom: 4,
+},
+productDescription: {
+  fontSize: 14,
+  color: '#64748b',
+},
+priceOptions: {
+  marginTop: 16,
+},
+pricesTitle: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  marginBottom: 12,
+  color: '#334155',
+},
+priceItem: {
+  marginBottom: 12,
+  padding: 12,
+  backgroundColor: '#fff',
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: '#e2e8f0',
+},
+priceText: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: '#334155',
+  marginBottom: 8,
 },
 button: {
   backgroundColor: '#5469D4',
