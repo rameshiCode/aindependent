@@ -1,59 +1,35 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, useColorScheme, ActivityIndicator, ScrollView, Alert } from 'react-native';
-import { useAuth } from '@/context/authProvider';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { useRouter } from 'expo-router';
-import { ThemedView } from '@/components/ThemedView';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { getSubscriptionStatusOptions, createPortalSessionMutation, cancelSubscriptionMutation } from '@/src/client/@tanstack/react-query.gen';
-import Constants from 'expo-constants';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
+import { getSubscriptionStatusOptions } from '../../../src/client/@tanstack/react-query.gen';
+import { router } from 'expo-router';
 
-// Define TypeScript interfaces for subscription data
-interface SubscriptionPlan {
-  name?: string;
-  description?: string;
-}
-
-interface SubscriptionDetails {
-  status?: string;
-  current_period_start?: string;
-  current_period_end?: string;
-  cancel_at_period_end?: boolean;
-  stripe_subscription_id?: string;
-}
-
-interface SubscriptionPrice {
-  amount?: number;
-  currency?: string;
-  interval?: string;
-}
-
+// Define the subscription data type
 interface SubscriptionData {
-  has_active_subscription?: boolean;
-  plan?: SubscriptionPlan;
-  subscription?: SubscriptionDetails;
-  price?: SubscriptionPrice;
+  has_active_subscription: boolean;
+  subscription_id?: string;
+  stripe_subscription_id?: string;
   status?: string;
   current_period_end?: string;
   cancel_at_period_end?: boolean;
-  stripe_subscription_id?: string;
+  plan?: {
+    name: string;
+    description: string;
+  };
+  price?: {
+    amount: number;
+    currency: string;
+    interval: string;
+  };
 }
 
-export default function Profile() {
-  const { currentUser, signOut } = useAuth();
-  const router = useRouter();
-  const backgroundColor = useThemeColor({}, 'background');
-  const textColor = useThemeColor({}, 'text');
-  const placeholderBackground = useThemeColor({}, 'inputBackground');
-  const placeholderTextColor = useThemeColor({}, 'inputText');
-  const buttonBackground = useThemeColor({}, 'buttonBackground');
-  const buttonTextColor = useThemeColor({}, 'buttonText');
-  const theme = useColorScheme();
+export default function ProfileScreen() {
+  // Replace with your actual auth hook
+  const user = { name: 'User', email: 'a@b.cc', image: null };
+  const signOut = () => { /* Your sign out logic */ };
 
-  // Format date function
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
-
+  // Format date for display
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -77,390 +53,303 @@ export default function Profile() {
     refetch: () => Promise<any>;
   };
 
-  // Define portal session response type
-    interface PortalSessionResponse {
-      url: string;
-    }
+  // Enhanced logging for debugging subscription issues
+  console.log('Subscription data:', JSON.stringify(subscription, null, 2));
+  console.log('Loading state:', isLoading);
+  console.log('Error state:', isError, error);
 
-  // Mutations for subscription management
-  const createPortalMutation = useMutation(createPortalSessionMutation());
-  const cancelSubMutation = useMutation(cancelSubscriptionMutation());
-
-  // Handle manage subscription button
-  const handleManageSubscription = async () => {
+  const handleRefresh = async () => {
+    console.log('Refreshing subscription data...');
     try {
-      const result = await createPortalMutation.mutateAsync({
-        body: {
-          return_url: `${Constants.expoConfig?.extra?.FRONTEND_URL || 'https://example.com'}/profile`,
-        }
-      });
-
-      const data = result.data as PortalSessionResponse;
-
-      if (data?.url) {
-        router.push({
-          pathname: '/web-view',
-          params: { url: data.url }
-        });
-      } else {
-        Alert.alert('Error', 'Unable to open subscription management portal');
-      }
-    } catch (error) {
-      console.error('Error opening portal:', error);
-      Alert.alert('Error', 'Failed to open subscription management portal');
+      const result = await refetch();
+      console.log('Refresh result:', JSON.stringify(result.data, null, 2));
+      Alert.alert('Refresh Complete', 'Subscription data has been refreshed.');
+    } catch (err) {
+      console.error('Error refreshing subscription data:', err);
+      Alert.alert('Refresh Error', 'Failed to refresh subscription data.');
     }
   };
 
-  // Handle cancel subscription button
-  const handleCancelSubscription = (subscriptionId?: string) => {
-    if (!subscriptionId) {
-      Alert.alert('Error', 'Subscription ID not found');
-      return;
+  const handleSubscribe = () => {
+    // Navigate to subscription page
+    router.push('/subscription');
+  };
+
+  const handleManageSubscription = () => {
+    router.push('/subscription');
+  };
+
+  const handleSignOut = () => {
+    signOut();
+  };
+
+  // Render subscription section based on status
+  const renderSubscriptionSection = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6200ee" />
+          <Text style={styles.loadingText}>Loading subscription info...</Text>
+        </View>
+      );
     }
 
-    Alert.alert(
-      'Cancel Subscription',
-      'Are you sure you want to cancel your subscription? You will still have access until the end of your billing period.',
-      [
-        {
-          text: 'No',
-          style: 'cancel',
-        },
-        {
-          text: 'Yes',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await cancelSubMutation.mutateAsync({
-                path: { subscription_id: subscriptionId }
-              });
+    if (isError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error loading subscription data</Text>
+          <Text style={styles.errorDetail}>{error?.message || 'Unknown error'}</Text>
+          <TouchableOpacity style={styles.button} onPress={handleRefresh}>
+            <Text style={styles.buttonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
 
-              // Refetch subscription data to update the UI
-              refetch();
+    if (subscription?.has_active_subscription) {
+      return (
+        <View style={styles.subscriptionContainer}>
+          <Text style={styles.subscriptionTitle}>Active Subscription</Text>
+          <View style={styles.subscriptionDetails}>
+            <Text style={styles.planName}>{subscription.plan?.name || 'Premium Plan'}</Text>
+            <Text style={styles.planDescription}>{subscription.plan?.description || 'Full access to all features'}</Text>
+            <Text style={styles.priceInfo}>
+              {subscription.price?.amount ? `${(subscription.price.amount / 100).toFixed(2)} ${subscription.price.currency.toUpperCase()}` : 'Price info unavailable'}
+              {subscription.price?.interval ? ` / ${subscription.price.interval}` : ''}
+            </Text>
+            <Text style={styles.renewalInfo}>
+              {subscription.cancel_at_period_end
+                ? `Your subscription will end on ${formatDate(subscription.current_period_end || '')}`
+                : `Renews on ${formatDate(subscription.current_period_end || '')}`}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.button} onPress={handleManageSubscription}>
+            <Text style={styles.buttonText}>Manage Subscription</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.outlineButton} onPress={handleRefresh}>
+            <Text style={styles.outlineButtonText}>Refresh Status</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
 
-              Alert.alert(
-                'Subscription Canceled',
-                'Your subscription has been canceled and will end at the current billing period.'
-              );
-            } catch (error) {
-              console.error('Error canceling subscription:', error);
-              Alert.alert('Error', 'Failed to cancel subscription');
-            }
-          },
-        },
-      ]
+    return (
+      <View style={styles.subscriptionContainer}>
+        <Text style={styles.subscriptionTitle}>Subscription</Text>
+        <Text style={styles.noSubscriptionText}>You don't have an active subscription.</Text>
+        <TouchableOpacity style={styles.button} onPress={handleSubscribe}>
+          <Text style={styles.buttonText}>Subscribe Now</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.outlineButton} onPress={handleRefresh}>
+          <Text style={styles.outlineButtonText}>Refresh Status</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
   return (
-    <ThemedView useSafeAreaTop style={[styles.container, { backgroundColor }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Profile Section */}
-        <View style={styles.profileSection}>
-          <Image
-            source={require('../../../assets/images/pfp.png')}
-            style={styles.profileImage}
-          />
-          <Text style={[styles.profileName, { color: textColor }]}>{currentUser?.full_name || 'User'}</Text>
-          <Text style={[styles.profileEmail, { color: placeholderTextColor }]}>{currentUser?.email}</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.profileHeader}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'U'}</Text>
         </View>
+        <Text style={styles.userName}>{user?.name || 'User'}</Text>
+        <Text style={styles.userEmail}>{user?.email || 'a@b.cc'}</Text>
+      </View>
 
-        {/* Subscription Section */}
-        <View style={[styles.subscriptionSection, { backgroundColor: placeholderBackground }]}>
-          <Text style={[styles.settingsTitle, { color: textColor }]}>Subscription</Text>
+      {renderSubscriptionSection()}
 
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#5469D4" />
-              <Text style={[styles.loadingText, { color: placeholderTextColor }]}>Loading subscription...</Text>
-            </View>
-          ) : isError ? (
-            <View style={styles.errorContainer}>
-              <Text style={[styles.errorText, { color: '#FF4444' }]}>
-                {error instanceof Error ? error.message : 'Failed to load subscription data'}
-              </Text>
-              <TouchableOpacity
-                style={[styles.retryButton, { backgroundColor: buttonBackground }]}
-                onPress={() => refetch()}
-              >
-                <Text style={[styles.retryButtonText, { color: buttonTextColor }]}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : subscription?.has_active_subscription ? (
-            <>
-              <View style={styles.subscriptionItem}>
-                <Text style={[styles.settingText, { color: textColor }]}>Plan</Text>
-                <Text style={[styles.subscriptionValue, { color: textColor }]}>
-                  {subscription.plan?.name || 'Premium Plan'}
-                </Text>
-              </View>
-
-              <View style={styles.subscriptionItem}>
-                <Text style={[styles.settingText, { color: textColor }]}>Status</Text>
-                <View style={[
-                  styles.statusBadge,
-                  subscription.status === 'active' && styles.activeBadge,
-                  subscription.status === 'past_due' && styles.pastDueBadge,
-                  subscription.status === 'canceled' && styles.canceledBadge,
-                ]}>
-                  <Text style={styles.statusText}>
-                    {subscription.status
-                      ? subscription.status.charAt(0).toUpperCase() +
-                        subscription.status.slice(1)
-                      : 'Unknown'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.subscriptionItem}>
-                <Text style={[styles.settingText, { color: textColor }]}>Price</Text>
-                <Text style={[styles.subscriptionValue, { color: textColor }]}>
-                  ${(subscription.price?.amount || 0) / 100} / {subscription.price?.interval || 'month'}
-                </Text>
-              </View>
-
-              <View style={styles.subscriptionItem}>
-                <Text style={[styles.settingText, { color: textColor }]}>Renewal Date</Text>
-                <Text style={[styles.subscriptionValue, { color: textColor }]}>
-                  {formatDate(subscription.current_period_end)}
-                </Text>
-              </View>
-
-              {subscription.cancel_at_period_end && (
-                <View style={styles.cancelNotice}>
-                  <Text style={styles.cancelText}>
-                    Your subscription will end on {formatDate(subscription.current_period_end)}
-                  </Text>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={[styles.manageButton, { backgroundColor: buttonBackground }]}
-                onPress={handleManageSubscription}
-              >
-                <Text style={[styles.manageButtonText, { color: buttonTextColor }]}>Manage Subscription</Text>
-              </TouchableOpacity>
-
-              {!subscription.cancel_at_period_end && (
-                <TouchableOpacity
-                  style={[styles.cancelButton, { borderColor: '#FF4444' }]}
-                  onPress={() => handleCancelSubscription(subscription.stripe_subscription_id)}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
-                </TouchableOpacity>
-              )}
-            </>
-          ) : (
-            <View style={styles.noSubscriptionContainer}>
-              <Text style={[styles.noSubscriptionText, { color: placeholderTextColor }]}>
-                You don't have an active subscription.
-              </Text>
-              <TouchableOpacity
-                style={[styles.subscribeButton, { backgroundColor: buttonBackground }]}
-                onPress={() => router.push('/subscription')}
-              >
-                <Text style={[styles.subscribeButtonText, { color: buttonTextColor }]}>Subscribe Now</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+      <View style={styles.settingsContainer}>
+        <Text style={styles.settingsTitle}>Settings</Text>
+        <View style={styles.settingRow}>
+          <Text style={styles.settingLabel}>Theme</Text>
+          <Text style={styles.settingValue}>Dark</Text>
         </View>
-
-        {/* Settings Section */}
-        <View style={[styles.settingsSection, { backgroundColor: placeholderBackground }]}>
-          <Text style={[styles.settingsTitle, { color: textColor }]}>Settings</Text>
-          {/* Theme Setting */}
-          <TouchableOpacity style={styles.settingItem}>
-            <Text style={[styles.settingText, { color: textColor }]}>Theme</Text>
-            <Text style={[styles.settingValue, { color: placeholderTextColor }]}>
-              {theme === 'light' ? 'Light' : 'Dark'}
-            </Text>
-          </TouchableOpacity>
-          {/* Notifications Setting */}
-          <TouchableOpacity style={styles.settingItem}>
-            <Text style={[styles.settingText, { color: textColor }]}>Notifications</Text>
-            <Text style={[styles.settingValue, { color: placeholderTextColor }]}>On</Text>
-          </TouchableOpacity>
+        <View style={styles.settingRow}>
+          <Text style={styles.settingLabel}>Notifications</Text>
+          <Text style={styles.settingValue}>On</Text>
         </View>
+      </View>
 
-        {/* Sign Out Button */}
-        <TouchableOpacity
-          style={[styles.signOutButton, { backgroundColor: buttonBackground }]}
-          onPress={signOut}
-        >
-          <Text style={[styles.signOutButtonText, { color: buttonTextColor }]}>Sign Out</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </ThemedView>
+      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: '#121212',
   },
-  profileSection: {
+  profileHeader: {
     alignItems: 'center',
-    marginBottom: 20,
+    padding: 20,
+    paddingTop: 40,
   },
-  profileImage: {
+  avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: 10,
+    backgroundColor: '#6200ee',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  profileName: {
+  avatarText: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  userName: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
   },
-  profileEmail: {
+  userEmail: {
+    fontSize: 16,
+    color: '#aaa',
+    marginBottom: 16,
+  },
+  subscriptionContainer: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    padding: 20,
+    margin: 16,
+    marginTop: 0,
+  },
+  subscriptionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 16,
+  },
+  noSubscriptionText: {
+    fontSize: 16,
+    color: '#ccc',
+    marginBottom: 16,
+  },
+  button: {
+    backgroundColor: '#6200ee',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
     fontSize: 16,
   },
-  subscriptionSection: {
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 20,
+  outlineButton: {
+    borderWidth: 1,
+    borderColor: '#6200ee',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
   },
-  settingsSection: {
-    borderRadius: 10,
+  outlineButtonText: {
+    color: '#6200ee',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  subscriptionDetails: {
+    marginBottom: 16,
+  },
+  planName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  planDescription: {
+    fontSize: 14,
+    color: '#ccc',
+    marginBottom: 8,
+  },
+  priceInfo: {
+    fontSize: 16,
+    color: '#6200ee',
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  renewalInfo: {
+    fontSize: 14,
+    color: '#aaa',
+  },
+  settingsContainer: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
     padding: 20,
+    margin: 16,
   },
   settingsTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
+    color: '#fff',
+    marginBottom: 16,
   },
-  settingItem: {
+  settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#333',
   },
-  settingText: {
+  settingLabel: {
     fontSize: 16,
+    color: '#fff',
   },
   settingValue: {
     fontSize: 16,
+    color: '#aaa',
   },
   signOutButton: {
-    marginTop: 20,
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  signOutButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  subscriptionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  subscriptionValue: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#6200ee',
     borderRadius: 12,
-    backgroundColor: '#9CA3AF',
-  },
-  activeBadge: {
-    backgroundColor: '#10B981',
-  },
-  pastDueBadge: {
-    backgroundColor: '#F59E0B',
-  },
-  canceledBadge: {
-    backgroundColor: '#EF4444',
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  cancelNotice: {
-    backgroundColor: '#FEE2E2',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 12,
-  },
-  cancelText: {
-    color: '#B91C1C',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  manageButton: {
-    marginTop: 16,
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    margin: 16,
     alignItems: 'center',
+    marginBottom: 40,
   },
-  manageButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    backgroundColor: 'transparent',
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FF4444',
-  },
-  noSubscriptionContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  noSubscriptionText: {
+  signOutText: {
     fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  subscribeButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  subscribeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    color: '#fff',
   },
   loadingContainer: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    padding: 20,
+    margin: 16,
     alignItems: 'center',
-    paddingVertical: 20,
+    justifyContent: 'center',
+    height: 150,
   },
   loadingText: {
-    marginTop: 8,
-    fontSize: 14,
+    marginTop: 12,
+    fontSize: 16,
+    color: '#ccc',
   },
   errorContainer: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    padding: 20,
+    margin: 16,
     alignItems: 'center',
-    paddingVertical: 20,
   },
   errorText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+    marginBottom: 8,
+  },
+  errorDetail: {
     fontSize: 14,
-    marginBottom: 10,
-  },
-  retryButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+    color: '#ccc',
+    marginBottom: 16,
+    textAlign: 'center',
+  }
 });

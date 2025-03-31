@@ -787,29 +787,39 @@ def create_subscription_with_payment_method(
 def cancel_subscription(
     subscription_id: str, session: SessionDep, current_user: CurrentUser
 ) -> Any:
-    """Cancel a subscription directly (without portal)."""
-    # Verify ownership
-    customer = session.exec(
-        select(Customer).where(Customer.user_id == current_user.id)
-    ).first()
-
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-
-    # Verify subscription belongs to this customer
-    db_subscription = session.exec(
-        select(Subscription)
-        .where(Subscription.customer_id == customer.id)
-        .where(Subscription.stripe_subscription_id == subscription_id)
-    ).first()
-
-    if not db_subscription:
-        raise HTTPException(
-            status_code=404, detail="Subscription not found or not owned by you"
+    """Cancel a subscription at the end of the current billing period."""
+    try:
+        # Log the cancellation request
+        logger.info(
+            f"Cancellation request for subscription {subscription_id} by user {current_user.id}"
         )
 
-    try:
-        # Cancel at period end (safer than immediate cancellation)
+        # Verify ownership
+        customer = session.exec(
+            select(Customer).where(Customer.user_id == current_user.id)
+        ).first()
+
+        if not customer:
+            logger.error(f"Customer not found for user {current_user.id}")
+            raise HTTPException(status_code=404, detail="Customer not found")
+
+        # Verify subscription belongs to this customer
+        db_subscription = session.exec(
+            select(Subscription)
+            .where(Subscription.customer_id == customer.id)
+            .where(Subscription.stripe_subscription_id == subscription_id)
+        ).first()
+
+        if not db_subscription:
+            logger.error(
+                f"Subscription {subscription_id} not found for customer {customer.id}"
+            )
+            raise HTTPException(
+                status_code=404, detail="Subscription not found or not owned by you"
+            )
+
+        # Cancel at period end (not immediately)
+        logger.info(f"Canceling subscription {subscription_id} at period end")
         sub_response = stripe.Subscription.modify(
             subscription_id,
             cancel_at_period_end=True,
@@ -819,6 +829,9 @@ def cancel_subscription(
         db_subscription.cancel_at_period_end = True
         session.add(db_subscription)
         session.commit()
+        logger.info(
+            f"Subscription {subscription_id} marked for cancellation at period end"
+        )
 
         return {
             "status": "success",
@@ -829,7 +842,13 @@ def cancel_subscription(
             ).isoformat(),
         }
     except stripe.error.StripeError as e:
+        logger.error(f"Stripe error canceling subscription {subscription_id}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error canceling subscription {subscription_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="An error occurred while canceling the subscription"
+        )
 
 
 @router.get("/payment-methods", response_model=list[dict])
@@ -1251,3 +1270,38 @@ async def get_subscription_details(
         if price
         else None,
     }
+
+
+@router.get("/available-subscriptions", response_model=list[dict])
+def get_available_subscriptions() -> Any:
+    """Get all available subscription options with formatted details for display."""
+    try:
+        # Get all active products
+        products = stripe.Product.list(active=True)
+
+        result = []
+        for product in products.data:
+            # Get prices for this product
+            prices = stripe.Price.list(product=product.id, active=True)
+
+            # Format product with prices
+            formatted_product = {
+                "id": product.id,
+                "name": product.name,
+                "description": product.description,
+                "prices": [
+                    {
+                        "id": price.id,
+                        "amount": price.unit_amount / 100,
+                        "currency": price.currency,
+                        "interval": price.recurring.interval,
+                        "interval_count": price.recurring.interval_count,
+                    }
+                    for price in prices.data
+                ],
+            }
+            result.append(formatted_product)
+
+        return result
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))

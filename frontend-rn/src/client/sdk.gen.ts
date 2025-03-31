@@ -97,6 +97,10 @@ import type {
   StripeConfirmSubscriptionData,
   StripeConfirmSubscriptionResponse,
   StripeConfirmSubscriptionError,
+  StripeGetSubscriptionDetailsData,
+  StripeGetSubscriptionDetailsResponse,
+  StripeGetAvailableSubscriptionsData,
+  StripeGetAvailableSubscriptionsResponse,
   OpenaiGetConversationsData,
   OpenaiGetConversationsResponse,
   OpenaiCreateConversationData,
@@ -761,7 +765,7 @@ export class StripeService {
 
   /**
    * Cancel Subscription
-   * Cancel a subscription directly (without portal).
+   * Cancel a subscription at the end of the current billing period.
    */
   public static cancelSubscription<ThrowOnError extends boolean = false>(
     options: Options<StripeCancelSubscriptionData, ThrowOnError>,
@@ -817,12 +821,6 @@ export class StripeService {
       unknown,
       ThrowOnError
     >({
-      security: [
-        {
-          scheme: "bearer",
-          type: "http",
-        },
-      ],
       url: "/api/v1/stripe/products",
       ...options,
     })
@@ -840,12 +838,6 @@ export class StripeService {
       StripeGetProductPricesError,
       ThrowOnError
     >({
-      security: [
-        {
-          scheme: "bearer",
-          type: "http",
-        },
-      ],
       url: "/api/v1/stripe/products/{product_id}/prices",
       ...options,
     })
@@ -927,6 +919,55 @@ export class StripeService {
         },
       ],
       url: "/api/v1/stripe/confirm-subscription",
+      ...options,
+    })
+  }
+
+  /**
+   * Get Subscription Details
+   * Get detailed information about the user's active subscription.
+   *
+   * This endpoint provides comprehensive information about the subscription,
+   * including status, billing period, and plan details.
+   */
+  public static getSubscriptionDetails<ThrowOnError extends boolean = false>(
+    options?: Options<StripeGetSubscriptionDetailsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      StripeGetSubscriptionDetailsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/details",
+      ...options,
+    })
+  }
+
+  /**
+   * Get Available Subscriptions
+   * Get all available subscription options with formatted details for display.
+   */
+  public static getAvailableSubscriptions<ThrowOnError extends boolean = false>(
+    options?: Options<StripeGetAvailableSubscriptionsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      StripeGetAvailableSubscriptionsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/stripe/available-subscriptions",
       ...options,
     })
   }

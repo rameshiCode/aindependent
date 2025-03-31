@@ -76,6 +76,9 @@ services:
       - SENTRY_DSN=${SENTRY_DSN}
 
   backend:
+    dns:
+    - 8.8.8.8  # Google's DNS
+    - 1.1.1.1  # Cloudflare's DNS
     image: '${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
     restart: always
     networks:

@@ -996,6 +996,44 @@ export type StripeConfirmSubscriptionResponses = {
 export type StripeConfirmSubscriptionResponse =
   StripeConfirmSubscriptionResponses[keyof StripeConfirmSubscriptionResponses]
 
+export type StripeGetSubscriptionDetailsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/stripe/details"
+}
+
+export type StripeGetSubscriptionDetailsResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type StripeGetSubscriptionDetailsResponse =
+  StripeGetSubscriptionDetailsResponses[keyof StripeGetSubscriptionDetailsResponses]
+
+export type StripeGetAvailableSubscriptionsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/stripe/available-subscriptions"
+}
+
+export type StripeGetAvailableSubscriptionsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<{
+    [key: string]: unknown
+  }>
+}
+
+export type StripeGetAvailableSubscriptionsResponse =
+  StripeGetAvailableSubscriptionsResponses[keyof StripeGetAvailableSubscriptionsResponses]
+
 export type OpenaiGetConversationsData = {
   body?: never
   path?: never

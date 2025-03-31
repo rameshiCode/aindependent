@@ -89,6 +89,8 @@ import type {
   StripeConfirmSubscriptionData,
   StripeConfirmSubscriptionError,
   StripeConfirmSubscriptionResponse,
+  StripeGetSubscriptionDetailsData,
+  StripeGetAvailableSubscriptionsData,
   OpenaiGetConversationsData,
   OpenaiCreateConversationData,
   OpenaiCreateConversationError,
@@ -1162,6 +1164,48 @@ export const confirmSubscriptionMutation = (
   return mutationOptions
 }
 
+export const getSubscriptionDetailsQueryKey = (
+  options?: Options<StripeGetSubscriptionDetailsData>,
+) => createQueryKey("stripeGetSubscriptionDetails", options)
+
+export const getSubscriptionDetailsOptions = (
+  options?: Options<StripeGetSubscriptionDetailsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.getSubscriptionDetails({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getSubscriptionDetailsQueryKey(options),
+  })
+}
+
+export const getAvailableSubscriptionsQueryKey = (
+  options?: Options<StripeGetAvailableSubscriptionsData>,
+) => createQueryKey("stripeGetAvailableSubscriptions", options)
+
+export const getAvailableSubscriptionsOptions = (
+  options?: Options<StripeGetAvailableSubscriptionsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await StripeService.getAvailableSubscriptions({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getAvailableSubscriptionsQueryKey(options),
+  })
+}
+
 export const getConversationsQueryKey = (
   options?: Options<OpenaiGetConversationsData>,
 ) => createQueryKey("openaiGetConversations", options)
@@ -1325,5 +1369,3 @@ export const createMessageMutation = (
   }
   return mutationOptions
 }
-
-export { OpenaiService }

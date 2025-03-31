@@ -6,6 +6,9 @@ import { ThemedView } from '../../../components/ThemedView';
 import { ThemedText } from '../../../components/ThemedText';
 import { StripeService } from '../../../src/client';
 import StripePaymentForm from '../../../components/StripePaymentForm';
+import { SubscriptionManager } from '../../../components/SubscriptionManager';
+
+
 
 export default function SubscriptionScreen() {
   const router = useRouter();
