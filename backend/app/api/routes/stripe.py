@@ -28,25 +28,32 @@ from app.models import (
     SubscriptionStatus,
 )
 
+# Load environment variables
 load_dotenv()
-# Initialize Stripe with your API key
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Initialize Stripe with API key
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+
+# Log Stripe API key status (without revealing full key)
 if not stripe.api_key:
     logger.error("Stripe API key is not set. Please check your environment variables.")
 else:
     logger.info(f"API Key loaded: {'Yes' if stripe.api_key else 'No'}")
     logger.info(f"API Key length: {len(stripe.api_key) if stripe.api_key else 0}")
-    logger.info(
-        f"API Key first/last chars: {stripe.api_key[:4]}...{stripe.api_key[-4:] if stripe.api_key else ''}"
-    )
+    if stripe.api_key:
+        logger.info(
+            f"API Key first/last chars: {stripe.api_key[:4]}...{stripe.api_key[-4:]}"
+        )
 
+# Create router
 router = APIRouter(prefix="/stripe", tags=["stripe"])
 
 
+# Helper retry decorator for Stripe API calls
 @tenacity.retry(
     stop=tenacity.stop_after_attempt(3),
     wait=tenacity.wait_exponential(multiplier=1, min=2, max=10),
@@ -61,17 +68,33 @@ async def safe_stripe_api_call(func, *args, **kwargs):
         raise
 
 
-# WEBHOOK
+# Helper function to convert Stripe status to your enum
+def convert_stripe_status_to_db_status(stripe_status: str) -> SubscriptionStatus:
+    """Convert Stripe subscription status to application enum"""
+    status_map = {
+        "active": SubscriptionStatus.ACTIVE,
+        "canceled": SubscriptionStatus.CANCELED,
+        "incomplete": SubscriptionStatus.INCOMPLETE,
+        "incomplete_expired": SubscriptionStatus.INCOMPLETE,
+        "past_due": SubscriptionStatus.PAST_DUE,
+        "trialing": SubscriptionStatus.TRIALING,
+        "unpaid": SubscriptionStatus.UNPAID,
+    }
+    return status_map.get(stripe_status, SubscriptionStatus.INCOMPLETE)
+
+
+# ==================== WEBHOOK HANDLING ====================
+
+
 @router.post("/webhook", status_code=status.HTTP_200_OK)
 async def stripe_webhook(
     request: Request,
-    session: SessionDep,  # Move this parameter up
-    stripe_signature: str = Header(None),  # Move this parameter down
+    session: SessionDep,
+    stripe_signature: str = Header(None),
 ) -> dict:
-    # The rest of your function remains the same
+    """Process Stripe webhook events"""
+    # Get request payload
     payload = await request.body()
-
-    # Rest of your function can remain unchanged
 
     # Verify webhook signature
     try:
@@ -100,26 +123,26 @@ async def stripe_webhook(
 
 
 async def handle_stripe_event(event: dict, session: SessionDep):
-    """
-    Process different types of Stripe webhook events
-    """
+    """Process different types of Stripe webhook events"""
     event_type = event["type"]
     data_object = event["data"]["object"]
 
     logger.info(f"Processing Stripe event: {event_type}")
 
     try:
-        if event_type == "customer.subscription.created":
-            await handle_subscription_created(data_object, session)
-        elif event_type == "customer.subscription.updated":
-            await handle_subscription_updated(data_object, session)
-        elif event_type == "customer.subscription.deleted":
-            await handle_subscription_deleted(data_object, session)
-        elif event_type == "invoice.payment_succeeded":
-            await handle_payment_succeeded(data_object, session)
-        elif event_type == "invoice.payment_failed":
-            await handle_payment_failed(data_object, session)
-        # Add other event types as needed
+        # Route the event to the appropriate handler based on event type
+        handler_map = {
+            "customer.subscription.created": handle_subscription_created,
+            "customer.subscription.updated": handle_subscription_updated,
+            "customer.subscription.deleted": handle_subscription_deleted,
+            "invoice.payment_succeeded": handle_payment_succeeded,
+            "invoice.payment_failed": handle_payment_failed,
+        }
+
+        # Call the handler if we have one for this event type
+        handler = handler_map.get(event_type)
+        if handler:
+            await handler(data_object, session)
         else:
             logger.info(f"Unhandled event type: {event_type}")
     except Exception as e:
@@ -236,20 +259,6 @@ async def handle_subscription_updated(data: dict, session: SessionDep):
     logger.info(f"Subscription updated: {stripe_subscription_id}")
 
 
-# Helper function to convert Stripe status to your enum
-def convert_stripe_status_to_db_status(stripe_status: str) -> SubscriptionStatus:
-    status_map = {
-        "active": SubscriptionStatus.ACTIVE,
-        "canceled": SubscriptionStatus.CANCELED,
-        "incomplete": SubscriptionStatus.INCOMPLETE,
-        "incomplete_expired": SubscriptionStatus.INCOMPLETE,
-        "past_due": SubscriptionStatus.PAST_DUE,
-        "trialing": SubscriptionStatus.TRIALING,
-        "unpaid": SubscriptionStatus.UNPAID,
-    }
-    return status_map.get(stripe_status, SubscriptionStatus.INCOMPLETE)
-
-
 async def handle_subscription_deleted(data: dict, session: SessionDep):
     """Handle subscription deleted event"""
     stripe_subscription_id = data["id"]
@@ -268,7 +277,7 @@ async def handle_subscription_deleted(data: dict, session: SessionDep):
     # Update subscription status
     subscription.status = SubscriptionStatus.CANCELED
 
-    # If you want to keep track of when it was canceled
+    # Keep track of when it was canceled
     subscription.canceled_at = datetime.now()
 
     session.add(subscription)
@@ -296,14 +305,12 @@ async def handle_payment_succeeded(data: dict, session: SessionDep):
         return
 
     # Update subscription details if needed
-    # For a successful payment, we might want to ensure status is ACTIVE
-    # and update any payment-related metadata
     if subscription.status != SubscriptionStatus.ACTIVE:
         subscription.status = SubscriptionStatus.ACTIVE
         session.add(subscription)
         session.commit()
 
-    # Optionally log payment details
+    # Log payment details
     invoice_id = data.get("id")
     amount_paid = data.get("amount_paid", 0)
     currency = data.get("currency", "usd")
@@ -348,24 +355,23 @@ async def handle_payment_failed(data: dict, session: SessionDep):
         f"Next attempt: {datetime.fromtimestamp(next_payment_attempt).isoformat() if next_payment_attempt else 'None'}"
     )
 
-    # You might want to notify the user about the payment failure
-    # This would typically be done through a separate notification system
+    # Future notification logic could be added here
     customer = session.get(Customer, subscription.customer_id)
     if customer:
         logger.info(f"Should notify user {customer.user_id} about payment failure")
-        # Implement notification logic here or queue a notification task
 
 
-# Health check endpoint (for development/debugging)
+# ==================== DIAGNOSTIC ENDPOINTS ====================
+
+
 @router.get("/health-check")
 async def stripe_health_check():
     """
     Simple health check to verify Stripe API connectivity.
-    This endpoint doesn't require authentication and can be used
-    to check if your server can communicate with Stripe.
+    This endpoint doesn't require authentication.
     """
     try:
-        # Make a simple API call to Stripe that doesn't require any specific permissions
+        # Make a simple API call to Stripe
         balance = stripe.Balance.retrieve()
 
         logger.info(
@@ -390,9 +396,13 @@ async def stripe_health_check():
         }
 
 
-# Get subscription status (ESSENTIAL - for checking if user has active subscription)
+# ==================== SUBSCRIPTION ENDPOINTS ====================
+
+
 @router.get("/subscription-status", response_model=dict)
-def get_subscription_status(session: SessionDep, current_user: CurrentUser) -> Any:
+def get_subscription_status(
+    session: SessionDep, current_user: CurrentUser
+) -> dict[str, Any]:
     """
     Get the subscription status for the current user.
     This is used to determine if a user has access to premium features.
@@ -560,16 +570,12 @@ async def create_checkout_session(
 
 
 @router.get("/usage-status", response_model=dict)
-def get_usage_status(session: SessionDep, current_user: CurrentUser) -> Any:
+def get_usage_status(session: SessionDep, current_user: CurrentUser) -> dict[str, Any]:
     """
     Get the current usage status for the user.
     This tracks how many free requests the user has used and how many remain.
     """
-    # This is a simplified example - you'll need to implement the actual usage tracking
-    # in your database models and update it when users make requests
-
     # Check if user has active subscription first
-    # Use the parameters in the function call to fix the unused argument error
     subscription_status = get_subscription_status(
         session=session, current_user=current_user
     )
@@ -583,18 +589,14 @@ def get_usage_status(session: SessionDep, current_user: CurrentUser) -> Any:
         }
 
     # For non-subscribed users, check usage
-    # Use the session parameter to query your database
     FREE_REQUESTS_LIMIT = 5
 
     # Example of using the session parameter:
     # user_usage = session.exec(select(UserUsage).where(UserUsage.user_id == current_user.id)).first()
     # requests_used = user_usage.requests_count if user_usage else 0
 
-    # For now, just a placeholder that uses the current_user parameter to avoid the linter error
-    requests_used = 0  # In a real implementation, this would come from your database
-    logger.info(
-        f"Checking usage for user: {current_user.email}"
-    )  # Use current_user to avoid unused argument error
+    requests_used = 0  # In a real implementation, this would come from database
+    logger.info(f"Checking usage for user: {current_user.email}")
 
     return {
         "has_active_subscription": False,
@@ -605,9 +607,8 @@ def get_usage_status(session: SessionDep, current_user: CurrentUser) -> Any:
     }
 
 
-# Add this new endpoint for incrementing usage
 @router.post("/increment-usage", response_model=dict)
-def increment_usage(session: SessionDep, current_user: CurrentUser) -> Any:
+def increment_usage(session: SessionDep, current_user: CurrentUser) -> dict[str, Any]:
     """
     Increment the usage counter for the current user.
     Call this when a user makes a request to your chat API.
@@ -654,13 +655,17 @@ def increment_usage(session: SessionDep, current_user: CurrentUser) -> Any:
     }
 
 
-# Admin endpoints (protected by superuser check)
+# ==================== ADMIN ENDPOINTS ====================
+
+
 @router.get(
     "/admin/subscriptions",
     response_model=list[dict],
     dependencies=[SuperUserRequired],
 )
-def get_all_subscriptions(limit: int = 100, starting_after: str | None = None) -> Any:
+def get_all_subscriptions(
+    limit: int = 100, starting_after: str | None = None
+) -> list[dict[str, Any]]:
     """
     Get all subscriptions across all customers.
     This is an admin endpoint and is restricted to superusers.
@@ -700,15 +705,17 @@ def get_all_subscriptions(limit: int = 100, starting_after: str | None = None) -
         )
 
 
+# ==================== CUSTOMER PAYMENT MANAGEMENT ====================
+
+
 @router.post("/create-subscription-with-payment-method", response_model=dict)
 def create_subscription_with_payment_method(
     body: dict,
     session: SessionDep,
-    current_user: CurrentUser,  # This dependency ensures authentication
-) -> Any:
+    current_user: CurrentUser,
+) -> dict[str, Any]:
     """Create a subscription with an existing payment method."""
-    # Add more logging
-    print(f"Creating subscription for user: {current_user.email}")
+    logger.info(f"Creating subscription for user: {current_user.email}")
 
     try:
         payment_method_id = body.get("payment_method_id")
@@ -786,7 +793,7 @@ def create_subscription_with_payment_method(
 @router.post("/cancel-subscription/{subscription_id}", response_model=dict)
 def cancel_subscription(
     subscription_id: str, session: SessionDep, current_user: CurrentUser
-) -> Any:
+) -> dict[str, Any]:
     """Cancel a subscription at the end of the current billing period."""
     try:
         # Log the cancellation request
@@ -852,7 +859,9 @@ def cancel_subscription(
 
 
 @router.get("/payment-methods", response_model=list[dict])
-def list_payment_methods(session: SessionDep, current_user: CurrentUser) -> Any:
+def list_payment_methods(
+    session: SessionDep, current_user: CurrentUser
+) -> list[dict[str, Any]]:
     """Get all payment methods for the current user."""
     customer = session.exec(
         select(Customer).where(Customer.user_id == current_user.id)
@@ -896,10 +905,8 @@ def list_payment_methods(session: SessionDep, current_user: CurrentUser) -> Any:
 
 
 @router.get("/products", status_code=status.HTTP_200_OK)
-def get_products() -> list:
-    """
-    Get all active products from Stripe
-    """
+def get_products() -> list[Any]:
+    """Get all active products from Stripe"""
     try:
         products = stripe.Product.list(active=True)
         return products.data
@@ -909,10 +916,8 @@ def get_products() -> list:
 
 
 @router.get("/products/{product_id}/prices", status_code=status.HTTP_200_OK)
-def get_product_prices(product_id: str) -> list:
-    """
-    Get all prices for a specific product
-    """
+def get_product_prices(product_id: str) -> list[Any]:
+    """Get all prices for a specific product"""
     try:
         prices = stripe.Price.list(product=product_id, active=True)
         return prices.data
@@ -1150,69 +1155,6 @@ async def confirm_subscription(
         )
 
 
-# SUBSCRIPTION HANDLER ENDPOINTS
-# @router.post("/cancel", status_code=status.HTTP_200_OK)
-# async def cancel_subscription(
-#     session: SessionDep,
-#     current_user: CurrentUser,
-# ) -> dict[str, Any]:
-#     """
-#     Cancel the user's subscription at the end of the current billing period.
-
-#     The user will maintain access until the end of their current billing period.
-#     """
-#     # Get customer record for current user
-#     customer = session.exec(
-#         select(Customer).where(Customer.user_id == current_user.id)
-#     ).first()
-
-#     if not customer:
-#         logger.error(f"Customer not found for user ID: {current_user.id}")
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND, detail="Customer record not found"
-#         )
-
-#     # Get active subscription for customer
-#     subscription = session.exec(
-#         select(Subscription)
-#         .where(Subscription.customer_id == customer.id)
-#         .where(Subscription.status == SubscriptionStatus.ACTIVE)
-#     ).first()
-
-#     if not subscription:
-#         logger.error(f"No active subscription found for customer ID: {customer.id}")
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND, detail="No active subscription found"
-#         )
-
-#     try:
-#         # Cancel subscription in Stripe at period end
-#         stripe_subscription = stripe.Subscription.modify(
-#             subscription.stripe_subscription_id, cancel_at_period_end=True
-#         )
-
-#         # Update local subscription record
-#         subscription.cancel_at_period_end = True
-#         session.add(subscription)
-#         session.commit()
-
-#         logger.info(f"Subscription {subscription.id} set to cancel at period end")
-
-#         return {
-#             "status": "success",
-#             "message": "Subscription will be canceled at the end of the current billing period",
-#             "subscription_id": str(subscription.id),
-#             "current_period_end": subscription.current_period_end.isoformat(),
-#         }
-
-#     except stripe.error.StripeError as e:
-#         logger.error(f"Stripe error when canceling subscription: {str(e)}")
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail=f"Error canceling subscription: {str(e)}",
-#         )
-
-
 @router.get("/details", status_code=status.HTTP_200_OK)
 async def get_subscription_details(
     session: SessionDep,
@@ -1273,7 +1215,7 @@ async def get_subscription_details(
 
 
 @router.get("/available-subscriptions", response_model=list[dict])
-def get_available_subscriptions() -> Any:
+def get_available_subscriptions() -> list[dict[str, Any]]:
     """Get all available subscription options with formatted details for display."""
     try:
         # Get all active products
