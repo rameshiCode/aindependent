@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
-from genericpath import samefile
 from sqlmodel import Session
 
 from app.api.routes.openai import (
@@ -310,15 +309,16 @@ async def test_create_message(
     completion_mock.choices = [MagicMock()]
     completion_mock.choices[0].message.content = "OpenAI response"
 
-    # Use patch to mock the call_openai_with_fallback function
-    with patch(
-        "app.api.routes.openai.call_openai_with_fallback",
-        AsyncMock(return_value=completion_mock),
-    ):
-        # Act
-        result = await create_message(
-            message, conversation_id, mock_current_user, mock_session
-        )
+    # Use patch to mock the openai_client check and call_openai_with_fallback function
+    with patch("app.api.routes.openai.openai_client", mock_openai_client):
+        with patch(
+            "app.api.routes.openai.call_openai_with_fallback",
+            AsyncMock(return_value=completion_mock),
+        ):
+            # Act
+            result = await create_message(
+                message, conversation_id, mock_current_user, mock_session
+            )
 
     # Assert
     assert result.role == "assistant"
@@ -419,6 +419,23 @@ async def test_delete_conversation(
 
 
 @pytest.mark.asyncio
+async def test_delete_conversation_not_found(mock_session, mock_current_user):
+    """Test deleting a conversation that doesn't exist."""
+    # Arrange
+    conversation_id = uuid.uuid4()
+
+    # Configure mock to return None for conversation
+    mock_session.exec.return_value.first.return_value = None
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        await delete_conversation(conversation_id, mock_session, mock_current_user)
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "Conversation not found"
+
+
+@pytest.mark.asyncio
 async def test_delete_conversation_with_no_messages(
     mock_session, mock_current_user, sample_conversation
 ):
@@ -489,274 +506,32 @@ async def test_create_message_with_empty_content(
     second_result = MagicMock()
     second_result.all.return_value = []
 
-    @pytest.mark.asyncio
-    async def test_delete_conversation_not_found(mock_session, mock_current_user):
-        """Test deleting a conversation that doesn't exist."""
-        # Arrange
-        conversation_id = uuid.uuid4()
+    # Set up the query results
+    mock_session.exec.side_effect = [first_result, second_result]
 
-        # Configure mock to return None for conversation
-        mock_session.exec.return_value.first.return_value = None
+    # Set up OpenAI client mock to appear "truthy"
+    mock_openai_client.__bool__ = lambda self: True  # <-- Add this
+    mock_openai_client.chat.completions.create = AsyncMock()  # <-- Add this
 
-        # Act & Assert
-        with pytest.raises(HTTPException) as exc_info:
-            await delete_conversation(conversation_id, mock_session, mock_current_user)
+    completion_mock = MagicMock()
+    completion_mock.choices = [MagicMock()]
+    completion_mock.choices[
+        0
+    ].message.content = "I notice your message was empty. How can I help you?"
 
-        assert exc_info.value.status_code == 404
-        assert exc_info.value.detail == "Conversation not found"
-
-    @pytest.mark.asyncio
-    async def test_create_message_with_api_key_not_configured(
-        mock_session, mock_current_user, sample_conversation
-    ):
-        """Test creating a message when OpenAI API key is not configured."""
-        # Arrange
-        conversation_id = sample_conversation.id
-        message = MessageSchema(role="user", content="Test message")
-
-        # Configure mocks for conversation query
-        mock_session.exec.return_value.first.return_value = sample_conversation
-
-        # Mock openai_client and api_key as None
-        with patch("app.api.routes.openai.openai_client", None):
-            with patch("app.api.routes.openai.api_key", None):
-                # Act & Assert
-                with pytest.raises(HTTPException) as exc_info:
-                    await create_message(
-                        message, conversation_id, mock_current_user, mock_session
-                    )
-
-                assert exc_info.value.status_code == 500
-                assert "OpenAI API key not configured" in exc_info.value.detail
-
-    @pytest.mark.asyncio
-    async def test_create_message_with_system_role(
-        mock_session, mock_current_user, mock_openai_client, sample_conversation
-    ):
-        """Test creating a message with system role."""
-        # Arrange
-        conversation_id = sample_conversation.id
-        message = MessageSchema(
-            role="system",
-            content="You are a helpful assistant that speaks like Shakespeare.",
-        )
-
-        # First query returns the conversation
-        first_result = MagicMock()
-        first_result.first.return_value = sample_conversation
-
-        # Second query returns conversation history
-        second_result = MagicMock()
-        second_result.all.return_value = []
-
-        # Configure the mock
-        mock_session.exec.side_effect = [first_result, second_result]
-
-        # Set up OpenAI client mock
-        completion_mock = MagicMock()
-        completion_mock.choices = [MagicMock()]
-        completion_mock.choices[
-            0
-        ].message.content = "Verily, how may I assist thee today?"
-
-        # Use patch for both openai_client and call_openai_with_fallback to fix the error
-        with patch("app.api.routes.openai.openai_client", mock_openai_client):
-            with patch(
-                "app.api.routes.openai.call_openai_with_fallback",
-                AsyncMock(return_value=completion_mock),
-            ):
-                # Act
-                result = await create_message(
-                    message, conversation_id, mock_current_user, mock_session
-                )
-
-        # Assert
-        assert result.role == "assistant"
-        assert "Verily" in result.content
-        assert mock_session.add.call_count == 2
-        assert mock_session.commit.call_count == 1
-
-    @pytest.mark.asyncio
-    async def test_create_conversation_with_long_title(mock_session, mock_current_user):
-        """Test creating a conversation with a long title."""
-        # Arrange
-        long_title = "A" * 100  # 100 character title
-        conversation_create = ConversationCreate(title=long_title)
-
-        # Act
-        result = await create_conversation(
-            conversation_create, mock_session, mock_current_user
-        )
-
-        # Assert
-        assert result.title == long_title
-        mock_session.add.assert_called_once()
-        mock_session.commit.assert_called_once()
-        mock_session.refresh.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_openai_rate_limit_error_handling(
-        mock_session, mock_current_user, mock_openai_client, sample_conversation
-    ):
-        """Test handling of rate limit errors from OpenAI."""
-        # Arrange
-        conversation_id = sample_conversation.id
-        message = MessageSchema(role="user", content="Test message")
-
-        # Configure mocks for conversation query
-        first_result = MagicMock()
-        first_result.first.return_value = sample_conversation
-
-        # Configure mocks for message history
-        second_result = MagicMock()
-        second_result.all.return_value = []
-
-        mock_session.exec.side_effect = [first_result, second_result]
-
-        # Mock rate limit error and eventual success
-        rate_limit_error = Exception("Rate limit exceeded")
-        completion_mock = MagicMock()
-        completion_mock.choices = [MagicMock()]
-        completion_mock.choices[0].message.content = "After rate limit retry response"
-
-        # Fix the test by patching both the client and the function
-        with patch("app.api.routes.openai.openai_client", mock_openai_client):
-            with patch(
-                "app.api.routes.openai.call_openai_with_fallback",
-                AsyncMock(side_effect=[rate_limit_error, completion_mock]),
-            ) as mock_call:
-                with patch("app.api.routes.openai.asyncio.sleep", AsyncMock()):
-                    # Act & Assert
-                    with pytest.raises(Exception, match="Rate limit exceeded"):
-                        await create_message(
-                            message, conversation_id, mock_current_user, mock_session
-                        )
-
-    @pytest.mark.asyncio
-    async def test_db_error_handling_in_create_message(
-        mock_session, mock_current_user, mock_openai_client, sample_conversation
-    ):
-        """Test error handling when database operations fail during message creation."""
-        # Arrange
-        conversation_id = sample_conversation.id
-        message = MessageSchema(role="user", content="Test message")
-
-        # Configure the conversation query to succeed
-        mock_session.exec.return_value.first.return_value = sample_conversation
-
-        # Make the session.add method raise an exception
-        mock_session.add.side_effect = Exception("Database error")
-
-        # Fix the test by patching openai_client
-        with patch("app.api.routes.openai.openai_client", mock_openai_client):
-            # Act & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                await create_message(
-                    message, conversation_id, mock_current_user, mock_session
-                )
-
-            assert exc_info.value.status_code == 500
-            assert "Database error" in exc_info.value.detail
-
-    # Fix for the existing test_create_message
-    @pytest.mark.asyncio
-    async def test_create_message_fixed(
-        mock_session,
-        mock_current_user,
-        mock_openai_client,
-        sample_conversation,
-        sample_messages,
-    ):
-        """Fixed test for creating a message and getting an OpenAI response."""
-        # Arrange
-        conversation_id = sample_conversation.id
-        message = MessageSchema(role="user", content="Test message")
-
-        # First query returns the conversation
-        first_result = MagicMock()
-        first_result.first.return_value = sample_conversation
-
-        # Second query returns conversation history
-        second_result = MagicMock()
-        second_result.all.return_value = sample_messages
-
-        # Set up the query results
-        mock_session.exec.side_effect = [first_result, second_result]
-
-        # Set up OpenAI client mock
-        completion_mock = MagicMock()
-        completion_mock.choices = [MagicMock()]
-        completion_mock.choices[0].message.content = "OpenAI response"
-
-        # Use patch for both openai_client and call_openai_with_fallback
-        with patch("app.api.routes.openai.openai_client", mock_openai_client):
-            with patch(
-                "app.api.routes.openai.call_openai_with_fallback",
-                AsyncMock(return_value=completion_mock),
-            ):
-                # Act
-                result = await create_message(
-                    message, conversation_id, mock_current_user, mock_session
-                )
-
-        # Assert
-        assert result.role == "assistant"
-        assert result.content == "OpenAI response"
-        assert (
-            mock_session.add.call_count == 2
-        )  # Once for user message, once for assistant
-        assert mock_session.commit.call_count == 1
-
-    # Fix for the existing test_create_message_with_empty_content
-    @pytest.mark.asyncio
-    async def test_create_message_with_empty_content_fixed(
-        mock_session, mock_current_user, mock_openai_client, sample_conversation
-    ):
-        """Fixed test for creating a message with empty content."""
-        # Arrange
-        conversation_id = sample_conversation.id
-        message = MessageSchema(role="user", content="")
-
-        # First query returns the conversation
-        first_result = MagicMock()
-        first_result.first.return_value = sample_conversation
-
-        # Second query returns conversation history
-        second_result = MagicMock()
-        second_result.all.return_value = []
-
-        # Configure the mock
-        mock_session.exec.side_effect = [first_result, second_result]
-
-        # Set up OpenAI client mock
-        completion_mock = MagicMock()
-        completion_mock.choices = [MagicMock()]
-        completion_mock.choices[
-            0
-        ].message.content = "I notice your message was empty. How can I help you?"
-
-        # Use patch for both openai_client and call_openai_with_fallback
-        with patch("app.api.routes.openai.openai_client", mock_openai_client):
-            with patch(
-                "app.api.routes.openai.call_openai_with_fallback",
-                AsyncMock(return_value=completion_mock),
-            ):
-                # Act
-                result = await create_message(
-                    message, conversation_id, mock_current_user, mock_session
-                )
-
-        # Assert
-        assert result.role == "assistant"
-        assert "empty" in result.content.lower()
-        assert mock_session.add.call_count == 2
-        assert mock_session.commit.call_count == 1
-
-    # Act
-    result = await update_conversation(
-        conversation_id, samefile, mock_session, mock_current_user
-    )
+    # Patch both the client and the API call
+    with patch("app.api.routes.openai.openai_client", mock_openai_client):
+        with patch(
+            "app.api.routes.openai.call_openai_with_fallback",
+            AsyncMock(return_value=completion_mock),
+        ):
+            # Act
+            result = await create_message(
+                message, conversation_id, mock_current_user, mock_session
+            )
 
     # Assert
-    assert result.title == samefile
-    mock_session.commit.assert_called_once()
+    assert result.role == "assistant"
+    assert "empty" in result.content.lower()
+    assert mock_session.add.call_count == 2
+    assert mock_session.commit.call_count == 1

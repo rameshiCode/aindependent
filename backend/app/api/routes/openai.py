@@ -3,7 +3,7 @@ import logging
 import os
 import traceback
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 import httpx
 from fastapi import APIRouter, HTTPException, status
@@ -274,6 +274,7 @@ async def create_message(
     session: SessionDep,
 ) -> MessageSchema:
     """Create a new message and get a response from OpenAI"""
+    global openai_client  # Add this line
     try:
         # Verify conversation exists and belongs to user
         conversation = session.exec(
@@ -299,6 +300,7 @@ async def create_message(
                     detail="OpenAI API key not configured",
                 )
 
+            # This should not happen but providing a fallback just in case
             # This should not happen but providing a fallback just in case
             try:
                 logger.info("Re-initializing OpenAI client")
@@ -363,7 +365,7 @@ async def create_message(
         session.add(db_assistant_message)
 
         # Update conversation timestamp
-        conversation.updated_at = datetime.utcnow()
+        conversation.updated_at = datetime.now(UTC)
         session.commit()
 
         # Return assistant message
@@ -402,7 +404,7 @@ async def update_conversation(
         )
 
     conversation.title = title
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = datetime.now(UTC)
     session.commit()
 
     messages = session.exec(

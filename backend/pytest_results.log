@@ -1,0 +1,197 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-7.4.0, pluggy-1.5.0 -- /home/rares/coding/aindependent/backend/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/rares/coding/aindependent/backend
+plugins: cov-4.1.0, asyncio-0.21.1, anyio-4.6.0
+asyncio: mode=Mode.STRICT
+collecting ... collected 18 items
+
+tests/test_openai.py::test_call_openai_with_fallback_success PASSED      [  5%]
+tests/test_openai.py::test_call_openai_with_fallback_retry_success PASSED [ 11%]
+tests/test_openai.py::test_call_openai_with_fallback_model_fallback PASSED [ 16%]
+tests/test_openai.py::test_call_openai_with_fallback_all_models_fail PASSED [ 22%]
+tests/test_openai.py::test_create_conversation PASSED                    [ 27%]
+tests/test_openai.py::test_get_conversations_empty PASSED                [ 33%]
+tests/test_openai.py::test_get_conversations_with_data PASSED            [ 38%]
+tests/test_openai.py::test_get_conversation_not_found PASSED             [ 44%]
+tests/test_openai.py::test_get_conversation_success PASSED               [ 50%]
+tests/test_openai.py::test_create_message FAILED                         [ 55%]
+tests/test_openai.py::test_create_message_conversation_not_found PASSED  [ 61%]
+tests/test_openai.py::test_update_conversation PASSED                    [ 66%]
+tests/test_openai.py::test_update_conversation_not_found PASSED          [ 72%]
+tests/test_openai.py::test_delete_conversation PASSED                    [ 77%]
+tests/test_openai.py::test_delete_conversation_not_found PASSED          [ 83%]
+tests/test_openai.py::test_delete_conversation_with_no_messages PASSED   [ 88%]
+tests/test_openai.py::test_get_conversations_with_empty_messages PASSED  [ 94%]
+tests/test_openai.py::test_create_message_with_empty_content FAILED      [100%]
+
+=================================== FAILURES ===================================
+_____________________________ test_create_message ______________________________
+
+mock_session = <MagicMock spec='Session' id='136267279940784'>
+mock_current_user = <MagicMock id='136267285037904'>
+mock_openai_client = <MagicMock name='openai_client' id='136267285043664'>
+sample_conversation = Conversation(id=UUID('47709670-d310-49ce-99ee-2c5a8f00d794'), user_id=UUID('37b4a771-baca-47bb-9fc8-78e9341c90a9'), ti...5, 4, 1, 5, 52, 52, 340050), updated_at=datetime.datetime(2025, 4, 1, 5, 52, 52, 343579, tzinfo=datetime.timezone.utc))
+sample_messages = [Message(id=UUID('59a8fba5-e69a-4d82-ab11-29c838994606'), conversation_id=UUID('47709670-d310-49ce-99ee-2c5a8f00d794')...tant', content='Hello, human! How can I help you today?', created_at=datetime.datetime(2025, 4, 1, 5, 52, 52, 340345))]
+
+    @pytest.mark.asyncio
+    async def test_create_message(
+        mock_session,
+        mock_current_user,
+        mock_openai_client,
+        sample_conversation,
+        sample_messages,
+    ):
+        """Test creating a message and getting an OpenAI response."""
+        # Arrange
+        conversation_id = sample_conversation.id
+        message = MessageSchema(role="user", content="Test message")
+
+        # First query returns the conversation
+        first_result = MagicMock()
+        first_result.first.return_value = sample_conversation
+
+        # Second query returns conversation history
+        second_result = MagicMock()
+        second_result.all.return_value = sample_messages
+
+        # Set up the query results
+        mock_session.exec.side_effect = [first_result, second_result]
+
+        # Set up OpenAI client mock
+        completion_mock = MagicMock()
+        completion_mock.choices = [MagicMock()]
+        completion_mock.choices[0].message.content = "OpenAI response"
+
+        # Use patch to mock the openai_client check and call_openai_with_fallback function
+        with patch("app.api.routes.openai.openai_client", mock_openai_client):
+            with patch(
+                "app.api.routes.openai.call_openai_with_fallback",
+                AsyncMock(return_value=completion_mock),
+            ):
+                # Act
+                result = await create_message(
+                    message, conversation_id, mock_current_user, mock_session
+                )
+
+        # Assert
+        assert result.role == "assistant"
+        assert result.content == "OpenAI response"
+        assert mock_session.add.call_count == 2  # Once for user message, once for assistant
+>       assert mock_session.commit.call_count == 1
+E       AssertionError: assert 2 == 1
+E        +  where 2 = <MagicMock name='mock.commit' id='136267284099968'>.call_count
+E        +    where <MagicMock name='mock.commit' id='136267284099968'> = <MagicMock spec='Session' id='136267279940784'>.commit
+
+tests/test_openai.py:327: AssertionError
+____________________ test_create_message_with_empty_content ____________________
+
+mock_session = <MagicMock spec='Session' id='136267280723328'>
+mock_current_user = <MagicMock id='136267280647904'>
+mock_openai_client = <MagicMock name='openai_client' id='136267280642800'>
+sample_conversation = Conversation(id=UUID('992dbaa1-9659-403d-82a3-47e71c17ae86'), user_id=UUID('876d3337-01b6-440a-8098-341b00977cab'), ti...5, 4, 1, 5, 52, 52, 469741), updated_at=datetime.datetime(2025, 4, 1, 5, 52, 52, 472202, tzinfo=datetime.timezone.utc))
+
+    @pytest.mark.asyncio
+    async def test_create_message_with_empty_content(
+        mock_session, mock_current_user, mock_openai_client, sample_conversation
+    ):
+        """Test creating a message with empty content."""
+        # Arrange
+        conversation_id = sample_conversation.id
+        message = MessageSchema(role="user", content="")
+
+        # First query returns the conversation
+        first_result = MagicMock()
+        first_result.first.return_value = sample_conversation
+
+        # Second query returns conversation history
+        second_result = MagicMock()
+        second_result.all.return_value = []
+
+        # Set up the query results
+        mock_session.exec.side_effect = [first_result, second_result]
+
+        # Set up OpenAI client mock to appear "truthy"
+        mock_openai_client.__bool__ = lambda self: True  # <-- Add this
+        mock_openai_client.chat.completions.create = AsyncMock()  # <-- Add this
+
+        completion_mock = MagicMock()
+        completion_mock.choices = [MagicMock()]
+        completion_mock.choices[0].message.content = "I notice your message was empty. How can I help you?"
+
+        # Patch both the client and the API call
+        with patch("app.api.routes.openai.openai_client", mock_openai_client):
+            with patch(
+                "app.api.routes.openai.call_openai_with_fallback",
+                AsyncMock(return_value=completion_mock),
+            ):
+                # Act
+                result = await create_message(
+                    message, conversation_id, mock_current_user, mock_session
+                )
+
+        # Assert
+        assert result.role == "assistant"
+        assert "empty" in result.content.lower()
+        assert mock_session.add.call_count == 2
+>       assert mock_session.commit.call_count == 1
+E       AssertionError: assert 2 == 1
+E        +  where 2 = <MagicMock name='mock.commit' id='136267280321664'>.call_count
+E        +    where <MagicMock name='mock.commit' id='136267280321664'> = <MagicMock spec='Session' id='136267280723328'>.commit
+
+tests/test_openai.py:535: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  /home/rares/coding/aindependent/backend/.venv/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_openai.py::test_create_conversation
+tests/test_openai.py::test_create_conversation
+tests/test_openai.py::test_create_message
+tests/test_openai.py::test_create_message
+tests/test_openai.py::test_create_message_with_empty_content
+tests/test_openai.py::test_create_message_with_empty_content
+  /home/rares/coding/aindependent/backend/.venv/lib/python3.12/site-packages/pydantic/fields.py:568: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return self.default_factory()
+
+tests/test_openai.py::test_get_conversations_with_data
+tests/test_openai.py::test_get_conversation_success
+tests/test_openai.py::test_create_message
+tests/test_openai.py::test_update_conversation
+tests/test_openai.py::test_delete_conversation
+tests/test_openai.py::test_delete_conversation_with_no_messages
+tests/test_openai.py::test_get_conversations_with_empty_messages
+tests/test_openai.py::test_create_message_with_empty_content
+  /home/rares/coding/aindependent/backend/tests/test_openai.py:64: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    created_at=datetime.utcnow(),
+
+tests/test_openai.py::test_get_conversations_with_data
+tests/test_openai.py::test_get_conversation_success
+tests/test_openai.py::test_create_message
+tests/test_openai.py::test_update_conversation
+tests/test_openai.py::test_delete_conversation
+tests/test_openai.py::test_delete_conversation_with_no_messages
+tests/test_openai.py::test_get_conversations_with_empty_messages
+tests/test_openai.py::test_create_message_with_empty_content
+  /home/rares/coding/aindependent/backend/tests/test_openai.py:65: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    updated_at=datetime.utcnow(),
+
+tests/test_openai.py::test_get_conversations_with_data
+tests/test_openai.py::test_get_conversation_success
+tests/test_openai.py::test_create_message
+tests/test_openai.py::test_delete_conversation
+  /home/rares/coding/aindependent/backend/tests/test_openai.py:78: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    created_at=datetime.utcnow(),
+
+tests/test_openai.py::test_get_conversations_with_data
+tests/test_openai.py::test_get_conversation_success
+tests/test_openai.py::test_create_message
+tests/test_openai.py::test_delete_conversation
+  /home/rares/coding/aindependent/backend/tests/test_openai.py:85: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    created_at=datetime.utcnow(),
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_openai.py::test_create_message - AssertionError: assert 2 == 1
+FAILED tests/test_openai.py::test_create_message_with_empty_content - Asserti...
+================== 2 failed, 16 passed, 31 warnings in 1.90s ===================
