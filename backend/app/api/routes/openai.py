@@ -3,7 +3,7 @@ import logging
 import os
 import traceback
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
 import httpx
 from fastapi import APIRouter, HTTPException, status
@@ -365,7 +365,7 @@ async def create_message(
         session.add(db_assistant_message)
 
         # Update conversation timestamp
-        conversation.updated_at = datetime.now(UTC)
+        conversation.updated_at = datetime.utcnow()
         session.commit()
 
         # Return assistant message
@@ -404,7 +404,7 @@ async def update_conversation(
         )
 
     conversation.title = title
-    conversation.updated_at = datetime.now(UTC)
+    conversation.updated_at = datetime.utcnow()
     session.commit()
 
     messages = session.exec(

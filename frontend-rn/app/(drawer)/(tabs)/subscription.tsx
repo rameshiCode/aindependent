@@ -358,7 +358,7 @@ export default function SubscriptionScreen() {
                   </ThemedText>
 
                   <StripePaymentForm
-                    priceId="price_1R4HTbK8wIdhxRomQmYkYDe1" // Replace with your actual price ID
+                    priceId="price_1R8yWaK8wIdhxRomayHEJt85" // Replace with your actual price ID
                     useCheckout={true}
                     onPaymentSuccess={fetchSubscription}
                   />
