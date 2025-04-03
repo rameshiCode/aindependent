@@ -9,7 +9,6 @@ import tenacity
 from dotenv import load_dotenv
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from sqlmodel import select
-from stripe import UsageRecord
 
 from app.api.deps import (
     CurrentUser,
@@ -569,6 +568,7 @@ async def create_checkout_session(
         )
 
 
+# Update this in your stripe.py file
 @router.get("/usage-status", response_model=dict)
 def get_usage_status(session: SessionDep, current_user: CurrentUser) -> dict[str, Any]:
     """
@@ -589,14 +589,18 @@ def get_usage_status(session: SessionDep, current_user: CurrentUser) -> dict[str
         }
 
     # For non-subscribed users, check usage
-    FREE_REQUESTS_LIMIT = 5
+    FREE_REQUESTS_LIMIT = 6  # Update to 6 as per your requirements
 
-    # Example of using the session parameter:
-    # user_usage = session.exec(select(UserUsage).where(UserUsage.user_id == current_user.id)).first()
-    # requests_used = user_usage.requests_count if user_usage else 0
+    # Import the UsageRecord from your models to avoid confusion with stripe.UsageRecord
+    from app.models import UsageRecord as AppUsageRecord
 
-    requests_used = 0  # In a real implementation, this would come from database
-    logger.info(f"Checking usage for user: {current_user.email}")
+    # Get usage record from database
+    usage_record = session.exec(
+        select(AppUsageRecord).where(AppUsageRecord.user_id == current_user.id)
+    ).first()
+
+    requests_used = usage_record.count if usage_record else 0
+    logger.info(f"Checking usage for user: {current_user.email}, Used: {requests_used}")
 
     return {
         "has_active_subscription": False,
@@ -604,9 +608,11 @@ def get_usage_status(session: SessionDep, current_user: CurrentUser) -> dict[str
         "requests_used": requests_used,
         "requests_limit": FREE_REQUESTS_LIMIT,
         "requests_remaining": max(0, FREE_REQUESTS_LIMIT - requests_used),
+        "limit_reached": requests_used >= FREE_REQUESTS_LIMIT,
     }
 
 
+# Add this to your stripe.py file
 @router.post("/increment-usage", response_model=dict)
 def increment_usage(session: SessionDep, current_user: CurrentUser) -> dict[str, Any]:
     """
@@ -626,15 +632,18 @@ def increment_usage(session: SessionDep, current_user: CurrentUser) -> dict[str,
         }
 
     # For non-subscribed users, increment usage
-    FREE_REQUESTS_LIMIT = 5  # Set your free tier limit
+    FREE_REQUESTS_LIMIT = 6  # Set your free tier limit to 6
+
+    # Import the UsageRecord from your models to avoid confusion with stripe.UsageRecord
+    from app.models import UsageRecord as AppUsageRecord
 
     # Get or create usage record
     usage_record = session.exec(
-        select(UsageRecord).where(UsageRecord.user_id == current_user.id)
+        select(AppUsageRecord).where(AppUsageRecord.user_id == current_user.id)
     ).first()
 
     if not usage_record:
-        usage_record = UsageRecord(user_id=current_user.id, count=0)
+        usage_record = AppUsageRecord(user_id=current_user.id, count=0)
 
     usage_record.count += 1
     usage_record.last_request_at = datetime.utcnow()

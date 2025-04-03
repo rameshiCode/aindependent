@@ -11,7 +11,14 @@ from sqlmodel import Session, select
 from app.core import security
 from app.core.config import settings
 from app.core.db import engine
-from app.models import Customer, Subscription, SubscriptionStatus, TokenPayload, User
+from app.models import (
+    Customer,
+    Subscription,
+    SubscriptionStatus,
+    TokenPayload,
+    UsageRecord,
+    User,
+)
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
@@ -116,3 +123,62 @@ def verify_active_subscription(session: SessionDep, current_user: CurrentUser) -
 
 
 ActiveSubscriptionRequired = Depends(verify_active_subscription)
+
+# Add these functions to the end of your existing deps.py file
+
+FREE_REQUESTS_LIMIT = 6
+
+
+def check_subscription_status(session: Session, user_id):
+    """Check if user has an active subscription"""
+    customer = session.exec(select(Customer).where(Customer.user_id == user_id)).first()
+
+    if customer:
+        # Check for active subscription
+        subscription = session.exec(
+            select(Subscription)
+            .where(Subscription.customer_id == customer.id)
+            .where(Subscription.status == SubscriptionStatus.ACTIVE)
+        ).first()
+
+        if subscription:
+            return True
+
+    return False
+
+
+def check_usage_limits(
+    current_user: User = Depends(get_current_active_user),
+    session: Session = Depends(get_db),
+):
+    """
+    Middleware to check if a user has reached their usage limits.
+    """
+    # If user has an active subscription, allow access
+    if check_subscription_status(session, current_user.id):
+        return current_user
+
+    # Check request count for free tier users
+    usage_record = session.exec(
+        select(UsageRecord).where(UsageRecord.user_id == current_user.id)
+    ).first()
+
+    requests_used = usage_record.count if usage_record else 0
+
+    # If over the limit, block access
+    if requests_used >= FREE_REQUESTS_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": "Usage limit reached. Please subscribe to continue.",
+                "requests_used": requests_used,
+                "requests_limit": FREE_REQUESTS_LIMIT,
+                "limit_reached": True,
+            },
+        )
+
+    return current_user
+
+
+# Create a dependency
+UsageLimitCheck = Depends(check_usage_limits)

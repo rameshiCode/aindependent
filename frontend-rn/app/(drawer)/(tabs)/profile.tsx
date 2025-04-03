@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, ScrollView, ActivityIndicator
 import { useQuery } from '@tanstack/react-query';
 import { getSubscriptionStatusOptions } from '../../../src/client/@tanstack/react-query.gen';
 import { router } from 'expo-router';
+import { useAuth } from '@/context/authProvider'; // Import useAuth
 
 // Define the subscription data type
 interface SubscriptionData {
@@ -24,9 +25,8 @@ interface SubscriptionData {
 }
 
 export default function ProfileScreen() {
-  // Replace with your actual auth hook
-  const user = { name: 'User', email: 'a@b.cc', image: null };
-  const signOut = () => { /* Your sign out logic */ };
+  // Use the actual auth hook
+  const { currentUser, signOut } = useAuth();
 
   // Format date for display
   const formatDate = (dateString: string) => {
@@ -53,11 +53,6 @@ export default function ProfileScreen() {
     refetch: () => Promise<any>;
   };
 
-  // Enhanced logging for debugging subscription issues
-  console.log('Subscription data:', JSON.stringify(subscription, null, 2));
-  console.log('Loading state:', isLoading);
-  console.log('Error state:', isError, error);
-
   const handleRefresh = async () => {
     console.log('Refreshing subscription data...');
     try {
@@ -79,8 +74,15 @@ export default function ProfileScreen() {
     router.push('/subscription');
   };
 
-  const handleSignOut = () => {
-    signOut();
+  const handleSignOut = async () => {
+    try {
+      // Call the signOut function from auth context
+      signOut();
+      // No need to navigate as the signOut function already handles that
+    } catch (error) {
+      console.error('Error signing out:', error);
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
   };
 
   // Render subscription section based on status
@@ -151,10 +153,16 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.profileHeader}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'U'}</Text>
+          <Text style={styles.avatarText}>
+            {currentUser?.full_name?.charAt(0) || currentUser?.email?.charAt(0) || 'U'}
+          </Text>
         </View>
-        <Text style={styles.userName}>{user?.name || 'User'}</Text>
-        <Text style={styles.userEmail}>{user?.email || 'a@b.cc'}</Text>
+        <Text style={styles.userName}>
+          {currentUser?.full_name || currentUser?.email || 'User'}
+        </Text>
+        <Text style={styles.userEmail}>
+          {currentUser?.email || 'a@b.cc'}
+        </Text>
       </View>
 
       {renderSubscriptionSection()}

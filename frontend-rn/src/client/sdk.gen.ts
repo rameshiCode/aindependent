@@ -575,6 +575,7 @@ export class UtilsService {
 export class StripeService {
   /**
    * Stripe Webhook
+   * Process Stripe webhook events
    */
   public static stripeWebhook<ThrowOnError extends boolean = false>(
     options?: Options<StripeStripeWebhookData, ThrowOnError>,
@@ -592,8 +593,7 @@ export class StripeService {
   /**
    * Stripe Health Check
    * Simple health check to verify Stripe API connectivity.
-   * This endpoint doesn't require authentication and can be used
-   * to check if your server can communicate with Stripe.
+   * This endpoint doesn't require authentication.
    */
   public static stripeHealthCheck<ThrowOnError extends boolean = false>(
     options?: Options<StripeStripeHealthCheckData, ThrowOnError>,
@@ -961,12 +961,6 @@ export class StripeService {
       unknown,
       ThrowOnError
     >({
-      security: [
-        {
-          scheme: "bearer",
-          type: "http",
-        },
-      ],
       url: "/api/v1/stripe/available-subscriptions",
       ...options,
     })
@@ -976,6 +970,7 @@ export class StripeService {
 export class OpenaiService {
   /**
    * Get Conversations
+   * Get all conversations for the current user
    */
   public static getConversations<ThrowOnError extends boolean = false>(
     options?: Options<OpenaiGetConversationsData, ThrowOnError>,
@@ -998,6 +993,7 @@ export class OpenaiService {
 
   /**
    * Create Conversation
+   * Create a new conversation
    */
   public static createConversation<ThrowOnError extends boolean = false>(
     options: Options<OpenaiCreateConversationData, ThrowOnError>,
@@ -1024,6 +1020,7 @@ export class OpenaiService {
 
   /**
    * Delete Conversation
+   * Delete a conversation and all its messages
    */
   public static deleteConversation<ThrowOnError extends boolean = false>(
     options: Options<OpenaiDeleteConversationData, ThrowOnError>,
@@ -1046,6 +1043,7 @@ export class OpenaiService {
 
   /**
    * Get Conversation
+   * Get a specific conversation with messages
    */
   public static getConversation<ThrowOnError extends boolean = false>(
     options: Options<OpenaiGetConversationData, ThrowOnError>,
@@ -1068,6 +1066,7 @@ export class OpenaiService {
 
   /**
    * Update Conversation
+   * Update conversation title
    */
   public static updateConversation<ThrowOnError extends boolean = false>(
     options: Options<OpenaiUpdateConversationData, ThrowOnError>,

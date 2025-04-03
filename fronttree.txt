@@ -1,0 +1,261 @@
+.
+├── backend
+│   ├── alembic.ini
+│   ├── app
+│   │   ├── api
+│   │   │   ├── api.py
+│   │   │   ├── deps.py
+│   │   │   ├── __init__.py
+│   │   │   ├── main.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── deps.cpython-312.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   └── main.cpython-312.pyc
+│   │   │   └── routes
+│   │   │       ├── __init__.py
+│   │   │       ├── login.py
+│   │   │       ├── openai.py
+│   │   │       ├── __pycache__
+│   │   │       │   ├── __init__.cpython-312.pyc
+│   │   │       │   ├── items.cpython-312.pyc
+│   │   │       │   ├── login.cpython-312.pyc
+│   │   │       │   ├── openai.cpython-312.pyc
+│   │   │       │   ├── private.cpython-312.pyc
+│   │   │       │   ├── stripe.cpython-312.pyc
+│   │   │       │   ├── users.cpython-312.pyc
+│   │   │       │   ├── utils.cpython-312.pyc
+│   │   │       │   └── whstripe.cpython-312.pyc
+│   │   │       ├── stripe.py
+│   │   │       ├── users.py
+│   │   │       ├── utils.py
+│   │   │       └── whstripe.py
+│   │   ├── backend_pre_start.py
+│   │   ├── core
+│   │   │   ├── config.py
+│   │   │   ├── db.py
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── config.cpython-312.pyc
+│   │   │   │   ├── db.cpython-312.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── security.cpython-312.pyc
+│   │   │   │   └── stripe.cpython-312.pyc
+│   │   │   └── security.py
+│   │   ├── crud.py
+│   │   ├── email-templates
+│   │   │   ├── build
+│   │   │   │   ├── new_account.html
+│   │   │   │   ├── reset_password.html
+│   │   │   │   └── test_email.html
+│   │   │   └── src
+│   │   │       ├── new_account.mjml
+│   │   │       ├── reset_password.mjml
+│   │   │       └── test_email.mjml
+│   │   ├── initial_data.py
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── models.py
+│   │   ├── __pycache__
+│   │   │   ├── backend_pre_start.cpython-312.pyc
+│   │   │   ├── crud.cpython-312.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── main.cpython-312.pyc
+│   │   │   ├── models.cpython-312.pyc
+│   │   │   └── utils.cpython-312.pyc
+│   │   ├── tests
+│   │   │   ├── api
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── routes
+│   │   │   │       ├── __init__.py
+│   │   │   │       ├── test_items.py
+│   │   │   │       ├── test_login.py
+│   │   │   │       ├── test_private.py
+│   │   │   │       └── test_users.py
+│   │   │   ├── conftest.py
+│   │   │   ├── crud
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── test_user.py
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── conftest.cpython-312-pytest-7.4.0.pyc
+│   │   │   │   └── __init__.cpython-312.pyc
+│   │   │   ├── scripts
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── test_backend_pre_start.py
+│   │   │   │   └── test_test_pre_start.py
+│   │   │   └── utils
+│   │   │       ├── __init__.py
+│   │   │       ├── item.py
+│   │   │       ├── user.py
+│   │   │       └── utils.py
+│   │   ├── tests_pre_start.py
+│   │   └── utils.py
+│   ├── Dockerfile
+│   ├── htmlcov
+│   ├── pyproject.toml
+│   ├── pytest_results.log
+│   ├── README.md
+│   ├── scripts
+│   │   ├── format.sh
+│   │   ├── lint.sh
+│   │   ├── prestart.sh
+│   │   ├── test.sh
+│   │   └── tests-start.sh
+│   ├── tests
+│   │   ├── conftest.py
+│   │   ├── __pycache__
+│   │   │   ├── conftest.cpython-312-pytest-7.4.0.pyc
+│   │   │   └── test_openai.cpython-312-pytest-7.4.0.pyc
+│   │   ├── test_openai.py
+│   │   └── test-requirements.txt
+│   ├── testsStripe
+│   │   ├── conftest.py
+│   │   ├── __pycache__
+│   │   │   ├── conftest.cpython-312-pytest-7.4.0.pyc
+│   │   │   ├── standalone_test_models_stripe.cpython-312-pytest-7.4.0.pyc
+│   │   │   ├── stripe_model_tests.cpython-312-pytest-7.4.0.pyc
+│   │   │   ├── test_models_stripe.cpython-312-pytest-7.4.0.pyc
+│   │   │   └── test_stripe.cpython-312-pytest-7.4.0.pyc
+│   │   ├── standalone_test_models_stripe.py
+│   │   ├── stripe_model_tests.py
+│   │   ├── test_models_stripe.py
+│   │   └── test_stripe.py
+│   └── uv.lock
+├── copier.yml
+├── deployment.md
+├── development.md
+├── docker-compose.override.yml
+├── docker-compose.traefik.yml
+├── docker-compose.yml
+├── frontend-rn
+│   ├── app
+│   │   ├── (app)
+│   │   │   └── _layout.tsx
+│   │   ├── (auth)
+│   │   │   ├── _layout.tsx
+│   │   │   ├── sign-in.tsx
+│   │   │   └── sign-up.tsx
+│   │   ├── (drawer)
+│   │   │   ├── _layout.tsx
+│   │   │   └── (tabs)
+│   │   │       ├── chat.tsx
+│   │   │       ├── index.tsx
+│   │   │       ├── _layout.tsx
+│   │   │       ├── profile.tsx
+│   │   │       ├── subscription-management.tsx
+│   │   │       └── subscription.tsx
+│   │   ├── health-check.tsx
+│   │   ├── _layout.tsx
+│   │   ├── +not-found.tsx
+│   │   ├── subscription-cancel.tsx
+│   │   ├── subscription-success.tsx
+│   │   └── web-view.tsx
+│   ├── app.config.ts
+│   ├── app.json
+│   ├── assets
+│   │   ├── fonts
+│   │   │   └── SpaceMono-Regular.ttf
+│   │   └── images
+│   │       ├── adaptive-icon.png
+│   │       ├── favicon.png
+│   │       ├── icon.png
+│   │       ├── partial-react-logo.png
+│   │       ├── pfp.png
+│   │       ├── react-logo@2x.png
+│   │       ├── react-logo@3x.png
+│   │       ├── react-logo.png
+│   │       └── splash-icon.png
+│   ├── biome.json
+│   ├── components
+│   │   ├── BackendLogin.tsx
+│   │   ├── BackendSignUp.tsx
+│   │   ├── ChatComponent.tsx
+│   │   ├── ChatHeader.tsx
+│   │   ├── Collapsible.tsx
+│   │   ├── CustomDrawerContent.tsx
+│   │   ├── ExternalLink.tsx
+│   │   ├── GoogleLogin.tsx
+│   │   ├── HapticTab.tsx
+│   │   ├── HelloWave.tsx
+│   │   ├── ParallaxScrollView.tsx
+│   │   ├── PaymentHistory.tsx
+│   │   ├── Sidebar.tsx
+│   │   ├── StripePaymentForm.tsx
+│   │   ├── SubscriptionManager.tsx
+│   │   ├── __tests__
+│   │   │   ├── __snapshots__
+│   │   │   │   └── ThemedText-test.tsx.snap
+│   │   │   └── ThemedText-test.tsx
+│   │   ├── ThemedText.tsx
+│   │   ├── ThemedView.tsx
+│   │   ├── ui
+│   │   │   ├── IconSymbol.ios.tsx
+│   │   │   ├── IconSymbol.tsx
+│   │   │   ├── TabBarBackground.ios.tsx
+│   │   │   └── TabBarBackground.tsx
+│   │   └── UsageLimitBanner.tsx
+│   ├── constants
+│   │   └── Colors.ts
+│   ├── context
+│   │   ├── authProvider.tsx
+│   │   └── useStorageState.tsx
+│   ├── Dockerfile
+│   ├── expo-env.d.ts
+│   ├── fix-openapi.js
+│   ├── fronttree.txt
+│   ├── hooks
+│   │   ├── useChat.ts
+│   │   ├── useColorScheme.ts
+│   │   ├── useColorScheme.web.ts
+│   │   ├── useThemeColor.ts
+│   │   └── useUsage.ts
+│   ├── openapi.json
+│   ├── openapi-ts.config.ts
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── readme4Implementation.md
+│   ├── README.md
+│   ├── scripts
+│   │   └── reset-project.js
+│   ├── src
+│   │   └── client
+│   │       ├── client.gen.ts
+│   │       ├── index.ts
+│   │       ├── sdk.gen.ts
+│   │       ├── @tanstack
+│   │       │   └── react-query.gen.ts
+│   │       └── types.gen.ts
+│   ├── tests
+│   │   └── subscription.test.tsx
+│   ├── tmpjson.json
+│   ├── tsconfig.json
+│   └── utils
+│       └── utils.ts
+├── fronttree.txt
+├── git-workflow.md
+├── hooks
+│   └── post_gen_project.py
+├── img
+│   ├── dashboard-create.png
+│   ├── dashboard-dark.png
+│   ├── dashboard-items.png
+│   ├── dashboard.png
+│   ├── dashboard-user-settings.png
+│   ├── docs.png
+│   ├── github-social-preview.png
+│   ├── github-social-preview.svg
+│   └── login.png
+├── LICENSE
+├── README.md
+├── release-notes.md
+├── scripts
+│   ├── build-push.sh
+│   ├── build.sh
+│   ├── deploy.sh
+│   ├── generate-client.sh
+│   ├── test-local.sh
+│   └── test.sh
+├── SECURITY.md
+└── testing_documentation.md
+
+51 directories, 208 files

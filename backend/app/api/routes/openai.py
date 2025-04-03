@@ -10,7 +10,8 @@ from fastapi import APIRouter, HTTPException, status
 from openai import AsyncOpenAI
 from sqlmodel import select
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, SessionDep, UsageLimitCheck
+from app.api.routes.stripe import increment_usage
 from app.models import (
     Conversation,
     ConversationCreate,
@@ -172,8 +173,6 @@ async def call_openai_with_fallback(
 
 
 # API Endpoints
-
-
 @router.post("/conversations", response_model=ConversationWithMessages)
 async def create_conversation(
     conversation: ConversationCreate, session: SessionDep, current_user: CurrentUser
@@ -266,7 +265,11 @@ async def get_conversation(
     )
 
 
-@router.post("/conversations/{conversation_id}/messages", response_model=MessageSchema)
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    response_model=MessageSchema,
+    dependencies=[UsageLimitCheck],
+)
 async def create_message(
     message: MessageSchema,
     conversation_id: uuid.UUID,
@@ -274,7 +277,7 @@ async def create_message(
     session: SessionDep,
 ) -> MessageSchema:
     """Create a new message and get a response from OpenAI"""
-    global openai_client  # Add this line
+    global openai_client
     try:
         # Verify conversation exists and belongs to user
         conversation = session.exec(
@@ -290,6 +293,9 @@ async def create_message(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
             )
+
+        # Increment usage - this will be skipped for subscribers
+        increment_usage(session=session, current_user=current_user)
 
         # Verify OpenAI client is initialized
         if not openai_client:

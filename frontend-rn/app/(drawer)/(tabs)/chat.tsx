@@ -1,15 +1,18 @@
 // app/(drawer)/(tabs)/chat.tsx
 import { useLocalSearchParams, router, useNavigation } from 'expo-router';
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getConversationOptions, getConversationsOptions, OpenaiService } from '@/src/client/@tanstack/react-query.gen';
+import { getConversationOptions, getConversationsOptions } from '@/src/client/@tanstack/react-query.gen';
+import { OpenaiService } from '@/src/client';
 import ChatHeader from '../../../components/ChatHeader';
 import { ConversationWithMessages } from '@/src/client';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import useUsage from '@/hooks/useUsage';
+import UsageLimitBanner from '@/components/UsageLimitBanner';
 
 interface Message {
   role: string;
@@ -24,6 +27,18 @@ export default function ChatScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+
+  // Usage tracking
+  const {
+    usageData,
+    limitReached,
+    hasSubscription,
+    incrementUsage,
+    refetchUsage
+  } = useUsage();
+
+  // State to track if a subscription banner was dismissed
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   // Use React Query to fetch conversation data
   const {
@@ -77,14 +92,34 @@ export default function ChatScreen() {
     }
   });
 
-  // Use React Query mutation for sending messages
+  // Use React Query mutation for sending messages with usage tracking
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      const { data } = await OpenaiService.createMessage({
-        path: { conversation_id: id as string },
-        body: { role: 'user', content }
-      });
-      return data;
+      try {
+        // If limit reached and no subscription, prevent sending the message
+        if (limitReached && !hasSubscription) {
+          throw new Error('Usage limit reached');
+        }
+
+        // Try to increment usage before making the API call
+        if (!hasSubscription) {
+          await incrementUsage();
+        }
+
+        // Then make the API call to send the message
+        const { data } = await OpenaiService.createMessage({
+          path: { conversation_id: id as string },
+          body: { role: 'user', content }
+        });
+        return data;
+      } catch (error: any) {
+        // Handle 402 Payment Required errors
+        if (error.response && error.response.status === 402) {
+          refetchUsage(); // Refresh usage data
+          throw new Error('Usage limit reached');
+        }
+        throw error;
+      }
     },
     onSuccess: (data) => {
       // Invalidate and refetch the conversation to get the updated messages
@@ -97,6 +132,32 @@ export default function ChatScreen() {
       // If this is the first message, generate a title based on the content
       if (chatData && chatData.messages && chatData.messages.length === 0) {
         generateTitleFromContent(inputText);
+      }
+    },
+    onError: (error: any) => {
+      console.error('Error sending message:', error);
+
+      // If this was due to usage limit, show a subscription prompt
+      if (error.message === 'Usage limit reached') {
+        Alert.alert(
+          'Free Message Limit Reached',
+          'You\'ve used all your free messages. Subscribe to continue chatting and keep access to your conversation history.',
+          [
+            {
+              text: 'Subscribe Now',
+              onPress: () => {
+                router.push({
+                  pathname: '/(drawer)/(tabs)/subscription',
+                  params: { fromUsageLimit: 'true' }
+                });
+              }
+            },
+            {
+              text: 'Later',
+              style: 'cancel'
+            }
+          ]
+        );
       }
     }
   });
@@ -143,14 +204,52 @@ export default function ChatScreen() {
     }
   };
 
-  // Auto-delete functionality has been removed
-
+  // Enhanced handleSendMessage with usage limit check
   const handleSendMessage = async () => {
     if (!inputText.trim() || !id) return;
 
+    // Check if limit reached before trying to send
+    if (limitReached && !hasSubscription) {
+      Alert.alert(
+        'Free Message Limit Reached',
+        'You\'ve used all your free messages. Subscribe to continue chatting.',
+        [
+          {
+            text: 'Subscribe Now',
+            onPress: () => {
+              router.push({
+                pathname: '/(drawer)/(tabs)/subscription',
+                params: { fromUsageLimit: 'true' }
+              });
+            }
+          },
+          {
+            text: 'Later',
+            style: 'cancel'
+          }
+        ]
+      );
+      return;
+    }
+
     try {
-      await sendMessageMutation.mutateAsync(inputText);
+      // Display user message immediately for better UX
+      const userMessage = { role: 'user', content: inputText };
+
+      // Add to UI optimistically
+      if (chatData) {
+        const updatedMessages = [...chatData.messages, userMessage];
+        queryClient.setQueryData(
+          getConversationOptions({ path: { conversation_id: id as string } }).queryKey,
+          {...chatData, messages: updatedMessages}
+        );
+      }
+
+      // Clear input
       setInputText('');
+
+      // Send message and get response
+      await sendMessageMutation.mutateAsync(inputText);
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -169,6 +268,15 @@ export default function ChatScreen() {
     </View>
   );
 
+  // Refresh usage data when the component mounts or when the URL params change
+  const params = useLocalSearchParams();
+
+  useEffect(() => {
+    if (params.refresh === 'true') {
+      refetchUsage();
+    }
+  }, [params.refresh]);
+
   return (
     <SafeAreaView
       style={[
@@ -186,6 +294,19 @@ export default function ChatScreen() {
         title={chatData?.title || 'Chat'}
         onNewChat={() => createConversationMutation.mutate()}
       />
+
+      {/* Usage limit banner */}
+      {usageData && !bannerDismissed && !hasSubscription && (
+        <UsageLimitBanner
+          usageData={{
+            requests_used: Number(usageData.requests_used),
+            requests_limit: Number(usageData.requests_limit),
+            requests_remaining: Number(usageData.requests_remaining),
+            limit_reached: Boolean(usageData.limit_reached)
+          }}
+          onDismiss={() => setBannerDismissed(true)}
+        />
+      )}
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -266,12 +387,12 @@ export default function ChatScreen() {
             value={inputText}
             onChangeText={setInputText}
             onSubmitEditing={handleSendMessage}
-            editable={!sendMessageMutation.isPending}
+            editable={!sendMessageMutation.isPending && !(limitReached && !hasSubscription)}
           />
           <TouchableOpacity
             style={styles.sendButton}
             onPress={handleSendMessage}
-            disabled={!inputText.trim() || !id || sendMessageMutation.isPending}
+            disabled={!inputText.trim() || !id || sendMessageMutation.isPending || (limitReached && !hasSubscription)}
           >
             {sendMessageMutation.isPending ? (
               <ActivityIndicator size="small" color="#0084ff" />
@@ -279,7 +400,7 @@ export default function ChatScreen() {
               <Ionicons
                 name="send"
                 size={24}
-                color={!inputText.trim() || !id ? '#888' : '#0084ff'}
+                color={!inputText.trim() || !id || (limitReached && !hasSubscription) ? '#888' : '#0084ff'}
               />
             )}
           </TouchableOpacity>
