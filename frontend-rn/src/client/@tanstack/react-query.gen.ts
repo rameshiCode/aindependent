@@ -7,6 +7,7 @@ import {
   UtilsService,
   StripeService,
   OpenaiService,
+  ProfilesService,
 } from "../sdk.gen"
 import {
   queryOptions,
@@ -105,6 +106,17 @@ import type {
   OpenaiCreateMessageData,
   OpenaiCreateMessageError,
   OpenaiCreateMessageResponse,
+  ProfilesGetMyProfileData,
+  ProfilesUpdateAbstinenceStatusData,
+  ProfilesUpdateAbstinenceStatusError,
+  ProfilesUpdateAbstinenceStatusResponse,
+  ProfilesGetUserGoalsData,
+  ProfilesCreateUserGoalData,
+  ProfilesCreateUserGoalError,
+  ProfilesCreateUserGoalResponse,
+  ProfilesUpdateUserGoalData,
+  ProfilesUpdateUserGoalError,
+  ProfilesUpdateUserGoalResponse,
 } from "../types.gen"
 import { client as _heyApiClient } from "../client.gen"
 
@@ -1360,6 +1372,150 @@ export const createMessageMutation = (
   > = {
     mutationFn: async (localOptions) => {
       const { data } = await OpenaiService.createMessage({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getMyProfileQueryKey = (
+  options?: Options<ProfilesGetMyProfileData>,
+) => createQueryKey("profilesGetMyProfile", options)
+
+export const getMyProfileOptions = (
+  options?: Options<ProfilesGetMyProfileData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.getMyProfile({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getMyProfileQueryKey(options),
+  })
+}
+
+export const updateAbstinenceStatusQueryKey = (
+  options: Options<ProfilesUpdateAbstinenceStatusData>,
+) => createQueryKey("profilesUpdateAbstinenceStatus", options)
+
+export const updateAbstinenceStatusOptions = (
+  options: Options<ProfilesUpdateAbstinenceStatusData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.updateAbstinenceStatus({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: updateAbstinenceStatusQueryKey(options),
+  })
+}
+
+export const updateAbstinenceStatusMutation = (
+  options?: Partial<Options<ProfilesUpdateAbstinenceStatusData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    ProfilesUpdateAbstinenceStatusResponse,
+    ProfilesUpdateAbstinenceStatusError,
+    Options<ProfilesUpdateAbstinenceStatusData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.updateAbstinenceStatus({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getUserGoalsQueryKey = (
+  options?: Options<ProfilesGetUserGoalsData>,
+) => createQueryKey("profilesGetUserGoals", options)
+
+export const getUserGoalsOptions = (
+  options?: Options<ProfilesGetUserGoalsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.getUserGoals({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getUserGoalsQueryKey(options),
+  })
+}
+
+export const createUserGoalQueryKey = (
+  options: Options<ProfilesCreateUserGoalData>,
+) => createQueryKey("profilesCreateUserGoal", options)
+
+export const createUserGoalOptions = (
+  options: Options<ProfilesCreateUserGoalData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.createUserGoal({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: createUserGoalQueryKey(options),
+  })
+}
+
+export const createUserGoalMutation = (
+  options?: Partial<Options<ProfilesCreateUserGoalData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    ProfilesCreateUserGoalResponse,
+    ProfilesCreateUserGoalError,
+    Options<ProfilesCreateUserGoalData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.createUserGoal({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const updateUserGoalMutation = (
+  options?: Partial<Options<ProfilesUpdateUserGoalData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    ProfilesUpdateUserGoalResponse,
+    ProfilesUpdateUserGoalError,
+    Options<ProfilesUpdateUserGoalData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.updateUserGoal({
         ...options,
         ...localOptions,
         throwOnError: true,

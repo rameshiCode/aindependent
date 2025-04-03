@@ -5,10 +5,9 @@ import traceback
 import uuid
 from datetime import datetime
 
-import httpx
-from fastapi import APIRouter, HTTPException, status
-from openai import AsyncOpenAI
-from sqlmodel import select
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from sqlalchemy import Engine
+from sqlmodel import Session, select
 
 from app.api.deps import CurrentUser, SessionDep, UsageLimitCheck
 from app.api.routes.stripe import increment_usage
@@ -19,6 +18,12 @@ from app.models import (
     Message,
     MessageSchema,
 )
+
+# Import the client from the common module
+from app.services.openai_client import api_key, get_openai_client, openai_client
+
+# Import the service function directly
+from app.services.profile_extractor import process_conversation_for_profile
 
 router = APIRouter(prefix="/openai", tags=["openai"])
 
@@ -36,7 +41,7 @@ try:
 except ImportError:
     logger.warning("python-dotenv not installed, skipping explicit .env loading")
 
-# Environment variable debugging (keeping this as requested)
+# Environment variable debugging
 logger.info("=================== OPENAI CONFIG DEBUG ===================")
 logger.info(f"Current working directory: {os.getcwd()}")
 logger.info(f"Environment variable count: {len(os.environ)}")
@@ -56,16 +61,12 @@ logger.info(f"All environment variable names: {all_env_keys}")
 openai_related_keys = [k for k in all_env_keys if "openai" in k.lower()]
 logger.info(f"OpenAI-related keys found: {openai_related_keys}")
 
-# Get API key
-api_key = None
-for key_name in possible_key_names:
-    value = os.environ.get(key_name)
-    if value:
-        logger.info(f"✅ Found key using name: {key_name}")
-        api_key = value
-        break
-
-if not api_key:
+# Safely log key info without revealing the full key
+if api_key:
+    key_length = len(api_key)
+    key_prefix = api_key[:4] + "..." if len(api_key) > 4 else ""
+    logger.info(f"✅ OpenAI API key found: length={key_length}, prefix={key_prefix}")
+else:
     logger.error("❌ OpenAI API key not found in any expected variable names!")
     # Check .env files
     env_paths = [".env", "/.env", "../.env", "../../.env", "/app/.env"]
@@ -80,33 +81,16 @@ if not api_key:
                     logger.error("❌ .env file doesn't contain OPENAI_API_KEY")
         else:
             logger.info(f"No .env file at {path}")
-else:
-    # Safely log key info without revealing the full key
-    key_length = len(api_key) if api_key else 0
-    key_prefix = api_key[:4] + "..." if api_key and len(api_key) > 4 else ""
-    logger.info(f"✅ OpenAI API key found: length={key_length}, prefix={key_prefix}")
 
 # Direct API key test
 logger.info(
     f"Direct API key test: {'✅ Found (length: ' + str(len(api_key)) + ')' if api_key else '❌ Not found'}"
 )
 
-# Initialize client with custom settings
-openai_client = None
-try:
-    if api_key:
-        # Create custom HTTP client with improved settings
-        http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=30.0),
-            verify=True,  # Set to False only for testing in restricted environments
-        )
-        openai_client = AsyncOpenAI(api_key=api_key, http_client=http_client)
-        logger.info("✅ OpenAI client initialized successfully")
-    else:
-        logger.error("Cannot initialize OpenAI client without API key")
-except Exception as e:
-    logger.error(f"❌ Failed to initialize OpenAI client: {str(e)}")
-    logger.exception("Detailed exception:")
+# Log OpenAI client status
+logger.info(
+    f"OpenAI client status: {'✅ Initialized' if openai_client else '❌ Not initialized'}"
+)
 
 logger.info("======== OPENAI CLIENT SETUP COMPLETE ========")
 
@@ -131,6 +115,7 @@ async def call_openai_with_fallback(
             models_to_try.append(model)
 
     last_error = None
+    client = get_openai_client()
 
     for model in models_to_try:
         retries = 0
@@ -139,7 +124,7 @@ async def call_openai_with_fallback(
                 logger.info(
                     f"Calling OpenAI API with model: {model} (attempt {retries+1}/{max_retries})"
                 )
-                completion = await openai_client.chat.completions.create(
+                completion = await client.chat.completions.create(
                     model=model,
                     messages=messages,
                 )
@@ -275,9 +260,9 @@ async def create_message(
     conversation_id: uuid.UUID,
     current_user: CurrentUser,
     session: SessionDep,
+    background_tasks: BackgroundTasks,
 ) -> MessageSchema:
     """Create a new message and get a response from OpenAI"""
-    global openai_client
     try:
         # Verify conversation exists and belongs to user
         conversation = session.exec(
@@ -297,32 +282,14 @@ async def create_message(
         # Increment usage - this will be skipped for subscribers
         increment_usage(session=session, current_user=current_user)
 
-        # Verify OpenAI client is initialized
-        if not openai_client:
-            if not api_key:
-                logger.error("OpenAI API key not configured")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="OpenAI API key not configured",
-                )
-
-            # This should not happen but providing a fallback just in case
-            # This should not happen but providing a fallback just in case
-            try:
-                logger.info("Re-initializing OpenAI client")
-                http_client = httpx.AsyncClient(
-                    timeout=httpx.Timeout(
-                        connect=10.0, read=30.0, write=30.0, pool=30.0
-                    ),
-                    verify=True,
-                )
-                openai_client = AsyncOpenAI(api_key=api_key, http_client=http_client)
-            except Exception as e:
-                logger.error(f"Failed to initialize OpenAI client: {str(e)}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to initialize OpenAI client",
-                )
+        # Verify OpenAI client is available
+        client = get_openai_client()
+        if not client:
+            logger.error("OpenAI client not available")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="OpenAI API not properly configured",
+            )
 
         # Save user message to database
         db_message = Message(
@@ -347,7 +314,11 @@ async def create_message(
         # Add system message if not present
         if not any(msg["role"] == "system" for msg in messages_for_api):
             messages_for_api.insert(
-                0, {"role": "system", "content": "You are a helpful assistant."}
+                0,
+                {
+                    "role": "system",
+                    "content": "You are a caring, empathetic AI therapist helping people overcome addiction. Your goal is to motivate change using empathy and understanding. You're working with users anonymously to create a safe space where they can discuss their struggles. Always focus on their wellbeing.",
+                },
             )
 
         logger.info(f"Sending {len(messages_for_api)} messages to OpenAI API")
@@ -373,6 +344,14 @@ async def create_message(
         # Update conversation timestamp
         conversation.updated_at = datetime.utcnow()
         session.commit()
+
+        # Add background task to process user profile from conversation
+        background_tasks.add_task(
+            process_conversation_for_profile,
+            session_factory=lambda: Session(Engine),
+            conversation_id=str(conversation_id),
+            user_id=str(current_user.id),
+        )
 
         # Return assistant message
         return MessageSchema(role="assistant", content=assistant_message)

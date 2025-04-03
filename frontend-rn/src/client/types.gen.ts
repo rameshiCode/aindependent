@@ -1196,6 +1196,151 @@ export type OpenaiCreateMessageResponses = {
 export type OpenaiCreateMessageResponse =
   OpenaiCreateMessageResponses[keyof OpenaiCreateMessageResponses]
 
+export type ProfilesGetMyProfileData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/my-profile"
+}
+
+export type ProfilesGetMyProfileResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type ProfilesGetMyProfileResponse =
+  ProfilesGetMyProfileResponses[keyof ProfilesGetMyProfileResponses]
+
+export type ProfilesUpdateAbstinenceStatusData = {
+  body: {
+    [key: string]: unknown
+  }
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/update-abstinence"
+}
+
+export type ProfilesUpdateAbstinenceStatusErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesUpdateAbstinenceStatusError =
+  ProfilesUpdateAbstinenceStatusErrors[keyof ProfilesUpdateAbstinenceStatusErrors]
+
+export type ProfilesUpdateAbstinenceStatusResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type ProfilesUpdateAbstinenceStatusResponse =
+  ProfilesUpdateAbstinenceStatusResponses[keyof ProfilesUpdateAbstinenceStatusResponses]
+
+export type ProfilesGetUserGoalsData = {
+  body?: never
+  path?: never
+  query?: {
+    status?: string | null
+  }
+  url: "/api/v1/profiles/goals"
+}
+
+export type ProfilesGetUserGoalsErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesGetUserGoalsError =
+  ProfilesGetUserGoalsErrors[keyof ProfilesGetUserGoalsErrors]
+
+export type ProfilesGetUserGoalsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<{
+    [key: string]: unknown
+  }>
+}
+
+export type ProfilesGetUserGoalsResponse =
+  ProfilesGetUserGoalsResponses[keyof ProfilesGetUserGoalsResponses]
+
+export type ProfilesCreateUserGoalData = {
+  body: {
+    [key: string]: unknown
+  }
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/goals"
+}
+
+export type ProfilesCreateUserGoalErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesCreateUserGoalError =
+  ProfilesCreateUserGoalErrors[keyof ProfilesCreateUserGoalErrors]
+
+export type ProfilesCreateUserGoalResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type ProfilesCreateUserGoalResponse =
+  ProfilesCreateUserGoalResponses[keyof ProfilesCreateUserGoalResponses]
+
+export type ProfilesUpdateUserGoalData = {
+  body: {
+    [key: string]: unknown
+  }
+  path: {
+    goal_id: string
+  }
+  query?: never
+  url: "/api/v1/profiles/goals/{goal_id}"
+}
+
+export type ProfilesUpdateUserGoalErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesUpdateUserGoalError =
+  ProfilesUpdateUserGoalErrors[keyof ProfilesUpdateUserGoalErrors]
+
+export type ProfilesUpdateUserGoalResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type ProfilesUpdateUserGoalResponse =
+  ProfilesUpdateUserGoalResponses[keyof ProfilesUpdateUserGoalResponses]
+
 export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})
 }

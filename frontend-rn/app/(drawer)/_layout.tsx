@@ -10,7 +10,7 @@ import { useColorScheme } from 'react-native';
 import Constants from 'expo-constants';
 import { SafeAreaProvider, useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 
-// Custom drawer content component to display chat history
+// Custom drawer content component to display chat history and navigation
 function CustomDrawerContent() {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
@@ -106,39 +106,6 @@ function CustomDrawerContent() {
     });
   };
 
-  // Render each conversation item
-  const renderConversationItem = ({ item }: any) => {
-    const isActive = pathname.includes(`id=${item.id}`);
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.conversationItem,
-          isActive && styles.activeConversationItem,
-          { backgroundColor: isActive ? (isDarkMode ? '#333' : '#e6e6e6') : 'transparent' }
-        ]}
-        onPress={() => handleConversationPress(item.id)}
-      >
-        <Ionicons
-          name="chatbubble-outline"
-          size={20}
-          color={isDarkMode ? '#fff' : '#000'}
-          style={styles.conversationIcon}
-        />
-        <Text
-          style={[
-            styles.conversationTitle,
-            { color: isDarkMode ? '#fff' : '#000' }
-          ]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {item.title || 'New Conversation'}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
   return (
     <View style={[
       styles.container,
@@ -148,7 +115,59 @@ function CustomDrawerContent() {
       }
     ]}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: isDarkMode ? '#fff' : '#000' }]}>Chat History</Text>
+        <Text style={[styles.headerTitle, { color: isDarkMode ? '#fff' : '#000' }]}>AIndependent</Text>
+
+        {/* Main Navigation Links */}
+        <View style={styles.navigationContainer}>
+          {/* Profile Link */}
+          <TouchableOpacity
+            style={[
+              styles.navigationButton,
+              pathname.includes('/user-profile') && styles.activeNavigationButton
+            ]}
+            onPress={() => router.push('/(drawer)/(tabs)/user-profile')}
+          >
+            <Ionicons name="person" size={20} color={isDarkMode ? '#fff' : '#000'} />
+            <Text style={[styles.navigationText, { color: isDarkMode ? '#fff' : '#000' }]}>
+              Your Profile
+            </Text>
+          </TouchableOpacity>
+
+          {/* Home Link */}
+          <TouchableOpacity
+            style={[
+              styles.navigationButton,
+              pathname === '/(drawer)/(tabs)/index' && styles.activeNavigationButton
+            ]}
+            onPress={() => router.push('/(drawer)/(tabs)')}
+          >
+            <Ionicons name="home" size={20} color={isDarkMode ? '#fff' : '#000'} />
+            <Text style={[styles.navigationText, { color: isDarkMode ? '#fff' : '#000' }]}>
+              Home
+            </Text>
+          </TouchableOpacity>
+
+          {/* Subscription Link */}
+          <TouchableOpacity
+            style={[
+              styles.navigationButton,
+              pathname.includes('/subscription') && styles.activeNavigationButton
+            ]}
+            onPress={() => router.push('/(drawer)/(tabs)/subscription')}
+          >
+            <Ionicons name="card" size={20} color={isDarkMode ? '#fff' : '#000'} />
+            <Text style={[styles.navigationText, { color: isDarkMode ? '#fff' : '#000' }]}>
+              Subscription
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Chat History Section */}
+      <View style={styles.chatHistoryHeader}>
+        <Text style={[styles.sectionTitle, { color: isDarkMode ? '#fff' : '#000' }]}>
+          Chat History
+        </Text>
         <TouchableOpacity
           style={[styles.newChatButton, { backgroundColor: isDarkMode ? '#333' : '#e6e6e6' }]}
           onPress={handleNewConversation}
@@ -183,7 +202,37 @@ function CustomDrawerContent() {
       ) : (
         <FlatList
           data={conversations}
-          renderItem={renderConversationItem}
+          renderItem={({ item }) => {
+            const isActive = pathname.includes(`id=${item.id}`);
+
+            return (
+              <TouchableOpacity
+                style={[
+                  styles.conversationItem,
+                  isActive && styles.activeConversationItem,
+                  { backgroundColor: isActive ? (isDarkMode ? '#333' : '#e6e6e6') : 'transparent' }
+                ]}
+                onPress={() => handleConversationPress(item.id)}
+              >
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={20}
+                  color={isDarkMode ? '#fff' : '#000'}
+                  style={styles.conversationIcon}
+                />
+                <Text
+                  style={[
+                    styles.conversationTitle,
+                    { color: isDarkMode ? '#fff' : '#000' }
+                  ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {item.title || 'New Conversation'}
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
@@ -242,15 +291,44 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
   },
-  newChatButton: {
+  navigationContainer: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  navigationButton: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     borderRadius: 8,
+    marginBottom: 8,
+  },
+  activeNavigationButton: {
+    backgroundColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  navigationText: {
+    marginLeft: 12,
+    fontSize: 16,
+  },
+  chatHistoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  newChatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
   },
   newChatText: {
     marginLeft: 8,
-    fontSize: 16,
+    fontSize: 14,
   },
   listContainer: {
     paddingVertical: 8,

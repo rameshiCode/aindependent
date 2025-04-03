@@ -118,6 +118,20 @@ import type {
   OpenaiCreateMessageData,
   OpenaiCreateMessageResponse,
   OpenaiCreateMessageError,
+  ProfilesGetMyProfileData,
+  ProfilesGetMyProfileResponse,
+  ProfilesUpdateAbstinenceStatusData,
+  ProfilesUpdateAbstinenceStatusResponse,
+  ProfilesUpdateAbstinenceStatusError,
+  ProfilesGetUserGoalsData,
+  ProfilesGetUserGoalsResponse,
+  ProfilesGetUserGoalsError,
+  ProfilesCreateUserGoalData,
+  ProfilesCreateUserGoalResponse,
+  ProfilesCreateUserGoalError,
+  ProfilesUpdateUserGoalData,
+  ProfilesUpdateUserGoalResponse,
+  ProfilesUpdateUserGoalError,
 } from "./types.gen"
 import { client as _heyApiClient } from "./client.gen"
 
@@ -1106,6 +1120,135 @@ export class OpenaiService {
         },
       ],
       url: "/api/v1/openai/conversations/{conversation_id}/messages",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+}
+
+export class ProfilesService {
+  /**
+   * Get My Profile
+   * Get the current user's profile including insights summary
+   */
+  public static getMyProfile<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesGetMyProfileData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      ProfilesGetMyProfileResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/my-profile",
+      ...options,
+    })
+  }
+
+  /**
+   * Update Abstinence Status
+   * Update the user's abstinence status
+   */
+  public static updateAbstinenceStatus<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesUpdateAbstinenceStatusData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      ProfilesUpdateAbstinenceStatusResponse,
+      ProfilesUpdateAbstinenceStatusError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/update-abstinence",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Get User Goals
+   * Get goals for the current user, optionally filtered by status
+   */
+  public static getUserGoals<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesGetUserGoalsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      ProfilesGetUserGoalsResponse,
+      ProfilesGetUserGoalsError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/goals",
+      ...options,
+    })
+  }
+
+  /**
+   * Create User Goal
+   * Create a new goal for the user
+   */
+  public static createUserGoal<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesCreateUserGoalData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      ProfilesCreateUserGoalResponse,
+      ProfilesCreateUserGoalError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/goals",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Update User Goal
+   * Update an existing goal
+   */
+  public static updateUserGoal<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesUpdateUserGoalData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).put<
+      ProfilesUpdateUserGoalResponse,
+      ProfilesUpdateUserGoalError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/goals/{goal_id}",
       ...options,
       headers: {
         "Content-Type": "application/json",

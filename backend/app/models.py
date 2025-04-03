@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, EmailStr
-from sqlmodel import Column, Field, Relationship, SQLModel, String
+from sqlmodel import JSON, Column, Field, Relationship, SQLModel, String
 
 
 # Shared properties
@@ -289,3 +289,77 @@ class ConversationWithMessages(SQLModel):
 #     id: str
 #     type: str
 #     data: dict
+
+# user profiling push notification
+# Add to app/models.py
+
+
+# User Profile model
+class UserProfile(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", unique=True, index=True)
+    therapist_gender: str | None = None
+    addiction_type: str | None = None
+    abstinence_days: int = 0
+    abstinence_start_date: datetime | None = None
+    relapse_risk_score: int | None = None
+    motivation_level: int | None = None
+    big_five_scores: dict | None = Field(default=None, sa_column=Column(JSON))
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationship
+    user: User = Relationship(back_populates="profile")
+    insights: list["UserInsight"] = Relationship(back_populates="profile")
+
+
+# User Insight model
+class UserInsight(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    profile_id: uuid.UUID = Field(foreign_key="userprofile.id", index=True)
+    conversation_id: uuid.UUID | None = Field(
+        default=None, foreign_key="conversation.id", index=True
+    )
+    insight_type: str  # 'trigger', 'coping_strategy', 'motivation', etc.
+    value: str
+    day_of_week: str | None = None  # For schedule-related insights
+    time_of_day: str | None = None  # For schedule-related insights
+    emotional_significance: float | None = None
+    confidence: float = 0.0
+    extracted_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    profile: UserProfile = Relationship(back_populates="insights")
+    user: User = Relationship()
+    conversation: Conversation | None = Relationship()
+
+
+# User Goal model
+class UserGoal(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    description: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    target_date: datetime | None = None
+    status: str = "active"  # 'active', 'completed', 'abandoned'
+    last_notification_sent: datetime | None = None
+
+    # Relationship
+    user: User = Relationship()
+
+
+# Notification model
+class UserNotification(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    title: str
+    body: str
+    notification_type: str  # 'goal_reminder', 'risk_event', 'abstinence_milestone'
+    scheduled_for: datetime
+    related_entity_id: uuid.UUID | None = None  # Could be insight_id or goal_id
+    priority: int = 3  # 1-5 scale
+    was_sent: bool = False
+    was_opened: bool = False
+
+    # Relationship
+    user: User = Relationship()
