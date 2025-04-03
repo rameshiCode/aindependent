@@ -132,6 +132,19 @@ import type {
   ProfilesUpdateUserGoalData,
   ProfilesUpdateUserGoalResponse,
   ProfilesUpdateUserGoalError,
+  NotificationsGetUserNotificationsData,
+  NotificationsGetUserNotificationsResponse,
+  NotificationsGetUserNotificationsError,
+  NotificationsGetNotificationCountData,
+  NotificationsGetNotificationCountResponse,
+  NotificationsMarkNotificationReadData,
+  NotificationsMarkNotificationReadResponse,
+  NotificationsMarkNotificationReadError,
+  NotificationsMarkAllNotificationsReadData,
+  NotificationsMarkAllNotificationsReadResponse,
+  NotificationsCreateNotificationData,
+  NotificationsCreateNotificationResponse,
+  NotificationsCreateNotificationError,
 } from "./types.gen"
 import { client as _heyApiClient } from "./client.gen"
 
@@ -1249,6 +1262,127 @@ export class ProfilesService {
         },
       ],
       url: "/api/v1/profiles/goals/{goal_id}",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+}
+
+export class NotificationsService {
+  /**
+   * Get User Notifications
+   * Get notifications for the current user
+   */
+  public static getUserNotifications<ThrowOnError extends boolean = false>(
+    options?: Options<NotificationsGetUserNotificationsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      NotificationsGetUserNotificationsResponse,
+      NotificationsGetUserNotificationsError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/notifications/",
+      ...options,
+    })
+  }
+
+  /**
+   * Get Notification Count
+   * Get count of unread notifications for the current user
+   */
+  public static getNotificationCount<ThrowOnError extends boolean = false>(
+    options?: Options<NotificationsGetNotificationCountData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      NotificationsGetNotificationCountResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/notifications/count",
+      ...options,
+    })
+  }
+
+  /**
+   * Mark Notification Read
+   * Mark a notification as read
+   */
+  public static markNotificationRead<ThrowOnError extends boolean = false>(
+    options: Options<NotificationsMarkNotificationReadData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      NotificationsMarkNotificationReadResponse,
+      NotificationsMarkNotificationReadError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/notifications/mark-read/{notification_id}",
+      ...options,
+    })
+  }
+
+  /**
+   * Mark All Notifications Read
+   * Mark all notifications as read for the current user
+   */
+  public static markAllNotificationsRead<ThrowOnError extends boolean = false>(
+    options?: Options<NotificationsMarkAllNotificationsReadData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).post<
+      NotificationsMarkAllNotificationsReadResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/notifications/mark-all-read",
+      ...options,
+    })
+  }
+
+  /**
+   * Create Notification
+   * Create a new notification (admin or system use)
+   */
+  public static createNotification<ThrowOnError extends boolean = false>(
+    options: Options<NotificationsCreateNotificationData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      NotificationsCreateNotificationResponse,
+      NotificationsCreateNotificationError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/notifications/create",
       ...options,
       headers: {
         "Content-Type": "application/json",

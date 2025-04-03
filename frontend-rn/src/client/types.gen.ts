@@ -1341,6 +1341,139 @@ export type ProfilesUpdateUserGoalResponses = {
 export type ProfilesUpdateUserGoalResponse =
   ProfilesUpdateUserGoalResponses[keyof ProfilesUpdateUserGoalResponses]
 
+export type NotificationsGetUserNotificationsData = {
+  body?: never
+  path?: never
+  query?: {
+    limit?: number
+    offset?: number
+    unread_only?: boolean
+  }
+  url: "/api/v1/notifications/"
+}
+
+export type NotificationsGetUserNotificationsErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type NotificationsGetUserNotificationsError =
+  NotificationsGetUserNotificationsErrors[keyof NotificationsGetUserNotificationsErrors]
+
+export type NotificationsGetUserNotificationsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<{
+    [key: string]: unknown
+  }>
+}
+
+export type NotificationsGetUserNotificationsResponse =
+  NotificationsGetUserNotificationsResponses[keyof NotificationsGetUserNotificationsResponses]
+
+export type NotificationsGetNotificationCountData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/notifications/count"
+}
+
+export type NotificationsGetNotificationCountResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type NotificationsGetNotificationCountResponse =
+  NotificationsGetNotificationCountResponses[keyof NotificationsGetNotificationCountResponses]
+
+export type NotificationsMarkNotificationReadData = {
+  body?: never
+  path: {
+    notification_id: string
+  }
+  query?: never
+  url: "/api/v1/notifications/mark-read/{notification_id}"
+}
+
+export type NotificationsMarkNotificationReadErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type NotificationsMarkNotificationReadError =
+  NotificationsMarkNotificationReadErrors[keyof NotificationsMarkNotificationReadErrors]
+
+export type NotificationsMarkNotificationReadResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type NotificationsMarkNotificationReadResponse =
+  NotificationsMarkNotificationReadResponses[keyof NotificationsMarkNotificationReadResponses]
+
+export type NotificationsMarkAllNotificationsReadData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/notifications/mark-all-read"
+}
+
+export type NotificationsMarkAllNotificationsReadResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type NotificationsMarkAllNotificationsReadResponse =
+  NotificationsMarkAllNotificationsReadResponses[keyof NotificationsMarkAllNotificationsReadResponses]
+
+export type NotificationsCreateNotificationData = {
+  body: {
+    [key: string]: unknown
+  }
+  path?: never
+  query?: never
+  url: "/api/v1/notifications/create"
+}
+
+export type NotificationsCreateNotificationErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type NotificationsCreateNotificationError =
+  NotificationsCreateNotificationErrors[keyof NotificationsCreateNotificationErrors]
+
+export type NotificationsCreateNotificationResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type NotificationsCreateNotificationResponse =
+  NotificationsCreateNotificationResponses[keyof NotificationsCreateNotificationResponses]
+
 export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})
 }

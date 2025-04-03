@@ -8,11 +8,14 @@ import {
   StripeService,
   OpenaiService,
   ProfilesService,
+  NotificationsService,
 } from "../sdk.gen"
 import {
   queryOptions,
   type UseMutationOptions,
   type DefaultError,
+  infiniteQueryOptions,
+  type InfiniteData,
 } from "@tanstack/react-query"
 import type {
   LoginAuthGoogleData,
@@ -117,6 +120,18 @@ import type {
   ProfilesUpdateUserGoalData,
   ProfilesUpdateUserGoalError,
   ProfilesUpdateUserGoalResponse,
+  NotificationsGetUserNotificationsData,
+  NotificationsGetUserNotificationsError,
+  NotificationsGetUserNotificationsResponse,
+  NotificationsGetNotificationCountData,
+  NotificationsMarkNotificationReadData,
+  NotificationsMarkNotificationReadError,
+  NotificationsMarkNotificationReadResponse,
+  NotificationsMarkAllNotificationsReadData,
+  NotificationsMarkAllNotificationsReadResponse,
+  NotificationsCreateNotificationData,
+  NotificationsCreateNotificationError,
+  NotificationsCreateNotificationResponse,
 } from "../types.gen"
 import { client as _heyApiClient } from "../client.gen"
 
@@ -1516,6 +1531,253 @@ export const updateUserGoalMutation = (
   > = {
     mutationFn: async (localOptions) => {
       const { data } = await ProfilesService.updateUserGoal({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getUserNotificationsQueryKey = (
+  options?: Options<NotificationsGetUserNotificationsData>,
+) => createQueryKey("notificationsGetUserNotifications", options)
+
+export const getUserNotificationsOptions = (
+  options?: Options<NotificationsGetUserNotificationsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await NotificationsService.getUserNotifications({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getUserNotificationsQueryKey(options),
+  })
+}
+
+const createInfiniteParams = <
+  K extends Pick<QueryKey<Options>[0], "body" | "headers" | "path" | "query">,
+>(
+  queryKey: QueryKey<Options>,
+  page: K,
+) => {
+  const params = queryKey[0]
+  if (page.body) {
+    params.body = {
+      ...(queryKey[0].body as any),
+      ...(page.body as any),
+    }
+  }
+  if (page.headers) {
+    params.headers = {
+      ...queryKey[0].headers,
+      ...page.headers,
+    }
+  }
+  if (page.path) {
+    params.path = {
+      ...(queryKey[0].path as any),
+      ...(page.path as any),
+    }
+  }
+  if (page.query) {
+    params.query = {
+      ...(queryKey[0].query as any),
+      ...(page.query as any),
+    }
+  }
+  return params as unknown as typeof page
+}
+
+export const getUserNotificationsInfiniteQueryKey = (
+  options?: Options<NotificationsGetUserNotificationsData>,
+): QueryKey<Options<NotificationsGetUserNotificationsData>> =>
+  createQueryKey("notificationsGetUserNotifications", options, true)
+
+export const getUserNotificationsInfiniteOptions = (
+  options?: Options<NotificationsGetUserNotificationsData>,
+) => {
+  return infiniteQueryOptions<
+    NotificationsGetUserNotificationsResponse,
+    NotificationsGetUserNotificationsError,
+    InfiniteData<NotificationsGetUserNotificationsResponse>,
+    QueryKey<Options<NotificationsGetUserNotificationsData>>,
+    | number
+    | Pick<
+        QueryKey<Options<NotificationsGetUserNotificationsData>>[0],
+        "body" | "headers" | "path" | "query"
+      >
+  >(
+    // @ts-ignore
+    {
+      queryFn: async ({ pageParam, queryKey, signal }) => {
+        // @ts-ignore
+        const page: Pick<
+          QueryKey<Options<NotificationsGetUserNotificationsData>>[0],
+          "body" | "headers" | "path" | "query"
+        > =
+          typeof pageParam === "object"
+            ? pageParam
+            : {
+                query: {
+                  offset: pageParam,
+                },
+              }
+        const params = createInfiniteParams(queryKey, page)
+        const { data } = await NotificationsService.getUserNotifications({
+          ...options,
+          ...params,
+          signal,
+          throwOnError: true,
+        })
+        return data
+      },
+      queryKey: getUserNotificationsInfiniteQueryKey(options),
+    },
+  )
+}
+
+export const getNotificationCountQueryKey = (
+  options?: Options<NotificationsGetNotificationCountData>,
+) => createQueryKey("notificationsGetNotificationCount", options)
+
+export const getNotificationCountOptions = (
+  options?: Options<NotificationsGetNotificationCountData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await NotificationsService.getNotificationCount({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getNotificationCountQueryKey(options),
+  })
+}
+
+export const markNotificationReadQueryKey = (
+  options: Options<NotificationsMarkNotificationReadData>,
+) => createQueryKey("notificationsMarkNotificationRead", options)
+
+export const markNotificationReadOptions = (
+  options: Options<NotificationsMarkNotificationReadData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await NotificationsService.markNotificationRead({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: markNotificationReadQueryKey(options),
+  })
+}
+
+export const markNotificationReadMutation = (
+  options?: Partial<Options<NotificationsMarkNotificationReadData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    NotificationsMarkNotificationReadResponse,
+    NotificationsMarkNotificationReadError,
+    Options<NotificationsMarkNotificationReadData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await NotificationsService.markNotificationRead({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const markAllNotificationsReadQueryKey = (
+  options?: Options<NotificationsMarkAllNotificationsReadData>,
+) => createQueryKey("notificationsMarkAllNotificationsRead", options)
+
+export const markAllNotificationsReadOptions = (
+  options?: Options<NotificationsMarkAllNotificationsReadData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await NotificationsService.markAllNotificationsRead({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: markAllNotificationsReadQueryKey(options),
+  })
+}
+
+export const markAllNotificationsReadMutation = (
+  options?: Partial<Options<NotificationsMarkAllNotificationsReadData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    NotificationsMarkAllNotificationsReadResponse,
+    DefaultError,
+    Options<NotificationsMarkAllNotificationsReadData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await NotificationsService.markAllNotificationsRead({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const createNotificationQueryKey = (
+  options: Options<NotificationsCreateNotificationData>,
+) => createQueryKey("notificationsCreateNotification", options)
+
+export const createNotificationOptions = (
+  options: Options<NotificationsCreateNotificationData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await NotificationsService.createNotification({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: createNotificationQueryKey(options),
+  })
+}
+
+export const createNotificationMutation = (
+  options?: Partial<Options<NotificationsCreateNotificationData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    NotificationsCreateNotificationResponse,
+    NotificationsCreateNotificationError,
+    Options<NotificationsCreateNotificationData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await NotificationsService.createNotification({
         ...options,
         ...localOptions,
         throwOnError: true,

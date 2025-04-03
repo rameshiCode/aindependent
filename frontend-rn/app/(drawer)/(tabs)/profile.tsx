@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getSubscriptionStatusOptions } from '../../../src/client/@tanstack/react-query.gen';
 import { router } from 'expo-router';
 import { useAuth } from '@/context/authProvider'; // Import useAuth
+import ProfileNotificationSection from '@/components/ProfileNotificationSection';
 
 // Define the subscription data type
 interface SubscriptionData {
@@ -167,15 +168,14 @@ export default function ProfileScreen() {
 
       {renderSubscriptionSection()}
 
+      {/* Import and use the ProfileNotificationSection component */}
+      <ProfileNotificationSection />
+
       <View style={styles.settingsContainer}>
         <Text style={styles.settingsTitle}>Settings</Text>
         <View style={styles.settingRow}>
           <Text style={styles.settingLabel}>Theme</Text>
           <Text style={styles.settingValue}>Dark</Text>
-        </View>
-        <View style={styles.settingRow}>
-          <Text style={styles.settingLabel}>Notifications</Text>
-          <Text style={styles.settingValue}>On</Text>
         </View>
       </View>
 
