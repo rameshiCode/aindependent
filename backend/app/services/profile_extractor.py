@@ -15,6 +15,48 @@ from app.services.openai_client import get_openai_client
 logger = logging.getLogger(__name__)
 
 
+# Define types for extracted insights
+class ExtractedInsight:
+    def __init__(
+        self,
+        insight_type: str,
+        value: str,
+        confidence: float = 0.0,
+        emotional_significance: float = 0.0,
+        day_of_week: str | None = None,
+        time_of_day: str | None = None,
+    ):
+        self.type = insight_type
+        self.value = value
+        self.confidence = confidence
+        self.emotional_significance = emotional_significance
+        self.day_of_week = day_of_week
+        self.time_of_day = time_of_day
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert insight to dictionary for JSON serialization"""
+        return {
+            "type": self.type,
+            "value": self.value,
+            "confidence": self.confidence,
+            "emotional_significance": self.emotional_significance,
+            "day_of_week": self.day_of_week,
+            "time_of_day": self.time_of_day,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ExtractedInsight":
+        """Create insight from dictionary"""
+        return cls(
+            insight_type=data.get("type", "unknown"),
+            value=data.get("value", ""),
+            confidence=data.get("confidence", 0.0),
+            emotional_significance=data.get("emotional_significance", 0.0),
+            day_of_week=data.get("day_of_week"),
+            time_of_day=data.get("time_of_day"),
+        )
+
+
 async def process_conversation_for_profile(
     session_factory, conversation_id: str, user_id: str
 ):
@@ -72,22 +114,34 @@ async def process_conversation_for_profile(
             if insights:
                 # Save insights to database
                 for insight in insights:
+                    # Convert to dictionary if it's an ExtractedInsight object
+                    insight_dict = (
+                        insight.to_dict()
+                        if isinstance(insight, ExtractedInsight)
+                        else insight
+                    )
+
                     user_insight = UserInsight(
                         user_id=user_id,
+                        profile_id=profile.id,
                         conversation_id=conversation_id,
-                        insight_type=insight.get("type", "unknown"),
-                        value=insight.get("value", ""),
-                        day_of_week=insight.get("day_of_week"),
-                        time_of_day=insight.get("time_of_day"),
-                        emotional_significance=insight.get(
+                        insight_type=insight_dict.get("type", "unknown"),
+                        value=insight_dict.get("value", ""),
+                        day_of_week=insight_dict.get("day_of_week"),
+                        time_of_day=insight_dict.get("time_of_day"),
+                        emotional_significance=insight_dict.get(
                             "emotional_significance", 0.5
                         ),
-                        confidence=insight.get("confidence", 0.5),
+                        confidence=insight_dict.get("confidence", 0.5),
                     )
                     session.add(user_insight)
 
                 # Update profile based on insights
                 update_profile_from_insights(session, profile, insights)
+
+                # Update profile metrics (RRS, motivation)
+                await calculate_relapse_risk_score(session, profile, insights, messages)
+
                 session.commit()
                 logger.info(f"Saved {len(insights)} insights for user {user_id}")
             else:
@@ -102,19 +156,18 @@ async def process_conversation_for_profile(
 
 async def extract_insights_from_conversation(
     messages: list[Message], profile: UserProfile
-) -> list[dict[str, Any]]:
-    """Extract insights from conversation using OpenAI"""
+) -> list[ExtractedInsight]:
+    """Extract insights from conversation using OpenAI with enhanced accuracy"""
     try:
         # Format messages for analysis
         conversation_text = "\n".join(
             [f"{msg.role.upper()}: {msg.content}" for msg in messages]
         )
 
-        # Create prompt for OpenAI
+        # Create prompt for OpenAI with more detailed instructions
         system_prompt = f"""
-        You are an expert addiction therapist and data analyst.
-        Analyze this conversation between a user and an AI therapist
-        to extract insights about the user's addiction profile.
+        You are an expert addiction therapist and data analyst specializing in motivational interviewing techniques.
+        Analyze this conversation between a user and an AI therapist to extract insights about the user's addiction profile.
 
         Current user profile:
         Addiction type: {profile.addiction_type or "Unknown"}
@@ -122,34 +175,44 @@ async def extract_insights_from_conversation(
         Motivation level (1-10): {profile.motivation_level or "Unknown"}
 
         Extract insights in the following categories:
-        1. addiction_type - What specific addiction the person is dealing with
-        2. trigger - Situations that lead to addictive behavior
-        3. coping_strategy - Ways the user manages cravings
-        4. schedule - Routine events in the user's life
-        5. motivation - What motivates the user to change
-        6. goal - Specific goals mentioned
-        7. abstinence - Info about sobriety or abstinence
-        8. emotion - Significant emotional states
+        1. addiction_type - The specific addiction the person is dealing with (e.g., alcohol, drugs, gambling)
+        2. trigger - Situations, emotions, or contexts that lead to addictive behavior or cravings
+        3. coping_strategy - Methods the user employs or could employ to manage cravings and avoid relapse
+        4. schedule - Routine events, habits, or patterns in the user's life, especially those related to addiction
+        5. motivation - Factors that drive the user's desire to change or maintain abstinence
+        6. goal - Specific objectives the user has mentioned about recovery or life improvement
+        7. abstinence - Information about sobriety duration, abstinence attempts, or relapse history
+        8. emotion - Significant emotional states experienced by the user, especially those connected to addiction
+        9. social_support - People, groups, or relationships that help or hinder the user's recovery
+        10. relapse_risk - Indicators suggesting potential for relapse or struggling
+
+        For each insight, provide:
+        - A clear, specific value that captures the essence of the insight
+        - A confidence score (0.0-1.0) indicating how certain you are about this insight
+        - An emotional_significance score (0.0-1.0) indicating how important this seems to the user
+        - For schedule-related insights, include day_of_week and time_of_day if mentioned
 
         Format your response as JSON:
         [
           {{
-            "type": "addiction_type|trigger|coping_strategy|schedule|motivation|goal|abstinence|emotion",
+            "type": "addiction_type|trigger|coping_strategy|schedule|motivation|goal|abstinence|emotion|social_support|relapse_risk",
             "value": "Description of the insight",
-            "day_of_week": "Monday", (for schedule types)
-            "time_of_day": "evening", (for schedule types)
-            "emotional_significance": 0.8, (0.0-1.0 scale)
-            "confidence": 0.9 (0.0-1.0 scale)
+            "confidence": 0.8,
+            "emotional_significance": 0.7,
+            "day_of_week": "Monday", (only for schedule type)
+            "time_of_day": "evening", (only for schedule type)
           }}
         ]
 
-        Only include insights where confidence > 0.6, and include maximum 3 most important insights.
+        Only include insights where confidence > 0.6.
+        Include a maximum of 5 most important insights (prioritize by emotional_significance).
+        Be precise, specific, and avoid vague generalizations.
         """
 
         openai_client = get_openai_client()
 
         response = await openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",  # Using a more capable model for better extraction
             messages=[
                 {"role": "system", "content": system_prompt},
                 {
@@ -157,39 +220,66 @@ async def extract_insights_from_conversation(
                     "content": f"Here is the conversation to analyze:\n\n{conversation_text}",
                 },
             ],
-            temperature=0.2,
-            max_tokens=1000,
+            temperature=0.2,  # Lower temperature for more consistent outputs
+            max_tokens=1500,
         )
 
         response_text = response.choices[0].message.content
 
-        # Try to parse the response as JSON
-        try:
-            insights = json.loads(response_text)
-            if isinstance(insights, list):
-                return insights
-            elif isinstance(insights, dict) and "insights" in insights:
-                return insights["insights"]
-            else:
-                logger.error(f"Unexpected JSON structure: {insights}")
-                return []
-        except json.JSONDecodeError:
-            # Try to extract JSON from text
-            json_match = re.search(r"\[\s*\{.*\}\s*\]", response_text, re.DOTALL)
-            if json_match:
-                try:
-                    insights = json.loads(json_match.group(0))
-                    return insights
-                except:
-                    logger.error("Failed to parse JSON from match")
-                    return []
-            else:
-                logger.error("No JSON found in response")
-                return []
+        # Try multiple approaches to extract valid JSON
+        insights = extract_json_with_fallbacks(response_text)
+
+        # Convert dictionaries to ExtractedInsight objects
+        return [
+            ExtractedInsight.from_dict(insight)
+            if isinstance(insight, dict)
+            else insight
+            for insight in insights
+        ]
 
     except Exception as e:
         logger.error(f"Error extracting insights: {str(e)}")
         return []
+
+
+def extract_json_with_fallbacks(text: str) -> list[dict[str, Any]]:
+    """Try multiple approaches to extract valid JSON from text"""
+    # First attempt: direct JSON parsing
+    try:
+        data = json.loads(text)
+        if isinstance(data, list):
+            return data
+        elif isinstance(data, dict) and "insights" in data:
+            return data["insights"]
+    except json.JSONDecodeError:
+        pass
+
+    # Second attempt: find JSON array pattern with regex
+    json_pattern = r"\[\s*\{.*\}\s*\]"
+    json_match = re.search(json_pattern, text, re.DOTALL)
+    if json_match:
+        try:
+            return json.loads(json_match.group(0))
+        except json.JSONDecodeError:
+            pass
+
+    # Third attempt: find individual JSON objects and combine them
+    object_pattern = r'\{\s*"type":\s*"[^"]+",.*?\}'
+    object_matches = re.findall(object_pattern, text, re.DOTALL)
+    if object_matches:
+        insights = []
+        for match in object_matches:
+            try:
+                insight = json.loads(match)
+                insights.append(insight)
+            except json.JSONDecodeError:
+                continue
+        if insights:
+            return insights
+
+    # Final fallback: no valid JSON found
+    logger.warning("Could not extract valid JSON from response")
+    return []
 
 
 def update_profile_from_insights(

@@ -20,18 +20,25 @@ export default function NotificationBadge({
   const badgeColor = color || tintColor || '#ff3b30';
   const badgeTextColor = textColor || '#ffffff';
 
-  // Fetch notification count
+  // Fetch notification count with error handling
   const {
     data,
     isLoading,
-    isError
+    isError,
+    error
   } = useQuery({
     queryKey: ['notificationCount'],
     queryFn: async () => {
-      const response = await client.get({
-        path: '/api/v1/notifications/count'
-      });
-      return response.data as { unread_count: number };
+      try {
+        const response = await client.get({
+          path: '/api/v1/notifications/count',
+          throwOnError: true
+        });
+        return response.data as { unread_count: number };
+      } catch (err) {
+        console.error('Error fetching notification count:', err);
+        throw err;
+      }
     },
     // Refresh every minute
     refetchInterval: 60000,
@@ -39,7 +46,22 @@ export default function NotificationBadge({
     refetchOnWindowFocus: false,
     // Start with stale data while revalidating
     staleTime: 30000,
+    retry: 2,
+    // Return empty object on error for graceful fallback
+    onError: (err) => {
+      console.error('Notification count query error:', err);
+    }
   });
+
+  // Log loading or error states for debugging
+  React.useEffect(() => {
+    if (isLoading) {
+      console.log('Loading notification count...');
+    }
+    if (isError) {
+      console.error('Error fetching notification count:', error);
+    }
+  }, [isLoading, isError, error]);
 
   // Don't show badge if loading, error, or count is 0
   if (isLoading || isError || !data || data.unread_count === 0) {
