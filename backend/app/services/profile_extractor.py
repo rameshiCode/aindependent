@@ -157,111 +157,163 @@ async def process_conversation_for_profile(
 async def extract_insights_from_conversation(
     messages: list[Message], profile: UserProfile
 ) -> list[ExtractedInsight]:
-    """Extract insights from conversation using OpenAI with enhanced accuracy"""
+    """Extract insights from conversation with enhanced context and categorization."""
     try:
         # Format messages for analysis
         conversation_text = "\n".join(
             [f"{msg.role.upper()}: {msg.content}" for msg in messages]
         )
 
-        # Create prompt for OpenAI with more detailed instructions
+        # Create a more advanced prompt with contextual information
         system_prompt = f"""
-        You are an expert addiction therapist and data analyst specializing in motivational interviewing techniques.
-        Analyze this conversation between a user and an AI therapist to extract insights about the user's addiction profile.
+        You are an expert addiction therapist and psychological profiler specializing in motivational interviewing and cognitive behavioral therapy.
+        Analyze this conversation between a user and an AI therapist to extract detailed insights about the user's addiction profile.
 
         Current user profile:
         Addiction type: {profile.addiction_type or "Unknown"}
         Abstinence days: {profile.abstinence_days or 0}
         Motivation level (1-10): {profile.motivation_level or "Unknown"}
+        Risk level: {profile.relapse_risk_score or "Unknown"}
 
-        Extract insights in the following categories:
-        1. addiction_type - The specific addiction the person is dealing with (e.g., alcohol, drugs, gambling)
-        2. trigger - Situations, emotions, or contexts that lead to addictive behavior or cravings
-        3. coping_strategy - Methods the user employs or could employ to manage cravings and avoid relapse
-        4. schedule - Routine events, habits, or patterns in the user's life, especially those related to addiction
-        5. motivation - Factors that drive the user's desire to change or maintain abstinence
-        6. goal - Specific objectives the user has mentioned about recovery or life improvement
-        7. abstinence - Information about sobriety duration, abstinence attempts, or relapse history
-        8. emotion - Significant emotional states experienced by the user, especially those connected to addiction
-        9. social_support - People, groups, or relationships that help or hinder the user's recovery
-        10. relapse_risk - Indicators suggesting potential for relapse or struggling
+        Extract insights in these categories:
+        1. addiction_type - The specific addiction (alcohol, drugs, gambling, etc.) and any subtypes or specific substances
+        2. trigger_emotional - Emotional states that lead to cravings or relapse (anxiety, depression, loneliness, etc.)
+        3. trigger_situational - External situations that trigger cravings (social events, locations, people, etc.)
+        4. trigger_temporal - Time-based patterns related to cravings or usage (evenings, weekends, specific days)
+        5. coping_strategy_existing - Methods the user already employs to manage cravings
+        6. coping_strategy_potential - New methods the user could employ based on their personality and situation
+        7. schedule - Routines or timing patterns in the user's life that may impact addiction
+        8. motivation_intrinsic - Internal factors driving the user to change (health, self-esteem, values)
+        9. motivation_extrinsic - External factors driving change (relationships, career, legal issues)
+        10. goal_short_term - Specific objectives for the near future (days/weeks)
+        11. goal_long_term - Broader objectives for long-term recovery (months/years)
+        12. abstinence - Information about sobriety duration, attempts, or relapse history
+        13. emotion_positive - Positive emotions expressed by the user
+        14. emotion_negative - Negative emotions expressed by the user
+        15. social_support_positive - People or relationships that help recovery
+        16. social_support_negative - People or relationships that hinder recovery
+        17. relapse_risk - Specific indicators suggesting potential for relapse
+        18. self_efficacy - User's belief in their ability to maintain recovery
+        19. value_alignment - Personal values mentioned that could support recovery
+        20. stage_of_change - Assessment of where user is in stages of change (precontemplation, contemplation, preparation, action, maintenance)
 
-        For each insight, provide:
-        - A clear, specific value that captures the essence of the insight
-        - A confidence score (0.0-1.0) indicating how certain you are about this insight
-        - An emotional_significance score (0.0-1.0) indicating how important this seems to the user
-        - For schedule-related insights, include day_of_week and time_of_day if mentioned
+        For each insight:
+        - Provide a specific value that captures the essence of the insight
+        - Assign a confidence score (0.0-1.0) based on clarity and frequency of evidence
+        - Assign an emotional_significance score (0.0-1.0) indicating importance to the user
+        - For temporal insights, include day_of_week and time_of_day if mentioned
 
-        Format your response as JSON:
+        Focus on identifying patterns and connections between different insights.
+        Prioritize recent statements over older ones.
+        Only include insights where confidence > 0.65.
+        Include a maximum of 8 most important insights (prioritize by emotional_significance).
+
+        Format as JSON:
         [
           {{
-            "type": "addiction_type|trigger|coping_strategy|schedule|motivation|goal|abstinence|emotion|social_support|relapse_risk",
+            "type": "category_subcategory",
             "value": "Description of the insight",
             "confidence": 0.8,
             "emotional_significance": 0.7,
-            "day_of_week": "Monday", (only for schedule type)
-            "time_of_day": "evening", (only for schedule type)
+            "day_of_week": "Monday", (only for temporal types)
+            "time_of_day": "evening", (only for temporal types)
           }}
         ]
-
-        Only include insights where confidence > 0.6.
-        Include a maximum of 5 most important insights (prioritize by emotional_significance).
-        Be precise, specific, and avoid vague generalizations.
         """
 
         openai_client = get_openai_client()
 
-        response = await openai_client.chat.completions.create(
-            model="gpt-4o",  # Using a more capable model for better extraction
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": f"Here is the conversation to analyze:\n\n{conversation_text}",
-                },
-            ],
-            temperature=0.2,  # Lower temperature for more consistent outputs
-            max_tokens=1500,
-        )
+        # Use GPT-4 for more nuanced analysis when available
+        try:
+            model = "gpt-4o"
+            response = await openai_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": f"Here is the conversation to analyze:\n\n{conversation_text}",
+                    },
+                ],
+                temperature=0.2,  # Low temperature for consistent outputs
+                max_tokens=1500,
+            )
+        except Exception as e:
+            logger.warning(f"Error using GPT-4: {str(e)}. Falling back to GPT-3.5.")
+            model = "gpt-3.5-turbo"
+            response = await openai_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": f"Here is the conversation to analyze:\n\n{conversation_text}",
+                    },
+                ],
+                temperature=0.3,
+                max_tokens=1500,
+            )
 
         response_text = response.choices[0].message.content
+        logger.info(f"Profile extraction completed using {model}")
 
-        # Try multiple approaches to extract valid JSON
+        # Extract JSON with fallbacks
         insights = extract_json_with_fallbacks(response_text)
 
         # Convert dictionaries to ExtractedInsight objects
-        return [
+        result = [
             ExtractedInsight.from_dict(insight)
             if isinstance(insight, dict)
             else insight
             for insight in insights
         ]
+        
+        # Log some statistics about extracted insights
+        logger.info(f"Extracted {len(result)} insights with avg confidence: {sum(i.confidence for i in result)/max(1, len(result)):.2f}")
+        
+        return result
 
     except Exception as e:
         logger.error(f"Error extracting insights: {str(e)}")
+        logger.exception("Detailed extraction error:")
         return []
 
 
-def extract_json_with_fallbacks(text: str) -> list[dict[str, Any]]:
-    """Try multiple approaches to extract valid JSON from text"""
+def extract_json_with_improved_fallbacks(text: str) -> list[dict[str, Any]]:
+    """Enhanced JSON extraction with better fallback strategies"""
     # First attempt: direct JSON parsing
     try:
-        data = json.loads(text)
-        if isinstance(data, list):
-            return data
-        elif isinstance(data, dict) and "insights" in data:
-            return data["insights"]
+        # Check if the text contains multiple JSON objects and extract them
+        text = text.strip()
+        # Find the first [ and last ] to extract the JSON array
+        start_idx = text.find('[')
+        end_idx = text.rfind(']')
+        if start_idx != -1 and end_idx != -1:
+            json_str = text[start_idx:end_idx + 1]
+            data = json.loads(json_str)
+            if isinstance(data, list):
+                return data
     except json.JSONDecodeError:
         pass
 
-    # Second attempt: find JSON array pattern with regex
-    json_pattern = r"\[\s*\{.*\}\s*\]"
-    json_match = re.search(json_pattern, text, re.DOTALL)
-    if json_match:
-        try:
-            return json.loads(json_match.group(0))
-        except json.JSONDecodeError:
-            pass
+    # Second attempt: fix common JSON syntax errors and try again
+    try:
+        # Replace single quotes with double quotes
+        corrected_text = text.replace("'", '"')
+        # Replace JavaScript-style trailing commas
+        corrected_text = re.sub(r',\s*}', '}', corrected_text)
+        corrected_text = re.sub(r',\s*]', ']', corrected_text)
+        
+        # Find JSON array pattern
+        start_idx = corrected_text.find('[')
+        end_idx = corrected_text.rfind(']')
+        if start_idx != -1 and end_idx != -1:
+            json_str = corrected_text[start_idx:end_idx + 1]
+            data = json.loads(json_str)
+            if isinstance(data, list):
+                return data
+    except json.JSONDecodeError:
+        pass
 
     # Third attempt: find individual JSON objects and combine them
     object_pattern = r'\{\s*"type":\s*"[^"]+",.*?\}'
@@ -270,90 +322,43 @@ def extract_json_with_fallbacks(text: str) -> list[dict[str, Any]]:
         insights = []
         for match in object_matches:
             try:
-                insight = json.loads(match)
+                # Fix common JSON syntax errors
+                fixed_match = match.replace("'", '"')
+                fixed_match = re.sub(r',\s*}', '}', fixed_match)
+                insight = json.loads(fixed_match)
                 insights.append(insight)
             except json.JSONDecodeError:
                 continue
         if insights:
             return insights
 
-    # Final fallback: no valid JSON found
-    logger.warning("Could not extract valid JSON from response")
-    return []
-
-
-def update_profile_from_insights(
-    session: Session, profile: UserProfile, insights: list[dict[str, Any]]
-):
-    """Update user profile based on extracted insights"""
-    for insight in insights:
-        # Skip low confidence insights
-        if insight.get("confidence", 0) < 0.6:
-            continue
-
-        insight_type = insight.get("type")
-        value = insight.get("value", "")
-
-        # Update addiction type if not already set
-        if insight_type == "addiction_type" and not profile.addiction_type:
-            profile.addiction_type = value
-
-        # Update motivation level
-        elif insight_type == "motivation":
-            # Try to extract a numerical value from 1-10
-            motivation_match = re.search(r"(\d+)(?:\s*\/\s*10|$)", value)
-            if motivation_match:
-                try:
-                    motivation = int(motivation_match.group(1))
-                    if 1 <= motivation <= 10:
-                        profile.motivation_level = motivation
-                except ValueError:
-                    pass
-
-        # Update abstinence information
-        elif insight_type == "abstinence":
-            # Try to extract days of abstinence
-            days_match = re.search(r"(\d+)\s*days?", value)
-            if days_match:
-                try:
-                    days = int(days_match.group(1))
-                    profile.abstinence_days = days
-                    # If abstinence start date not set, calculate it
-                    if not profile.abstinence_start_date:
-                        profile.abstinence_start_date = datetime.utcnow() - timedelta(
-                            days=days
-                        )
-                except ValueError:
-                    pass
-
-            # Check for relapse mentions
-            if "relapse" in value.lower() or "slip" in value.lower():
-                # Reset abstinence counter
-                profile.abstinence_days = 0
-                profile.abstinence_start_date = datetime.utcnow()
-
-        # Create goals from goal insights
-        elif insight_type == "goal" and insight.get("confidence", 0) > 0.7:
-            # Check if this seems like a specific, actionable goal
-            if len(value) > 10:  # Minimum length for a meaningful goal
-                # Check if we already have a similar goal
-                existing_goals = session.exec(
-                    select(UserGoal)
-                    .where(UserGoal.user_id == profile.user_id)
-                    .where(UserGoal.status == "active")
-                ).all()
-
-                # Simple similarity check to avoid duplicates
-                if not any(
-                    goal.description.lower() in value.lower()
-                    or value.lower() in goal.description.lower()
-                    for goal in existing_goals
-                ):
-                    new_goal = UserGoal(
-                        user_id=profile.user_id, description=value, status="active"
-                    )
-                    session.add(new_goal)
-
-    # Update last_updated timestamp
-    profile.last_updated = datetime.utcnow()
-    session.add(profile)
+    # Final fallback: extract key-value pairs using regex
+    if not "type" in text and not "value" in text:
+        logger.warning("No valid insights found in text")
+        return []
+    
+    insights = []
+    type_pattern = r'"type":\s*"([^"]+)"'
+    value_pattern = r'"value":\s*"([^"]+)"'
+    confidence_pattern = r'"confidence":\s*(0\.\d+)'
+    significance_pattern = r'"emotional_significance":\s*(0\.\d+)'
+    
+    # Find all occurrences of type and value
+    type_matches = re.findall(type_pattern, text)
+    value_matches = re.findall(value_pattern, text)
+    confidence_matches = re.findall(confidence_pattern, text)
+    significance_matches = re.findall(significance_pattern, text)
+    
+    # Use the minimum length to avoid index errors
+    min_length = min(len(type_matches), len(value_matches))
+    
+    for i in range(min_length):
+        insight = {
+            "type": type_matches[i],
+            "value": value_matches[i],
+            "confidence": float(confidence_matches[i]) if i < len(confidence_matches) else 0.7,
+            "emotional_significance": float(significance_matches[i]) if i < len(significance_matches) else 0.7
+        }
+        insights.append(insight)
+    
+    return insights

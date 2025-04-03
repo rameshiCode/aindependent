@@ -129,6 +129,10 @@ import type {
   NotificationsMarkNotificationReadResponse,
   NotificationsMarkAllNotificationsReadData,
   NotificationsMarkAllNotificationsReadResponse,
+  NotificationsGetNotificationSettingsData,
+  NotificationsUpdateNotificationSettingsData,
+  NotificationsUpdateNotificationSettingsError,
+  NotificationsUpdateNotificationSettingsResponse,
   NotificationsCreateNotificationData,
   NotificationsCreateNotificationError,
   NotificationsCreateNotificationResponse,
@@ -1737,6 +1741,68 @@ export const markAllNotificationsReadMutation = (
   > = {
     mutationFn: async (localOptions) => {
       const { data } = await NotificationsService.markAllNotificationsRead({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getNotificationSettingsQueryKey = (
+  options?: Options<NotificationsGetNotificationSettingsData>,
+) => createQueryKey("notificationsGetNotificationSettings", options)
+
+export const getNotificationSettingsOptions = (
+  options?: Options<NotificationsGetNotificationSettingsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await NotificationsService.getNotificationSettings({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getNotificationSettingsQueryKey(options),
+  })
+}
+
+export const updateNotificationSettingsQueryKey = (
+  options: Options<NotificationsUpdateNotificationSettingsData>,
+) => createQueryKey("notificationsUpdateNotificationSettings", options)
+
+export const updateNotificationSettingsOptions = (
+  options: Options<NotificationsUpdateNotificationSettingsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await NotificationsService.updateNotificationSettings({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: updateNotificationSettingsQueryKey(options),
+  })
+}
+
+export const updateNotificationSettingsMutation = (
+  options?: Partial<Options<NotificationsUpdateNotificationSettingsData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    NotificationsUpdateNotificationSettingsResponse,
+    NotificationsUpdateNotificationSettingsError,
+    Options<NotificationsUpdateNotificationSettingsData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await NotificationsService.updateNotificationSettings({
         ...options,
         ...localOptions,
         throwOnError: true,

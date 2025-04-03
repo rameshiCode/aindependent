@@ -142,6 +142,11 @@ import type {
   NotificationsMarkNotificationReadError,
   NotificationsMarkAllNotificationsReadData,
   NotificationsMarkAllNotificationsReadResponse,
+  NotificationsGetNotificationSettingsData,
+  NotificationsGetNotificationSettingsResponse,
+  NotificationsUpdateNotificationSettingsData,
+  NotificationsUpdateNotificationSettingsResponse,
+  NotificationsUpdateNotificationSettingsError,
   NotificationsCreateNotificationData,
   NotificationsCreateNotificationResponse,
   NotificationsCreateNotificationError,
@@ -1274,7 +1279,12 @@ export class ProfilesService {
 export class NotificationsService {
   /**
    * Get User Notifications
-   * Get notifications for the current user
+   * Get notifications for the current user.
+   *
+   * Args:
+   * limit: Maximum number of notifications to return
+   * offset: Number of notifications to skip
+   * unread_only: Whether to return only unread notifications
    */
   public static getUserNotifications<ThrowOnError extends boolean = false>(
     options?: Options<NotificationsGetUserNotificationsData, ThrowOnError>,
@@ -1320,7 +1330,10 @@ export class NotificationsService {
 
   /**
    * Mark Notification Read
-   * Mark a notification as read
+   * Mark a notification as read and track engagement
+   *
+   * Args:
+   * notification_id: ID of the notification to mark as read
    */
   public static markNotificationRead<ThrowOnError extends boolean = false>(
     options: Options<NotificationsMarkNotificationReadData, ThrowOnError>,
@@ -1365,8 +1378,61 @@ export class NotificationsService {
   }
 
   /**
+   * Get Notification Settings
+   * Get notification settings for the current user
+   */
+  public static getNotificationSettings<ThrowOnError extends boolean = false>(
+    options?: Options<NotificationsGetNotificationSettingsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      NotificationsGetNotificationSettingsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/notifications/settings",
+      ...options,
+    })
+  }
+
+  /**
+   * Update Notification Settings
+   * Update notification settings for the current user
+   */
+  public static updateNotificationSettings<
+    ThrowOnError extends boolean = false,
+  >(
+    options: Options<NotificationsUpdateNotificationSettingsData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      NotificationsUpdateNotificationSettingsResponse,
+      NotificationsUpdateNotificationSettingsError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/notifications/settings",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
    * Create Notification
-   * Create a new notification (admin or system use)
+   * Create a new notification (admin or system use).
+   * This endpoint is for testing or administrative purposes.
    */
   public static createNotification<ThrowOnError extends boolean = false>(
     options: Options<NotificationsCreateNotificationData, ThrowOnError>,

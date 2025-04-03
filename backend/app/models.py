@@ -1,3 +1,4 @@
+from typing import Optional
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -355,11 +356,67 @@ class UserNotification(SQLModel, table=True):
     title: str
     body: str
     notification_type: str  # 'goal_reminder', 'risk_event', 'abstinence_milestone'
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     scheduled_for: datetime
     related_entity_id: uuid.UUID | None = None  # Could be insight_id or goal_id
     priority: int = 3  # 1-5 scale
     was_sent: bool = False
     was_opened: bool = False
+    
+    # Relationship
+    user: User = Relationship()
+    engagements: list["UserNotificationEngagement"] = Relationship(back_populates="notification")
+
+class ScheduledNotification(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    notification_type: str  # Type of notification
+    title: str  # Notification title
+    body: str  # Notification body
+    scheduled_for: datetime  # When to send the notification
+    sent: bool = False  # Whether it has been sent
+    related_entity_id: Optional[str] = None  # ID of related entity
+    priority: int = 3  # Priority on a scale of 1-10
+    metadata: Optional[str] = Field(default=None, sa_column=Column(JSON))  # JSON-serialized metadata
 
     # Relationship
     user: User = Relationship()
+
+class UserNotificationSettings(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", unique=True, index=True)
+    
+    # Toggle settings for different notification types
+    goal_reminders: bool = True
+    abstinence_milestones: bool = True
+    risk_alerts: bool = True
+    daily_check_ins: bool = False
+    coping_strategies: bool = True
+    educational_content: bool = True
+    
+    # Quiet hours settings
+    quiet_hours_enabled: bool = False
+    quiet_hours_start: str = "22:00"  # HH:MM format
+    quiet_hours_end: str = "08:00"    # HH:MM format
+    
+    # Preferred notification times
+    preferred_time_morning: bool = True
+    preferred_time_afternoon: bool = True
+    preferred_time_evening: bool = True
+    
+    # Maximum notifications per day
+    max_notifications_per_day: int = 5
+    
+    # Relationship
+    user: User = Relationship()
+
+class UserNotificationEngagement(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    notification_id: uuid.UUID = Field(foreign_key="usernotification.id", index=True)
+    engaged: bool  # Whether the user engaged with notification
+    engagement_time: datetime = Field(default_factory=datetime.utcnow)  # When engagement happened
+
+    # Relationships
+    user: "User" = Relationship()
+    notification: UserNotification = Relationship()

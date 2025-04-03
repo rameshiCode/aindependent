@@ -1386,7 +1386,7 @@ export type NotificationsGetNotificationCountResponses = {
    * Successful Response
    */
   200: {
-    [key: string]: unknown
+    [key: string]: number
   }
 }
 
@@ -1442,6 +1442,56 @@ export type NotificationsMarkAllNotificationsReadResponses = {
 
 export type NotificationsMarkAllNotificationsReadResponse =
   NotificationsMarkAllNotificationsReadResponses[keyof NotificationsMarkAllNotificationsReadResponses]
+
+export type NotificationsGetNotificationSettingsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/notifications/settings"
+}
+
+export type NotificationsGetNotificationSettingsResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type NotificationsGetNotificationSettingsResponse =
+  NotificationsGetNotificationSettingsResponses[keyof NotificationsGetNotificationSettingsResponses]
+
+export type NotificationsUpdateNotificationSettingsData = {
+  body: {
+    [key: string]: unknown
+  }
+  path?: never
+  query?: never
+  url: "/api/v1/notifications/settings"
+}
+
+export type NotificationsUpdateNotificationSettingsErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type NotificationsUpdateNotificationSettingsError =
+  NotificationsUpdateNotificationSettingsErrors[keyof NotificationsUpdateNotificationSettingsErrors]
+
+export type NotificationsUpdateNotificationSettingsResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type NotificationsUpdateNotificationSettingsResponse =
+  NotificationsUpdateNotificationSettingsResponses[keyof NotificationsUpdateNotificationSettingsResponses]
 
 export type NotificationsCreateNotificationData = {
   body: {

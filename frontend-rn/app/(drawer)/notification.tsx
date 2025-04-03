@@ -1,348 +1,445 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   TouchableOpacity,
-  Switch,
-  ScrollView,
+  RefreshControl,
+  ActivityIndicator,
   Alert,
-  ActivityIndicator
+  Image
 } from 'react-native';
-import { Stack } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { client } from '@/src/client/client.gen';
+import { useAuth } from '@/context/authProvider';
+import { getUserNotificationsOptions } from '@/src/client/@tanstack/react-query.gen';
+import { useRouter } from 'expo-router';
+import Animated, { 
+  FadeIn, 
+  FadeOut, 
+  useAnimatedStyle, 
+  useSharedValue, 
+  withTiming,
+  interpolate
+} from 'react-native-reanimated';
 
-// Define notification settings type
-interface NotificationSettings {
-  goal_reminders: boolean;
-  abstinence_milestones: boolean;
-  risk_alerts: boolean;
-  daily_check_ins: boolean;
-  app_updates: boolean;
-  quiet_hours_enabled: boolean;
-  quiet_hours_start: string; // HH:MM format
-  quiet_hours_end: string; // HH:MM format
+// Notification types with icons
+const NOTIFICATION_ICONS = {
+  abstinence_milestone: "trophy-outline",
+  relapse_risk_critical: "alert-circle",
+  relapse_risk_high: "warning-outline",
+  goal_reminder: "flag-outline",
+  goal_deadline: "time-outline",
+  motivation_boost: "heart-outline",
+  coping_strategy: "fitness-outline",
+  check_in: "chatbubble-ellipses-outline",
+  high_risk_period: "trending-up-outline",
+  milestone_approaching: "star-outline",
+  educational: "book-outline"
+};
+
+// Default fallback icon
+const DEFAULT_ICON = "notifications-outline";
+
+// Define notification type
+interface Notification {
+  id: string;
+  title: string;
+  body: string;
+  notification_type: string;
+  created_at: string;
+  was_opened: boolean;
+  priority: number;
+  related_entity_id?: string;
+  metadata?: any;
 }
 
-export default function NotificationSettingsScreen() {
+// Different notification background colors by type/priority
+const getNotificationColor = (type: string, priority: number, theme: string) => {
+  // Base colors
+  const baseColors = {
+    dark: {
+      abstinence_milestone: '#1e3a8a', // Blue
+      relapse_risk_critical: '#991b1b', // Red
+      relapse_risk_high: '#92400e', // Amber
+      goal_reminder: '#065f46', // Green
+      default: '#1f2937' // Default dark
+    },
+    light: {
+      abstinence_milestone: '#dbeafe', // Light blue
+      relapse_risk_critical: '#fee2e2', // Light red
+      relapse_risk_high: '#ffedd5', // Light amber
+      goal_reminder: '#d1fae5', // Light green
+      default: '#f3f4f6' // Default light
+    }
+  };
+
+  // Get appropriate color theme
+  const colors = theme === 'dark' ? baseColors.dark : baseColors.light;
+  
+  // First check by type
+  for (const [key, value] of Object.entries(colors)) {
+    if (type.includes(key)) {
+      return value;
+    }
+  }
+  
+  // Fallback to priority if no type match
+  if (priority >= 9) return colors.relapse_risk_critical;
+  if (priority >= 7) return colors.relapse_risk_high;
+  if (priority >= 5) return colors.goal_reminder;
+  
+  // Default color
+  return colors.default;
+};
+
+export default function EnhancedNotificationScreen() {
   const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const router = useRouter();
+  const { session } = useAuth();
+  const themeType = useThemeColor({}, 'background') === '#fff' ? 'light' : 'dark';
 
   // Theme colors
   const backgroundColor = useThemeColor({}, 'background');
-  const cardBackground = useThemeColor({}, 'inputBackground');
   const textColor = useThemeColor({}, 'text');
+  const cardBackground = useThemeColor({}, 'inputBackground');
   const tintColor = useThemeColor({}, 'tint');
   const borderColor = useThemeColor({}, 'inputBorder');
+  const subtleTextColor = themeType === 'dark' ? '#a3a3a3' : '#666666';
 
-  // Default notification settings
-  const defaultSettings: NotificationSettings = {
-    goal_reminders: true,
-    abstinence_milestones: true,
-    risk_alerts: true,
-    daily_check_ins: false,
-    app_updates: true,
-    quiet_hours_enabled: false,
-    quiet_hours_start: '22:00',
-    quiet_hours_end: '08:00'
-  };
+  // Animation values
+  const headerOpacity = useSharedValue(1);
+  const scrollY = useSharedValue(0);
 
-  // State for notification settings
-  const [settings, setSettings] = useState<NotificationSettings>(defaultSettings);
-
-  // State for tracking whether settings have changed
-  const [hasChanges, setHasChanges] = useState(false);
-
-  // Mock query for fetching notification settings
-  // In a real implementation, this would be a real endpoint
+  // Fetch notifications
   const {
-    data: fetchedSettings,
+    data: notifications,
     isLoading,
     isError,
+    error,
     refetch
   } = useQuery({
-    queryKey: ['notificationSettings'],
-    queryFn: async () => {
-      try {
-        // This is where you would make an actual API call
-        // For now, we'll simulate a response
-        // Replace this with actual endpoint when available
-
-        // Simulated API call for demo purposes
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // In the real implementation, you would do:
-        // const response = await client.get({
-        //   path: '/api/v1/notifications/settings',
-        //   throwOnError: true
-        // });
-        // return response.data as NotificationSettings;
-
-        // For now, return defaults
-        return defaultSettings;
-      } catch (err) {
-        console.error('Error fetching notification settings:', err);
-        throw err;
-      }
-    },
-    retry: 2
+    ...getUserNotificationsOptions(),
+    queryKey: ['notifications'],
+    staleTime: 60 * 1000, // 1 minute
   });
 
-  // Mock mutation for saving notification settings
-  const saveSettings = useMutation({
-    mutationFn: async (updatedSettings: NotificationSettings) => {
-      try {
-        // This is where you would make an actual API call
-        // For now, we'll simulate a response
-        // Replace this with actual endpoint when available
+  // Animation styles
+  const headerStyle = useAnimatedStyle(() => {
+    return {
+      opacity: headerOpacity.value,
+      transform: [
+        {
+          translateY: interpolate(
+            scrollY.value,
+            [0, 50],
+            [0, -10],
+            'clamp'
+          ),
+        },
+      ],
+    };
+  });
 
-        // Simulated API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // In the real implementation, you would do:
-        // const response = await client.post({
-        //   path: '/api/v1/notifications/settings',
-        //   body: updatedSettings,
-        //   throwOnError: true
-        // });
-        // return response.data;
-
-        // For now, just return the settings
-        return updatedSettings;
-      } catch (err) {
-        console.error('Error saving notification settings:', err);
-        throw err;
-      }
+  // Mark notification as read mutation
+  const markAsRead = useMutation({
+    mutationFn: async (notificationId: string) => {
+      const response = await client.post({
+        path: `/api/v1/notifications/mark-read/${notificationId}`,
+        throwOnError: true
+      });
+      return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notificationSettings'] });
-      setHasChanges(false);
-      Alert.alert(
-        "Settings Saved",
-        "Your notification preferences have been updated.",
-        [{ text: "OK" }]
-      );
-    },
-    onError: (error) => {
-      Alert.alert(
-        "Error",
-        "Failed to save notification settings. Please try again.",
-        [{ text: "OK" }]
-      );
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notificationCount'] });
     }
   });
 
-  // Update settings when fetched
-  useEffect(() => {
-    if (fetchedSettings) {
-      setSettings(fetchedSettings);
-    }
-  }, [fetchedSettings]);
-
-  // Toggle setting
-  const toggleSetting = (setting: keyof NotificationSettings) => {
-    setSettings(prev => {
-      const newSettings = {
-        ...prev,
-        [setting]: !prev[setting]
-      };
-
-      setHasChanges(true);
-      return newSettings;
-    });
-  };
-
-  // Handle save button press
-  const handleSave = () => {
-    saveSettings.mutate(settings);
-  };
-
-  // Setting sections data for rendering
-  const settingSections = [
-    {
-      title: "Notification Types",
-      settings: [
-        {
-          key: "goal_reminders" as keyof NotificationSettings,
-          title: "Goal Reminders",
-          description: "Notifications about your set goals and milestones",
-          icon: "flag-outline"
-        },
-        {
-          key: "abstinence_milestones" as keyof NotificationSettings,
-          title: "Achievement Alerts",
-          description: "Celebrate your progress with milestone notifications",
-          icon: "trophy-outline"
-        },
-        {
-          key: "risk_alerts" as keyof NotificationSettings,
-          title: "Risk Alerts",
-          description: "Get notified during high-risk periods",
-          icon: "warning-outline"
-        },
-        {
-          key: "daily_check_ins" as keyof NotificationSettings,
-          title: "Daily Check-ins",
-          description: "Reminders to check in with the app daily",
-          icon: "calendar-outline"
-        },
-        {
-          key: "app_updates" as keyof NotificationSettings,
-          title: "App Updates",
-          description: "Important updates about the app",
-          icon: "information-circle-outline"
-        }
-      ]
+  // Mark all as read mutation
+  const markAllAsRead = useMutation({
+    mutationFn: async () => {
+      const response = await client.post({
+        path: '/api/v1/notifications/mark-all-read',
+        throwOnError: true
+      });
+      return response.data;
     },
-    {
-      title: "Quiet Hours",
-      settings: [
-        {
-          key: "quiet_hours_enabled" as keyof NotificationSettings,
-          title: "Enable Quiet Hours",
-          description: "No notifications during specified hours",
-          icon: "moon-outline"
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notificationCount'] });
+    }
+  });
+
+  // Handle refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+      await queryClient.invalidateQueries({ queryKey: ['notificationCount'] });
+    } catch (e) {
+      console.error('Error refreshing notifications:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch, queryClient]);
+
+  // Refresh on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      onRefresh();
+    }, [onRefresh])
+  );
+
+  // Handle notification tap
+  const handleNotificationPress = async (notification: Notification) => {
+    try {
+      // Mark as read
+      if (!notification.was_opened) {
+        markAsRead.mutate(notification.id);
+      }
+
+      // Handle navigation based on notification type
+      if (notification.notification_type.includes('goal') && notification.related_entity_id) {
+        // Navigate to user goals screen
+        router.push('/(drawer)/(tabs)/user-profile?tab=goals');
+      } 
+      else if (notification.notification_type.includes('relapse_risk')) {
+        // Navigate to chat for immediate support
+        router.push('/(drawer)/(tabs)/chat');
+      }
+      else if (notification.notification_type.includes('abstinence_milestone')) {
+        // Navigate to profile screen
+        router.push('/(drawer)/(tabs)/user-profile');
+      }
+      else {
+        // Default action - navigate to main chat
+        router.push('/(drawer)/(tabs)/chat');
+      }
+    } catch (e) {
+      console.error('Error handling notification:', e);
+    }
+  };
+
+  // Handle "Mark All as Read" button press
+  const handleMarkAllAsRead = () => {
+    Alert.alert(
+      "Mark All as Read",
+      "Are you sure you want to mark all notifications as read?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Yes, Mark All", 
+          onPress: () => markAllAsRead.mutate() 
         }
       ]
+    );
+  };
+
+  // Get notification icon
+  const getNotificationIcon = (type: string) => {
+    for (const [key, value] of Object.entries(NOTIFICATION_ICONS)) {
+      if (type.includes(key)) {
+        return value;
+      }
     }
-  ];
+    return DEFAULT_ICON;
+  };
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor }]} edges={['bottom']}>
-      <Stack.Screen options={{ title: "Notification Settings" }} />
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    const diffHours = Math.round(diffMs / 3600000);
+    const diffDays = Math.round(diffMs / 86400000);
 
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={tintColor} />
-          <Text style={[styles.loadingText, { color: textColor }]}>
-            Loading settings...
-          </Text>
-        </View>
-      ) : isError ? (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color="#ff3b30" />
-          <Text style={styles.errorText}>Failed to load settings</Text>
-          <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: tintColor }]}
-            onPress={() => refetch()}
-          >
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Main settings sections */}
-          {settingSections.map((section, sectionIndex) => (
-            <View
-              key={`section-${sectionIndex}`}
+    if (diffMins < 60) {
+      return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  // Render notification item
+  const renderNotificationItem = ({ item }: { item: Notification }) => {
+    const bgColor = getNotificationColor(item.notification_type, item.priority, themeType);
+    const icon = getNotificationIcon(item.notification_type);
+    
+    return (
+      <Animated.View
+        entering={FadeIn.duration(300)}
+        exiting={FadeOut.duration(300)}
+      >
+        <TouchableOpacity
+          style={[
+            styles.notificationItem,
+            { 
+              backgroundColor: bgColor,
+              borderColor,
+              opacity: item.was_opened ? 0.8 : 1
+            }
+          ]}
+          onPress={() => handleNotificationPress(item)}
+        >
+          <View style={styles.notificationIcon}>
+            <Ionicons 
+              name={icon as any} 
+              size={24} 
+              color={themeType === 'dark' ? '#fff' : tintColor} 
+            />
+          </View>
+          
+          <View style={styles.notificationContent}>
+            <Text 
               style={[
-                styles.card,
-                { backgroundColor: cardBackground, borderColor }
+                styles.notificationTitle, 
+                { 
+                  color: textColor,
+                  fontWeight: item.was_opened ? '400' : '600'
+                }
               ]}
             >
-              <Text style={[styles.cardTitle, { color: textColor }]}>
-                {section.title}
-              </Text>
+              {item.title}
+            </Text>
+            
+            <Text 
+              style={[
+                styles.notificationBody, 
+                { color: textColor }
+              ]}
+              numberOfLines={2}
+            >
+              {item.body}
+            </Text>
+            
+            <Text style={[styles.notificationTime, { color: subtleTextColor }]}>
+              {formatDate(item.created_at)}
+            </Text>
+          </View>
+          
+          {!item.was_opened && (
+            <View style={[styles.unreadIndicator, { backgroundColor: tintColor }]} />
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+  
+  // Empty state component
+  const EmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons 
+        name="notifications-off-outline" 
+        size={80} 
+        color={subtleTextColor} 
+        style={styles.emptyIcon}
+      />
+      <Text style={[styles.emptyTitle, { color: textColor }]}>
+        No Notifications
+      </Text>
+      <Text style={[styles.emptySubtitle, { color: subtleTextColor }]}>
+        We'll notify you when there are important updates about your recovery journey.
+      </Text>
+    </View>
+  );
 
-              {section.settings.map((setting, index) => (
-                <View
-                  key={`setting-${setting.key}`}
-                  style={[
-                    styles.settingItem,
-                    index < section.settings.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderBottomColor: borderColor
-                    }
-                  ]}
-                >
-                  <View style={styles.settingInfo}>
-                    <Ionicons
-                      name={setting.icon as any}
-                      size={24}
-                      color={tintColor}
-                      style={styles.settingIcon}
-                    />
-                    <View>
-                      <Text style={[styles.settingTitle, { color: textColor }]}>
-                        {setting.title}
-                      </Text>
-                      <Text style={[styles.settingDescription, { color: `${textColor}80` }]}>
-                        {setting.description}
-                      </Text>
-                    </View>
-                  </View>
-                  <Switch
-                    value={settings[setting.key]}
-                    onValueChange={() => toggleSetting(setting.key)}
-                    trackColor={{ false: '#767577', true: `${tintColor}80` }}
-                    thumbColor={settings[setting.key] ? tintColor : '#f4f3f4'}
-                  />
-                </View>
-              ))}
+  // Loading state component
+  const LoadingState = () => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color={tintColor} />
+      <Text style={[styles.loadingText, { color: textColor }]}>
+        Loading notifications...
+      </Text>
+    </View>
+  );
 
-              {/* Time picker for quiet hours */}
-              {section.title === "Quiet Hours" && settings.quiet_hours_enabled && (
-                <View style={styles.timePickerContainer}>
-                  <Text style={[styles.timePickerLabel, { color: textColor }]}>
-                    No notifications will be sent between:
-                  </Text>
-                  <View style={styles.timeRangeContainer}>
-                    <TouchableOpacity
-                      style={[styles.timeButton, { borderColor }]}
-                      onPress={() => {
-                        // Here you'd show a time picker and update settings.quiet_hours_start
-                        Alert.alert("Coming Soon", "Time picker will be implemented in a future update.");
-                      }}
-                    >
-                      <Text style={[styles.timeButtonText, { color: textColor }]}>
-                        {settings.quiet_hours_start}
-                      </Text>
-                    </TouchableOpacity>
-                    <Text style={[styles.timeRangeSeparator, { color: textColor }]}>to</Text>
-                    <TouchableOpacity
-                      style={[styles.timeButton, { borderColor }]}
-                      onPress={() => {
-                        // Here you'd show a time picker and update settings.quiet_hours_end
-                        Alert.alert("Coming Soon", "Time picker will be implemented in a future update.");
-                      }}
-                    >
-                      <Text style={[styles.timeButtonText, { color: textColor }]}>
-                        {settings.quiet_hours_end}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            </View>
-          ))}
+  // Error state component
+  const ErrorState = () => (
+    <View style={styles.errorContainer}>
+      <Ionicons name="alert-circle-outline" size={60} color="#ff3b30" />
+      <Text style={styles.errorTitle}>Something went wrong</Text>
+      <Text style={styles.errorSubtitle}>
+        We couldn't load your notifications.
+      </Text>
+      <TouchableOpacity 
+        style={[styles.retryButton, { backgroundColor: tintColor }]}
+        onPress={onRefresh}
+      >
+        <Text style={styles.retryButtonText}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
-          {/* Save button */}
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              { backgroundColor: tintColor, opacity: hasChanges ? 1 : 0.5 }
-            ]}
-            onPress={handleSave}
-            disabled={!hasChanges || saveSettings.isPending}
+  return (
+    <View style={[styles.container, { backgroundColor }]}>
+      {/* Header Section */}
+      <Animated.View style={[styles.header, headerStyle, { borderBottomColor: borderColor }]}>
+        <Text style={[styles.headerTitle, { color: textColor }]}>
+          Notifications
+        </Text>
+        {notifications && notifications.length > 0 && (
+          <TouchableOpacity 
+            style={styles.markAllButton}
+            onPress={handleMarkAllAsRead}
+            disabled={markAllAsRead.isPending}
           >
-            {saveSettings.isPending ? (
-              <ActivityIndicator size="small" color="#fff" />
+            {markAllAsRead.isPending ? (
+              <ActivityIndicator size="small" color={tintColor} />
             ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={[styles.markAllText, { color: tintColor }]}>
+                Mark All Read
+              </Text>
             )}
           </TouchableOpacity>
+        )}
+      </Animated.View>
 
-          {/* Help text */}
-          <Text style={[styles.helpText, { color: `${textColor}80` }]}>
-            Notifications help you stay on track with your recovery journey.
-            You can adjust your preferences at any time.
-          </Text>
-        </ScrollView>
+      {/* Content Section */}
+      {isLoading ? (
+        <LoadingState />
+      ) : isError ? (
+        <ErrorState />
+      ) : (
+        <FlatList
+          data={notifications}
+          renderItem={renderNotificationItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[
+            styles.listContainer,
+            notifications && notifications.length === 0 && styles.emptyListContainer
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={tintColor}
+              colors={[tintColor]}
+            />
+          }
+          ListEmptyComponent={<EmptyState />}
+          onScroll={(event) => {
+            scrollY.value = event.nativeEvent.contentOffset.y;
+            headerOpacity.value = withTiming(
+              event.nativeEvent.contentOffset.y > 50 ? 0.8 : 1,
+              { duration: 200 }
+            );
+          }}
+          scrollEventThrottle={16}
+        />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -350,9 +447,81 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    zIndex: 1000,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  markAllButton: {
+    padding: 8,
+  },
+  markAllText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  listContainer: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 32,
+  },
+  emptyListContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationItem: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderLeftWidth: 3,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  notificationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  notificationContent: {
+    flex: 1,
+  },
+  notificationTitle: {
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  notificationBody: {
+    fontSize: 14,
+    marginBottom: 6,
+    lineHeight: 20,
+  },
+  notificationTime: {
+    fontSize: 12,
+  },
+  unreadIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    position: 'absolute',
+    top: 16,
+    right: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -367,103 +536,47 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
-  errorText: {
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
     color: '#ff3b30',
+  },
+  errorSubtitle: {
     fontSize: 16,
-    marginTop: 12,
+    textAlign: 'center',
+    marginTop: 8,
     marginBottom: 24,
+    color: '#666',
   },
   retryButton: {
-    paddingVertical: 12,
     paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
     color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
-  card: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  settingInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 16,
-  },
-  settingIcon: {
-    marginRight: 16,
-  },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  settingDescription: {
-    fontSize: 14,
-  },
-  timePickerContainer: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-  },
-  timePickerLabel: {
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  timeRangeContainer: {
-    flexDirection: 'row',
+  emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 24,
   },
-  timeButton: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    minWidth: 100,
-    alignItems: 'center',
+  emptyIcon: {
+    marginBottom: 20,
   },
-  timeButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  timeRangeSeparator: {
-    marginHorizontal: 16,
-    fontSize: 16,
-  },
-  saveButton: {
-    paddingVertical: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  emptyTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 8,
   },
-  helpText: {
+  emptySubtitle: {
     textAlign: 'center',
     fontSize: 14,
-    paddingHorizontal: 24,
-    marginBottom: 16,
+    lineHeight: 22,
   }
 });
