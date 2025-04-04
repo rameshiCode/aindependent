@@ -1,10 +1,30 @@
-from typing import Optional
 import uuid
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 from sqlmodel import JSON, Column, Field, Relationship, SQLModel, String
+
+
+class UserProfile(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", unique=True, index=True)
+    therapist_gender: str | None = None
+    addiction_type: str | None = None
+    abstinence_days: int = 0
+    abstinence_start_date: datetime | None = None
+    relapse_risk_score: int | None = None
+    motivation_level: int | None = None
+    big_five_scores: dict | None = Field(default=None, sa_column=Column(JSON))
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
+
+    # Keep the relationship definition only on this side
+    user: "User" = Relationship(
+        back_populates="profile",
+        sa_relationship_kwargs={"primaryjoin": "UserProfile.user_id == User.id"},
+    )
+    insights: list["UserInsight"] = Relationship(back_populates="profile")
 
 
 # Shared properties
@@ -42,13 +62,19 @@ class UpdatePassword(SQLModel):
     new_password: str = Field(min_length=8, max_length=40)
 
 
-# Database model, database table inferred from class name
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
 
+    # Relationships
     conversations: list["Conversation"] = Relationship(
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+    # Use string reference here
+    profile: Optional["UserProfile"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"uselist": False, "lazy": "selectin"},
     )
 
 
@@ -296,21 +322,6 @@ class ConversationWithMessages(SQLModel):
 
 
 # User Profile model
-class UserProfile(SQLModel, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    user_id: uuid.UUID = Field(foreign_key="user.id", unique=True, index=True)
-    therapist_gender: str | None = None
-    addiction_type: str | None = None
-    abstinence_days: int = 0
-    abstinence_start_date: datetime | None = None
-    relapse_risk_score: int | None = None
-    motivation_level: int | None = None
-    big_five_scores: dict | None = Field(default=None, sa_column=Column(JSON))
-    last_updated: datetime = Field(default_factory=datetime.utcnow)
-
-    # Relationship
-    user: User = Relationship(back_populates="profile")
-    insights: list["UserInsight"] = Relationship(back_populates="profile")
 
 
 # User Insight model
@@ -331,8 +342,8 @@ class UserInsight(SQLModel, table=True):
 
     # Relationships
     profile: UserProfile = Relationship(back_populates="insights")
-    user: User = Relationship()
-    conversation: Conversation | None = Relationship()
+    user: "User" = Relationship()  # String reference
+    conversation: "Conversation" = Relationship()  # String reference
 
 
 # User Goal model
@@ -362,10 +373,13 @@ class UserNotification(SQLModel, table=True):
     priority: int = 3  # 1-5 scale
     was_sent: bool = False
     was_opened: bool = False
-    
+
     # Relationship
     user: User = Relationship()
-    engagements: list["UserNotificationEngagement"] = Relationship(back_populates="notification")
+    engagements: list["UserNotificationEngagement"] = Relationship(
+        back_populates="notification"
+    )
+
 
 class ScheduledNotification(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -375,17 +389,20 @@ class ScheduledNotification(SQLModel, table=True):
     body: str  # Notification body
     scheduled_for: datetime  # When to send the notification
     sent: bool = False  # Whether it has been sent
-    related_entity_id: Optional[str] = None  # ID of related entity
+    related_entity_id: str | None = None  # ID of related entity
     priority: int = 3  # Priority on a scale of 1-10
-    metadata: Optional[str] = Field(default=None, sa_column=Column(JSON))  # JSON-serialized metadata
+    data: str | None = Field(
+        default=None, sa_column=Column(JSON)
+    )  # JSON-serialized metadata
 
     # Relationship
     user: User = Relationship()
 
+
 class UserNotificationSettings(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id", unique=True, index=True)
-    
+
     # Toggle settings for different notification types
     goal_reminders: bool = True
     abstinence_milestones: bool = True
@@ -393,29 +410,32 @@ class UserNotificationSettings(SQLModel, table=True):
     daily_check_ins: bool = False
     coping_strategies: bool = True
     educational_content: bool = True
-    
+
     # Quiet hours settings
     quiet_hours_enabled: bool = False
     quiet_hours_start: str = "22:00"  # HH:MM format
-    quiet_hours_end: str = "08:00"    # HH:MM format
-    
+    quiet_hours_end: str = "08:00"  # HH:MM format
+
     # Preferred notification times
     preferred_time_morning: bool = True
     preferred_time_afternoon: bool = True
     preferred_time_evening: bool = True
-    
+
     # Maximum notifications per day
     max_notifications_per_day: int = 5
-    
+
     # Relationship
     user: User = Relationship()
+
 
 class UserNotificationEngagement(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
     notification_id: uuid.UUID = Field(foreign_key="usernotification.id", index=True)
     engaged: bool  # Whether the user engaged with notification
-    engagement_time: datetime = Field(default_factory=datetime.utcnow)  # When engagement happened
+    engagement_time: datetime = Field(
+        default_factory=datetime.utcnow
+    )  # When engagement happened
 
     # Relationships
     user: "User" = Relationship()
