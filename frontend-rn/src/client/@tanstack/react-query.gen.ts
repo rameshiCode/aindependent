@@ -8,6 +8,7 @@ import {
   StripeService,
   OpenaiService,
   ProfilesService,
+  DefaultService,
 } from "../sdk.gen"
 import {
   queryOptions,
@@ -117,6 +118,15 @@ import type {
   ProfilesUpdateUserGoalData,
   ProfilesUpdateUserGoalError,
   ProfilesUpdateUserGoalResponse,
+  ProfilesGetUserInsightsData,
+  ProfilesGetProfileAttributeData,
+  ProfilesUpdateProfileAttributeData,
+  ProfilesUpdateProfileAttributeError,
+  ProfilesUpdateProfileAttributeResponse,
+  ApiChatData,
+  ApiChatError,
+  ApiEndChatData,
+  ApiEndChatError,
 } from "../types.gen"
 import { client as _heyApiClient } from "../client.gen"
 
@@ -1516,6 +1526,142 @@ export const updateUserGoalMutation = (
   > = {
     mutationFn: async (localOptions) => {
       const { data } = await ProfilesService.updateUserGoal({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getUserInsightsQueryKey = (
+  options?: Options<ProfilesGetUserInsightsData>,
+) => createQueryKey("profilesGetUserInsights", options)
+
+export const getUserInsightsOptions = (
+  options?: Options<ProfilesGetUserInsightsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.getUserInsights({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getUserInsightsQueryKey(options),
+  })
+}
+
+export const getProfileAttributeQueryKey = (
+  options: Options<ProfilesGetProfileAttributeData>,
+) => createQueryKey("profilesGetProfileAttribute", options)
+
+export const getProfileAttributeOptions = (
+  options: Options<ProfilesGetProfileAttributeData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.getProfileAttribute({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getProfileAttributeQueryKey(options),
+  })
+}
+
+export const updateProfileAttributeMutation = (
+  options?: Partial<Options<ProfilesUpdateProfileAttributeData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    ProfilesUpdateProfileAttributeResponse,
+    ProfilesUpdateProfileAttributeError,
+    Options<ProfilesUpdateProfileAttributeData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.updateProfileAttribute({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const apiChatQueryKey = (options: Options<ApiChatData>) =>
+  createQueryKey("apiChat", options)
+
+export const apiChatOptions = (options: Options<ApiChatData>) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await DefaultService.apiChat({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: apiChatQueryKey(options),
+  })
+}
+
+export const apiChatMutation = (options?: Partial<Options<ApiChatData>>) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    ApiChatError,
+    Options<ApiChatData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await DefaultService.apiChat({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const apiEndChatQueryKey = (options: Options<ApiEndChatData>) =>
+  createQueryKey("apiEndChat", options)
+
+export const apiEndChatOptions = (options: Options<ApiEndChatData>) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await DefaultService.apiEndChat({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: apiEndChatQueryKey(options),
+  })
+}
+
+export const apiEndChatMutation = (
+  options?: Partial<Options<ApiEndChatData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    ApiEndChatError,
+    Options<ApiEndChatData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await DefaultService.apiEndChat({
         ...options,
         ...localOptions,
         throwOnError: true,

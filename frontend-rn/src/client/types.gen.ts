@@ -43,11 +43,17 @@ export type Message = {
   role: string
   content: string
   created_at?: string
+  message_metadata?: {
+    [key: string]: unknown
+  } | null
 }
 
 export type MessageSchema = {
   role: string
   content: string
+  metadata?: {
+    [key: string]: unknown
+  } | null
 }
 
 export type NewPassword = {
@@ -1340,6 +1346,154 @@ export type ProfilesUpdateUserGoalResponses = {
 
 export type ProfilesUpdateUserGoalResponse =
   ProfilesUpdateUserGoalResponses[keyof ProfilesUpdateUserGoalResponses]
+
+export type ProfilesGetUserInsightsData = {
+  body?: never
+  path?: never
+  query?: {
+    insight_type?: string | null
+    limit?: number
+  }
+  url: "/api/v1/profiles/insights"
+}
+
+export type ProfilesGetUserInsightsErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesGetUserInsightsError =
+  ProfilesGetUserInsightsErrors[keyof ProfilesGetUserInsightsErrors]
+
+export type ProfilesGetUserInsightsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<{
+    [key: string]: unknown
+  }>
+}
+
+export type ProfilesGetUserInsightsResponse =
+  ProfilesGetUserInsightsResponses[keyof ProfilesGetUserInsightsResponses]
+
+export type ProfilesGetProfileAttributeData = {
+  body?: never
+  path: {
+    attribute_name: string
+  }
+  query?: never
+  url: "/api/v1/profiles/profile-attribute/{attribute_name}"
+}
+
+export type ProfilesGetProfileAttributeErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesGetProfileAttributeError =
+  ProfilesGetProfileAttributeErrors[keyof ProfilesGetProfileAttributeErrors]
+
+export type ProfilesGetProfileAttributeResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type ProfilesGetProfileAttributeResponse =
+  ProfilesGetProfileAttributeResponses[keyof ProfilesGetProfileAttributeResponses]
+
+export type ProfilesUpdateProfileAttributeData = {
+  body: {
+    [key: string]: unknown
+  }
+  path: {
+    attribute_name: string
+  }
+  query?: never
+  url: "/api/v1/profiles/profile-attribute/{attribute_name}"
+}
+
+export type ProfilesUpdateProfileAttributeErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesUpdateProfileAttributeError =
+  ProfilesUpdateProfileAttributeErrors[keyof ProfilesUpdateProfileAttributeErrors]
+
+export type ProfilesUpdateProfileAttributeResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type ProfilesUpdateProfileAttributeResponse =
+  ProfilesUpdateProfileAttributeResponses[keyof ProfilesUpdateProfileAttributeResponses]
+
+export type ApiChatData = {
+  body: {
+    [key: string]: unknown
+  }
+  path: {
+    user_id: string
+  }
+  query?: never
+  url: "/api/v1/chat/{user_id}"
+}
+
+export type ApiChatErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ApiChatError = ApiChatErrors[keyof ApiChatErrors]
+
+export type ApiChatResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type ApiEndChatData = {
+  body?: never
+  path: {
+    user_id: string
+  }
+  query?: never
+  url: "/api/v1/chat/{user_id}/end"
+}
+
+export type ApiEndChatErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ApiEndChatError = ApiEndChatErrors[keyof ApiEndChatErrors]
+
+export type ApiEndChatResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
 
 export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})

@@ -1,5 +1,5 @@
 from app.services.profile_service import ProfileService
-from app.models.profile import AddictionType, RecoveryStage
+from app.models import AddictionType, RecoveryStage
 from typing import Dict, List, Any
 import re
 

@@ -132,6 +132,19 @@ import type {
   ProfilesUpdateUserGoalData,
   ProfilesUpdateUserGoalResponse,
   ProfilesUpdateUserGoalError,
+  ProfilesGetUserInsightsData,
+  ProfilesGetUserInsightsResponse,
+  ProfilesGetUserInsightsError,
+  ProfilesGetProfileAttributeData,
+  ProfilesGetProfileAttributeResponse,
+  ProfilesGetProfileAttributeError,
+  ProfilesUpdateProfileAttributeData,
+  ProfilesUpdateProfileAttributeResponse,
+  ProfilesUpdateProfileAttributeError,
+  ApiChatData,
+  ApiChatError,
+  ApiEndChatData,
+  ApiEndChatError,
 } from "./types.gen"
 import { client as _heyApiClient } from "./client.gen"
 
@@ -1254,6 +1267,119 @@ export class ProfilesService {
         "Content-Type": "application/json",
         ...options?.headers,
       },
+    })
+  }
+
+  /**
+   * Get User Insights
+   * Get insights for the current user, optionally filtered by type
+   */
+  public static getUserInsights<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesGetUserInsightsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      ProfilesGetUserInsightsResponse,
+      ProfilesGetUserInsightsError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/insights",
+      ...options,
+    })
+  }
+
+  /**
+   * Get Profile Attribute
+   * Get a specific profile attribute
+   */
+  public static getProfileAttribute<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesGetProfileAttributeData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).get<
+      ProfilesGetProfileAttributeResponse,
+      ProfilesGetProfileAttributeError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/profile-attribute/{attribute_name}",
+      ...options,
+    })
+  }
+
+  /**
+   * Update Profile Attribute
+   * Update a specific profile attribute
+   */
+  public static updateProfileAttribute<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesUpdateProfileAttributeData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).put<
+      ProfilesUpdateProfileAttributeResponse,
+      ProfilesUpdateProfileAttributeError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/profile-attribute/{attribute_name}",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+}
+
+export class DefaultService {
+  /**
+   * Chat
+   * Process a chat message and analyze it for profile information
+   */
+  public static apiChat<ThrowOnError extends boolean = false>(
+    options: Options<ApiChatData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      unknown,
+      ApiChatError,
+      ThrowOnError
+    >({
+      url: "/api/v1/chat/{user_id}",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * End Chat
+   * End the conversation and perform comprehensive profile analysis
+   */
+  public static apiEndChat<ThrowOnError extends boolean = false>(
+    options: Options<ApiEndChatData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      unknown,
+      ApiEndChatError,
+      ThrowOnError
+    >({
+      url: "/api/v1/chat/{user_id}/end",
+      ...options,
     })
   }
 }

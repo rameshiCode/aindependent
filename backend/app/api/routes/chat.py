@@ -1,25 +1,47 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlmodel import Session
 
-from app.api.routes.openai import OpenAIService
+from app.api.deps import get_db, get_current_user
+from app.api.routes.openai import call_openai_with_fallback, get_openai_client
 from app.services.conversation_analyzer import ConversationAnalyzer
 from app.services.profile_service import ProfileService
 
 router = APIRouter()
-openai_service = OpenAIService()
 profile_service = ProfileService()
 conversation_analyzer = ConversationAnalyzer(profile_service)
 
 
 @router.post("/chat/{user_id}")
-async def chat(user_id: str, message: dict):
+async def chat(user_id: str, message: dict, db: Session = Depends(get_db)):
     """Process a chat message and analyze it for profile information"""
-    # Process message with OpenAI
-    response = await openai_service.process_message(user_id, message)
+    # Use existing functions from openai.py
+    client = get_openai_client()
+    
+    # Format messages for OpenAI
+    messages_for_api = [
+        {
+            "role": "system",
+            "content": "You are a caring, empathetic AI therapist helping people overcome addiction."
+        },
+        {
+            "role": "user", 
+            "content": message.get("content", "")
+        }
+    ]
+    
+    completion = await call_openai_with_fallback(
+        messages_for_api,
+        requested_model="gpt-3.5-turbo",
+        max_retries=3,
+    )
 
-    # Analyze user message for profile information
+    response = {
+        "role": "assistant",
+        "content": completion.choices[0].message.content
+    }
+
+    # Analyze messages for profile information
     conversation_analyzer.analyze_message(user_id, message)
-
-    # Analyze AI response for conversation stage
     conversation_analyzer.analyze_message(user_id, response)
 
     return response
