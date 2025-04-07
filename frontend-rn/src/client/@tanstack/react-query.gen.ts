@@ -1671,3 +1671,5 @@ export const apiEndChatMutation = (
   }
   return mutationOptions
 }
+
+export { OpenaiService }

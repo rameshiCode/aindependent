@@ -11,7 +11,7 @@ export default function Home() {
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
   const cardBackground = useThemeColor({}, 'inputBackground');
-  const borderColor = useThemeColor({}, 'border') || '#e0e0e0';
+  const borderColor = useThemeColor({}, 'inputBorder') || '#e0e0e0';
 
   // Define your routes here to make it easy to add new ones
   const ROUTES = [
@@ -44,7 +44,9 @@ export default function Home() {
               <TouchableOpacity
                 key={index}
                 style={[styles.linkButton, { backgroundColor: cardBackground, borderColor }]}
-                onPress={() => router.push(route.path)}
+                onPress={() => router.push({
+                  pathname: route.path as any
+                })}
               >
                 <Text style={[styles.linkText, { color: tintColor }]}>
                   {route.name}

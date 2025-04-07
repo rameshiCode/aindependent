@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Card, ProgressBar, Chip, List, Divider } from 'react-native-paper';
-import ThemedText from './ThemedText';
+import { ThemedText } from './ThemedText';
 import { useThemeColor } from '../hooks/useThemeColor';
 import { useProfile } from '../hooks/useProfile';
 
@@ -9,6 +8,7 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
   const { profile, insights, isLoading, error } = useProfile(userId);
   const backgroundColor = useThemeColor({}, 'background');
   const primaryColor = useThemeColor({}, 'primary');
+  const secondaryColor = useThemeColor({}, 'secondaryBackground');
   const textColor = useThemeColor({}, 'text');
 
   if (isLoading) {
@@ -46,9 +46,15 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor }]}>
-      <Card style={styles.card}>
-        <Card.Title title="User Profile" subtitle="Based on Motivational Interviewing" />
-        <Card.Content>
+      <View style={[styles.card, { backgroundColor: secondaryColor }]}>
+        {/* Card Title */}
+        <View style={styles.cardHeader}>
+          <ThemedText style={styles.cardTitle}>User Profile</ThemedText>
+          <ThemedText style={styles.cardSubtitle}>Based on Motivational Interviewing</ThemedText>
+        </View>
+
+        {/* Card Content */}
+        <View style={styles.cardContent}>
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Addiction Type</ThemedText>
             <ThemedText>{profile.addiction_type || 'Not identified yet'}</ThemedText>
@@ -58,11 +64,18 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
             <ThemedText style={styles.sectionTitle}>Motivation Level</ThemedText>
             {profile.motivation_level ? (
               <>
-                <ProgressBar
-                  progress={profile.motivation_level / 10}
-                  color={primaryColor}
-                  style={styles.progressBar}
-                />
+                {/* Custom Progress Bar */}
+                <View style={styles.progressBarContainer}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${profile.motivation_level * 10}%`,
+                        backgroundColor: primaryColor
+                      }
+                    ]}
+                  />
+                </View>
                 <ThemedText>{profile.motivation_level}/10</ThemedText>
               </>
             ) : (
@@ -78,9 +91,11 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
                   const [trait, value] = insight.value.split(':');
                   if (value === 'true') {
                     return (
-                      <Chip key={index} style={styles.chip} mode="outlined">
-                        {trait.replace(/_/g, ' ')}
-                      </Chip>
+                      <View key={index} style={[styles.chip, { borderColor: primaryColor }]}>
+                        <ThemedText style={styles.chipText}>
+                          {trait.replace(/_/g, ' ')}
+                        </ThemedText>
+                      </View>
                     );
                   }
                   return null;
@@ -91,21 +106,27 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
             </View>
           </View>
 
-          <Divider style={styles.divider} />
+          {/* Divider */}
+          <View style={[styles.divider, { backgroundColor: textColor + '30' }]} />
 
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Triggers</ThemedText>
             {insightsByType?.trigger ? (
-              <List.Section>
+              <View style={styles.listSection}>
                 {insightsByType.trigger.map((insight, index) => (
-                  <List.Item
-                    key={index}
-                    title={insight.value}
-                    description={`${insight.day_of_week || ''} ${insight.time_of_day || ''}`}
-                    left={props => <List.Icon {...props} icon="alert-circle" />}
-                  />
+                  <View key={index} style={styles.listItem}>
+                    <View style={[styles.listIcon, { backgroundColor: primaryColor + '30' }]}>
+                      <ThemedText style={{ color: primaryColor }}>!</ThemedText>
+                    </View>
+                    <View style={styles.listContent}>
+                      <ThemedText style={styles.listTitle}>{insight.value}</ThemedText>
+                      <ThemedText style={styles.listDescription}>
+                        {`${insight.day_of_week || ''} ${insight.time_of_day || ''}`}
+                      </ThemedText>
+                    </View>
+                  </View>
                 ))}
-              </List.Section>
+              </View>
             ) : (
               <ThemedText>No triggers identified yet</ThemedText>
             )}
@@ -131,8 +152,8 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
               <ThemedText>Not tracked yet</ThemedText>
             )}
           </View>
-        </Card.Content>
-      </Card>
+        </View>
+      </View>
     </ScrollView>
   );
 };
@@ -144,6 +165,28 @@ const styles = StyleSheet.create({
   },
   card: {
     marginBottom: 16,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  cardContent: {
+    padding: 16,
   },
   section: {
     marginBottom: 16,
@@ -153,10 +196,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
   },
-  progressBar: {
+  progressBarContainer: {
     height: 10,
     borderRadius: 5,
+    backgroundColor: 'rgba(0,0,0,0.1)',
     marginVertical: 8,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 5,
   },
   chipContainer: {
     flexDirection: 'row',
@@ -164,8 +213,47 @@ const styles = StyleSheet.create({
   },
   chip: {
     margin: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipText: {
+    fontSize: 14,
   },
   divider: {
+    height: 1,
     marginVertical: 16,
+  },
+  listSection: {
+    marginTop: 8,
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  listIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  listContent: {
+    flex: 1,
+  },
+  listTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  listDescription: {
+    fontSize: 14,
+    opacity: 0.7,
   },
 });

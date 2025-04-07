@@ -6,12 +6,14 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
-from openai import OpenAI
-from sqlalchemy import Engine
+from openai import AsyncOpenAI  # <-- Use AsyncOpenAI instead of OpenAI
 from sqlmodel import Session, select
 
 from app.api.deps import CurrentUser, SessionDep, UsageLimitCheck
 from app.api.routes.stripe import increment_usage
+from app.core.db import (
+    engine,  # This should import your actual SQLAlchemy engine instance
+)
 from app.models import (
     Conversation,
     ConversationCreate,
@@ -28,17 +30,17 @@ router = APIRouter(prefix="/openai", tags=["openai"])
 
 api_key = os.environ.get("OPENAI_API_KEY")
 
-# Initialize OpenAI client
+# Initialize AsyncOpenAI client
 openai_client = None
 if api_key:
-    openai_client = OpenAI(api_key=api_key)
+    openai_client = AsyncOpenAI(api_key=api_key)
 
 
 def get_openai_client():
     """Get OpenAI client instance"""
     global openai_client
     if not openai_client and api_key:
-        openai_client = OpenAI(api_key=api_key)
+        openai_client = AsyncOpenAI(api_key=api_key)
     return openai_client
 
 
@@ -139,6 +141,7 @@ async def call_openai_with_fallback(
                 logger.info(
                     f"Calling OpenAI API with model: {model} (attempt {retries+1}/{max_retries})"
                 )
+                # This is now a properly awaitable call
                 completion = await client.chat.completions.create(
                     model=model,
                     messages=messages,
@@ -377,7 +380,9 @@ async def create_message(
 
             # Process the conversation with goal acceptance context
             process_conversation_for_profile(
-                session_factory=lambda: Session(Engine),
+                session_factory=lambda: Session(
+                    engine
+                ),  # Using the actual engine instance
                 conversation_id=str(conversation_id),
                 user_id=str(current_user.id),
                 is_goal_accepted=True,
@@ -387,7 +392,7 @@ async def create_message(
             # Regular background processing
             background_tasks.add_task(
                 process_conversation_for_profile,
-                session_factory=lambda: Session(Engine),
+                session_factory=lambda: Session(engine),  # Fix this line too
                 conversation_id=str(conversation_id),
                 user_id=str(current_user.id),
             )

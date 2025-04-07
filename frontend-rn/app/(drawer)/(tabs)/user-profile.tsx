@@ -1,5 +1,5 @@
 // frontend-rn/app/(drawer)/(tabs)/user-profile.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   ScrollView,
@@ -15,7 +15,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { client } from '@/src/client/client.gen';
+
+// Import the generated React Query hooks
+import {
+  getMyProfileOptions,
+  getMyProfileQueryKey,
+  updateAbstinenceStatusMutation,
+  updateUserGoalMutation
+} from '@/src/client/@tanstack/react-query.gen';
 
 // Define types for the profile data
 interface UserProfile {
@@ -55,38 +62,25 @@ export default function UserProfileScreen() {
   const tintColor = useThemeColor({}, 'tint');
   const borderColor = useThemeColor({}, 'inputBorder');
 
-  // Fetch user profile data
+  // Fetch user profile data using the generated query hook
   const { data: profile, isLoading, error, refetch } = useQuery({
-    queryKey: ['profile'],
-    queryFn: async () => {
-      const response = await client.GET('/api/v1/profiles/my-profile');
-      return response.data as UserProfile;
-    }
+    ...getMyProfileOptions(),
+    select: (data) => data as unknown as UserProfile, // Type cast the response
   });
 
-  // Mutation for updating abstinence status
+  // Mutation for updating abstinence status using the generated mutation hook
   const resetAbstinence = useMutation({
-    mutationFn: async () => {
-      const response = await client.POST('/api/v1/profiles/update-abstinence', {
-        body: { reset: true }
-      });
-      return response.data;
-    },
+    ...updateAbstinenceStatusMutation(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: getMyProfileQueryKey() });
     }
   });
 
-  // Mutation for updating goal status
+  // Mutation for updating goal status using the generated mutation hook
   const updateGoalStatus = useMutation({
-    mutationFn: async ({ goalId, status }: { goalId: string, status: string }) => {
-      const response = await client.PUT(`/api/v1/profiles/goals/${goalId}`, {
-        body: { status }
-      });
-      return response.data;
-    },
+    ...updateUserGoalMutation(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: getMyProfileQueryKey() });
     }
   });
 
@@ -118,7 +112,9 @@ export default function UserProfileScreen() {
         {
           text: "Reset",
           style: "destructive",
-          onPress: () => resetAbstinence.mutate()
+          onPress: () => resetAbstinence.mutate({
+            body: { reset: true }
+          })
         }
       ]
     );
@@ -133,7 +129,10 @@ export default function UserProfileScreen() {
         { text: "Cancel", style: "cancel" },
         {
           text: "Complete",
-          onPress: () => updateGoalStatus.mutate({ goalId, status: 'completed' })
+          onPress: () => updateGoalStatus.mutate({
+            path: { goal_id: goalId },
+            body: { status: 'completed' }
+          })
         }
       ]
     );
@@ -149,7 +148,10 @@ export default function UserProfileScreen() {
         {
           text: "Abandon",
           style: "destructive",
-          onPress: () => updateGoalStatus.mutate({ goalId, status: 'abandoned' })
+          onPress: () => updateGoalStatus.mutate({
+            path: { goal_id: goalId },
+            body: { status: 'abandoned' }
+          })
         }
       ]
     );
