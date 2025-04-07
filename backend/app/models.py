@@ -1,3 +1,4 @@
+from typing import Any, Optional
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -363,3 +364,75 @@ class UserNotification(SQLModel, table=True):
 
     # Relationship
     user: User = Relationship()
+
+class AddictionType(str, Enum):
+    ALCOHOL = "alcohol"
+    DRUGS = "drugs"
+    GAMBLING = "gambling"
+    OTHER = "other"
+
+class RecoveryStage(str, Enum):
+    PRECONTEMPLATION = "precontemplation"
+    CONTEMPLATION = "contemplation"
+    PREPARATION = "preparation"
+    ACTION = "action"
+    MAINTENANCE = "maintenance"
+
+class ProfileAttributeModel(BaseModel):
+    value: Any
+    confidence: float
+    last_updated: datetime
+
+class UserProfileModel(BaseModel):
+    user_id: str
+    created_at: datetime
+    last_updated: datetime
+     
+    # Core attributes
+    addiction_type: Optional[ProfileAttributeModel]
+    addiction_severity: Optional[ProfileAttributeModel]
+    addiction_duration: Optional[ProfileAttributeModel]
+    previous_recovery_attempts: Optional[ProfileAttributeModel]
+    
+    # Family relationships
+    family_aware: Optional[ProfileAttributeModel]
+    family_support_level: Optional[ProfileAttributeModel]
+    family_communication: Optional[ProfileAttributeModel]
+    family_triggers: Optional[ProfileAttributeModel]
+    
+    # Psychological traits
+    need_for_approval: Optional[ProfileAttributeModel]
+    fear_of_rejection: Optional[ProfileAttributeModel]
+    low_self_confidence: Optional[ProfileAttributeModel]
+    submissiveness: Optional[ProfileAttributeModel]
+    
+    # Behavioral patterns
+    triggers: Optional[ProfileAttributeModel]
+    motivation_level: Optional[ProfileAttributeModel]
+    motivators: Optional[ProfileAttributeModel]
+    barriers: Optional[ProfileAttributeModel]
+    ambivalence_factors: Optional[ProfileAttributeModel]
+    
+    # Recovery stage
+    recovery_stage: Optional[ProfileAttributeModel]
+    
+    # Coping mechanisms
+    effective_strategies: Optional[ProfileAttributeModel]
+    ineffective_patterns: Optional[ProfileAttributeModel]
+    anxiety_management: Optional[ProfileAttributeModel]
+    relapse_prevention: Optional[ProfileAttributeModel]
+    
+    # Contextual information
+    abstinence_start_date: Optional[ProfileAttributeModel]
+    milestones: Optional[ProfileAttributeModel]
+    high_risk_events: Optional[ProfileAttributeModel]
+    regular_patterns: Optional[ProfileAttributeModel]
+    
+    # Environmental factors
+    living_situation: Optional[ProfileAttributeModel]
+    work_environment: Optional[ProfileAttributeModel]
+    social_circle: Optional[ProfileAttributeModel]
+    support_resources: Optional[ProfileAttributeModel]
+    
+    # Keywords for notifications
+    notification_keywords: Optional[ProfileAttributeModel]
