@@ -1,7 +1,7 @@
-from typing import Any, Optional, List
 import uuid
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, EmailStr
 from sqlmodel import JSON, Column, Field, Relationship, SQLModel, String
@@ -252,7 +252,9 @@ class Message(SQLModel, table=True):
     role: str  # "system", "user", or "assistant"
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    metadata: dict | None = Field(default=None, sa_column=Column(JSON))  # Added for MI stage tracking
+    message_metadata: dict | None = Field(
+        default=None, sa_column=Column(JSON)
+    )  # Added for MI stage tracking
 
     # Relationships
     conversation: Conversation | None = Relationship(back_populates="messages")
@@ -326,7 +328,9 @@ class UserProfile(SQLModel, table=True):
     relapse_risk_score: int | None = None
     motivation_level: int | None = None
     recovery_stage: str | None = None  # Added for MI-based profiling
-    psychological_traits: dict | None = Field(default=None, sa_column=Column(JSON))  # Added for MI-based profiling
+    psychological_traits: dict | None = Field(
+        default=None, sa_column=Column(JSON)
+    )  # Added for MI-based profiling
     big_five_scores: dict | None = Field(default=None, sa_column=Column(JSON))
     last_updated: datetime = Field(default_factory=datetime.utcnow)
 
@@ -402,55 +406,55 @@ class UserProfileModel(BaseModel):
     user_id: str
     created_at: datetime
     last_updated: datetime
-     
+
     # Core attributes
-    addiction_type: Optional[ProfileAttributeModel]
-    addiction_severity: Optional[ProfileAttributeModel]
-    addiction_duration: Optional[ProfileAttributeModel]
-    previous_recovery_attempts: Optional[ProfileAttributeModel]
-    
+    addiction_type: ProfileAttributeModel | None
+    addiction_severity: ProfileAttributeModel | None
+    addiction_duration: ProfileAttributeModel | None
+    previous_recovery_attempts: ProfileAttributeModel | None
+
     # Family relationships
-    family_aware: Optional[ProfileAttributeModel]
-    family_support_level: Optional[ProfileAttributeModel]
-    family_communication: Optional[ProfileAttributeModel]
-    family_triggers: Optional[ProfileAttributeModel]
-    
+    family_aware: ProfileAttributeModel | None
+    family_support_level: ProfileAttributeModel | None
+    family_communication: ProfileAttributeModel | None
+    family_triggers: ProfileAttributeModel | None
+
     # Psychological traits
-    need_for_approval: Optional[ProfileAttributeModel]
-    fear_of_rejection: Optional[ProfileAttributeModel]
-    low_self_confidence: Optional[ProfileAttributeModel]
-    submissiveness: Optional[ProfileAttributeModel]
-    
+    need_for_approval: ProfileAttributeModel | None
+    fear_of_rejection: ProfileAttributeModel | None
+    low_self_confidence: ProfileAttributeModel | None
+    submissiveness: ProfileAttributeModel | None
+
     # Behavioral patterns
-    triggers: Optional[ProfileAttributeModel]
-    motivation_level: Optional[ProfileAttributeModel]
-    motivators: Optional[ProfileAttributeModel]
-    barriers: Optional[ProfileAttributeModel]
-    ambivalence_factors: Optional[ProfileAttributeModel]
-    
+    triggers: ProfileAttributeModel | None
+    motivation_level: ProfileAttributeModel | None
+    motivators: ProfileAttributeModel | None
+    barriers: ProfileAttributeModel | None
+    ambivalence_factors: ProfileAttributeModel | None
+
     # Recovery stage
-    recovery_stage: Optional[ProfileAttributeModel]
-    
+    recovery_stage: ProfileAttributeModel | None
+
     # Coping mechanisms
-    effective_strategies: Optional[ProfileAttributeModel]
-    ineffective_patterns: Optional[ProfileAttributeModel]
-    anxiety_management: Optional[ProfileAttributeModel]
-    relapse_prevention: Optional[ProfileAttributeModel]
-    
+    effective_strategies: ProfileAttributeModel | None
+    ineffective_patterns: ProfileAttributeModel | None
+    anxiety_management: ProfileAttributeModel | None
+    relapse_prevention: ProfileAttributeModel | None
+
     # Contextual information
-    abstinence_start_date: Optional[ProfileAttributeModel]
-    milestones: Optional[ProfileAttributeModel]
-    high_risk_events: Optional[ProfileAttributeModel]
-    regular_patterns: Optional[ProfileAttributeModel]
-    
+    abstinence_start_date: ProfileAttributeModel | None
+    milestones: ProfileAttributeModel | None
+    high_risk_events: ProfileAttributeModel | None
+    regular_patterns: ProfileAttributeModel | None
+
     # Environmental factors
-    living_situation: Optional[ProfileAttributeModel]
-    work_environment: Optional[ProfileAttributeModel]
-    social_circle: Optional[ProfileAttributeModel]
-    support_resources: Optional[ProfileAttributeModel]
-    
+    living_situation: ProfileAttributeModel | None
+    work_environment: ProfileAttributeModel | None
+    social_circle: ProfileAttributeModel | None
+    support_resources: ProfileAttributeModel | None
+
     # Keywords for notifications
-    notification_keywords: Optional[List[str]]
+    notification_keywords: list[str] | None
 
 
 # API response models for profile data
@@ -460,18 +464,18 @@ class UserInsightResponse(BaseModel):
     value: str
     confidence: float
     extracted_at: datetime
-    mi_stage: Optional[str]
-    day_of_week: Optional[str]
-    time_of_day: Optional[str]
+    mi_stage: str | None
+    day_of_week: str | None
+    time_of_day: str | None
 
 
 class UserProfileResponse(BaseModel):
     id: str
     user_id: str
-    addiction_type: Optional[str]
+    addiction_type: str | None
     abstinence_days: int
-    abstinence_start_date: Optional[datetime]
-    motivation_level: Optional[int]
-    recovery_stage: Optional[str]
-    psychological_traits: Optional[dict]
+    abstinence_start_date: datetime | None
+    motivation_level: int | None
+    recovery_stage: str | None
+    psychological_traits: dict | None
     last_updated: datetime

@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from openai import OpenAI
 from sqlalchemy import Engine
 from sqlmodel import Session, select
 
@@ -17,15 +18,29 @@ from app.models import (
     ConversationWithMessages,
     Message,
     MessageSchema,
+    UserGoal,
 )
-
-# Import the client from the common module
-from app.services.openai_client import api_key, get_openai_client, openai_client
 
 # Import the service function directly
 from app.services.profile_extractor import process_conversation_for_profile
 
 router = APIRouter(prefix="/openai", tags=["openai"])
+
+api_key = os.environ.get("OPENAI_API_KEY")
+
+# Initialize OpenAI client
+openai_client = None
+if api_key:
+    openai_client = OpenAI(api_key=api_key)
+
+
+def get_openai_client():
+    """Get OpenAI client instance"""
+    global openai_client
+    if not openai_client and api_key:
+        openai_client = OpenAI(api_key=api_key)
+    return openai_client
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -345,13 +360,37 @@ async def create_message(
         conversation.updated_at = datetime.utcnow()
         session.commit()
 
-        # Add background task to process user profile from conversation
-        background_tasks.add_task(
-            process_conversation_for_profile,
-            session_factory=lambda: Session(Engine),
-            conversation_id=str(conversation_id),
-            user_id=str(current_user.id),
+        # Check if the conversation has reached a goal-setting stage
+        is_goal_accepted, goal_description = detect_goal_acceptance(
+            messages_for_api, assistant_message
         )
+
+        if is_goal_accepted and goal_description:
+            logger.info(f"Goal accepted: {goal_description}")
+
+            # Create the goal
+            user_goal = UserGoal(
+                user_id=current_user.id, description=goal_description, status="active"
+            )
+            session.add(user_goal)
+            session.commit()
+
+            # Process the conversation with goal acceptance context
+            process_conversation_for_profile(
+                session_factory=lambda: Session(Engine),
+                conversation_id=str(conversation_id),
+                user_id=str(current_user.id),
+                is_goal_accepted=True,
+                goal_description=goal_description,
+            )
+        else:
+            # Regular background processing
+            background_tasks.add_task(
+                process_conversation_for_profile,
+                session_factory=lambda: Session(Engine),
+                conversation_id=str(conversation_id),
+                user_id=str(current_user.id),
+            )
 
         # Return assistant message
         return MessageSchema(role="assistant", content=assistant_message)
@@ -367,6 +406,113 @@ async def create_message(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}",
         )
+
+
+def detect_goal_acceptance(messages, latest_assistant_message):
+    """
+    Analyze messages to detect if a goal was proposed and accepted.
+    Returns (is_goal_accepted, goal_description) tuple
+    """
+    # First, check if the latest assistant message proposes a goal
+    goal_proposal_indicators = [
+        "your goal could be",
+        "i suggest setting a goal",
+        "here's a goal for you",
+        "i recommend that you",
+        "a good goal would be",
+        "try to achieve",
+        "commit to",
+        "your task is to",
+        "your assignment is",
+    ]
+
+    goal_proposed = any(
+        indicator in latest_assistant_message.lower()
+        for indicator in goal_proposal_indicators
+    )
+
+    if not goal_proposed:
+        # No goal was proposed in the most recent message
+        return False, None
+
+    # Look for user acceptance in previous exchanges
+    for i in range(len(messages) - 2, 0, -1):  # Start from the second-to-last message
+        if messages[i]["role"] == "assistant" and messages[i + 1]["role"] == "user":
+            assistant_msg = messages[i]["content"].lower()
+            user_response = messages[i + 1]["content"].lower()
+
+            # Check if the assistant proposed a goal
+            if any(
+                indicator in assistant_msg for indicator in goal_proposal_indicators
+            ):
+                # Check if user accepted
+                acceptance_indicators = [
+                    "yes",
+                    "sure",
+                    "okay",
+                    "ok",
+                    "i'll do it",
+                    "sounds good",
+                    "i will",
+                    "i agree",
+                    "good idea",
+                    "i can do that",
+                    "i'll try",
+                    "i accept",
+                ]
+
+                if any(
+                    acceptance in user_response for acceptance in acceptance_indicators
+                ):
+                    # Extract goal description - this is a simple implementation
+                    # You might want to use more sophisticated NLP here
+                    goal_description = extract_goal_from_message(assistant_msg)
+                    return True, goal_description
+
+    # If we just proposed a goal but don't have a response yet, don't trigger
+    return False, None
+
+
+def extract_goal_from_message(message):
+    """
+    Extract a goal description from an assistant message.
+    This is a simple implementation - for production, consider using NLP.
+    """
+    # Look for common patterns like "your goal could be X" or "I suggest X"
+    message = message.lower()
+
+    for pattern in [
+        "your goal could be to",
+        "i suggest",
+        "here's a goal for you:",
+        "i recommend that you",
+        "a good goal would be to",
+        "try to",
+        "commit to",
+        "your task is to",
+        "your assignment is to",
+    ]:
+        if pattern in message:
+            start_index = message.find(pattern) + len(pattern)
+            # Get text after the pattern until the end of sentence
+            sentence_end = message.find(".", start_index)
+            if sentence_end == -1:  # No period found
+                sentence_end = len(message)
+
+            goal_text = message[start_index:sentence_end].strip()
+            return goal_text
+
+    # If no specific pattern found, return a larger chunk of the message
+    # This is a fallback method
+    sentences = message.split(".")
+    for sentence in sentences:
+        if any(
+            word in sentence for word in ["goal", "task", "commit", "try", "recommend"]
+        ):
+            return sentence.strip()
+
+    # Last resort: just return something reasonable
+    return "Goal from the conversation"
 
 
 @router.put("/conversations/{conversation_id}", response_model=ConversationWithMessages)

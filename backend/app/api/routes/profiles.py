@@ -49,6 +49,8 @@ def get_my_profile(session: SessionDep, current_user: CurrentUser):
         if profile.abstinence_start_date
         else None,
         "motivation_level": profile.motivation_level,
+        "recovery_stage": profile.recovery_stage,
+        "psychological_traits": profile.psychological_traits,
         "insights": [
             {
                 "id": str(insight.id),
@@ -97,6 +99,7 @@ def update_abstinence_status(
         # Add insight about relapse
         insight = UserInsight(
             user_id=current_user.id,
+            profile_id=profile.id,  # Make sure to link the insight to the profile
             insight_type="abstinence",
             value="User reported a relapse and reset their abstinence counter.",
             emotional_significance=0.8,
@@ -190,6 +193,23 @@ def update_user_goal(
                 detail="Invalid status. Must be 'active', 'completed', or 'abandoned'",
             )
 
+    # Update target date if provided
+    if "target_date" in goal_data:
+        try:
+            if goal_data["target_date"]:
+                goal.target_date = datetime.fromisoformat(goal_data["target_date"])
+            else:
+                goal.target_date = None
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Use ISO format (YYYY-MM-DD).",
+            )
+
+    # Update description if provided
+    if "description" in goal_data:
+        goal.description = goal_data["description"]
+
     session.add(goal)
     session.commit()
 
@@ -215,6 +235,16 @@ def create_user_goal(goal_data: dict, session: SessionDep, current_user: Current
         user_id=current_user.id, description=goal_data["description"], status="active"
     )
 
+    # Add target date if provided
+    if "target_date" in goal_data and goal_data["target_date"]:
+        try:
+            goal.target_date = datetime.fromisoformat(goal_data["target_date"])
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Use ISO format (YYYY-MM-DD).",
+            )
+
     session.add(goal)
     session.commit()
     session.refresh(goal)
@@ -225,4 +255,121 @@ def create_user_goal(goal_data: dict, session: SessionDep, current_user: Current
         "created_at": goal.created_at.isoformat(),
         "target_date": goal.target_date.isoformat() if goal.target_date else None,
         "status": goal.status,
+    }
+
+
+@router.get("/insights", response_model=list[dict])
+def get_user_insights(
+    session: SessionDep,
+    current_user: CurrentUser,
+    insight_type: str | None = None,
+    limit: int = 10,
+):
+    """Get insights for the current user, optionally filtered by type"""
+    query = select(UserInsight).where(UserInsight.user_id == current_user.id)
+
+    if insight_type:
+        query = query.where(UserInsight.insight_type == insight_type)
+
+    query = query.order_by(UserInsight.extracted_at.desc()).limit(limit)
+    insights = session.exec(query).all()
+
+    return [
+        {
+            "id": str(insight.id),
+            "type": insight.insight_type,
+            "value": insight.value,
+            "significance": insight.emotional_significance,
+            "confidence": insight.confidence,
+            "extracted_at": insight.extracted_at.isoformat(),
+            "day_of_week": insight.day_of_week,
+            "time_of_day": insight.time_of_day,
+        }
+        for insight in insights
+    ]
+
+
+@router.get("/profile-attribute/{attribute_name}", response_model=dict)
+def get_profile_attribute(
+    attribute_name: str, session: SessionDep, current_user: CurrentUser
+):
+    """Get a specific profile attribute"""
+    profile = session.exec(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    ).first()
+
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found"
+        )
+
+    # Check if the attribute exists
+    if not hasattr(profile, attribute_name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid attribute name: {attribute_name}",
+        )
+
+    # Get the attribute value
+    value = getattr(profile, attribute_name)
+
+    return {
+        "name": attribute_name,
+        "value": value,
+        "last_updated": profile.last_updated.isoformat(),
+    }
+
+
+@router.put("/profile-attribute/{attribute_name}", response_model=dict)
+def update_profile_attribute(
+    attribute_name: str, data: dict, session: SessionDep, current_user: CurrentUser
+):
+    """Update a specific profile attribute"""
+    if "value" not in data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing required field: value",
+        )
+
+    profile = session.exec(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    ).first()
+
+    if not profile:
+        # Create profile if it doesn't exist
+        profile = UserProfile(user_id=current_user.id)
+        session.add(profile)
+        session.commit()
+        session.refresh(profile)
+
+    # Check if the attribute exists
+    if not hasattr(profile, attribute_name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid attribute name: {attribute_name}",
+        )
+
+    # Update the attribute
+    setattr(profile, attribute_name, data["value"])
+    profile.last_updated = datetime.utcnow()
+
+    # Create an insight if confidence is provided
+    if "confidence" in data and data["confidence"] is not None:
+        insight = UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type=f"profile_attribute_{attribute_name}",
+            value=str(data["value"]),
+            confidence=float(data["confidence"]),
+            extracted_at=datetime.utcnow(),
+        )
+        session.add(insight)
+
+    session.add(profile)
+    session.commit()
+
+    return {
+        "name": attribute_name,
+        "value": data["value"],
+        "last_updated": profile.last_updated.isoformat(),
     }
