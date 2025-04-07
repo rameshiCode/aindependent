@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, List
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -50,6 +50,7 @@ class User(UserBase, table=True):
     conversations: list["Conversation"] = Relationship(
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    profile: "UserProfile" = Relationship(back_populates="user")
 
 
 # Properties to return via API, id is always required
@@ -241,6 +242,7 @@ class Conversation(SQLModel, table=True):
         back_populates="conversation",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
+    insights: list["UserInsight"] = Relationship(back_populates="conversation")
 
 
 # Message model
@@ -250,6 +252,7 @@ class Message(SQLModel, table=True):
     role: str  # "system", "user", or "assistant"
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    metadata: dict | None = Field(default=None, sa_column=Column(JSON))  # Added for MI stage tracking
 
     # Relationships
     conversation: Conversation | None = Relationship(back_populates="messages")
@@ -259,6 +262,7 @@ class Message(SQLModel, table=True):
 class MessageSchema(BaseModel):
     role: str
     content: str
+    metadata: dict | None = None  # Added for MI stage tracking
 
 
 class ChatCompletionRequest(SQLModel):
@@ -286,13 +290,29 @@ class ConversationWithMessages(SQLModel):
     messages: list[MessageSchema]
 
 
-# class WebhookEvent(SQLModel):
-#     id: str
-#     type: str
-#     data: dict
+# Addiction Type Enum
+class AddictionType(str, Enum):
+    ALCOHOL = "alcohol"
+    DRUGS = "drugs"
+    GAMBLING = "gambling"
+    OTHER = "other"
 
-# user profiling push notification
-# Add to app/models.py
+
+# Recovery Stage Enum
+class RecoveryStage(str, Enum):
+    PRECONTEMPLATION = "precontemplation"
+    CONTEMPLATION = "contemplation"
+    PREPARATION = "preparation"
+    ACTION = "action"
+    MAINTENANCE = "maintenance"
+
+
+# Motivational Interviewing Stage Enum
+class MIStage(str, Enum):
+    ENGAGING = "engaging"
+    FOCUSING = "focusing"
+    EVOKING = "evoking"
+    PLANNING = "planning"
 
 
 # User Profile model
@@ -305,6 +325,8 @@ class UserProfile(SQLModel, table=True):
     abstinence_start_date: datetime | None = None
     relapse_risk_score: int | None = None
     motivation_level: int | None = None
+    recovery_stage: str | None = None  # Added for MI-based profiling
+    psychological_traits: dict | None = Field(default=None, sa_column=Column(JSON))  # Added for MI-based profiling
     big_five_scores: dict | None = Field(default=None, sa_column=Column(JSON))
     last_updated: datetime = Field(default_factory=datetime.utcnow)
 
@@ -321,18 +343,19 @@ class UserInsight(SQLModel, table=True):
     conversation_id: uuid.UUID | None = Field(
         default=None, foreign_key="conversation.id", index=True
     )
-    insight_type: str  # 'trigger', 'coping_strategy', 'motivation', etc.
+    insight_type: str  # 'trigger', 'coping_strategy', 'motivation', 'psychological_trait', etc.
     value: str
     day_of_week: str | None = None  # For schedule-related insights
     time_of_day: str | None = None  # For schedule-related insights
     emotional_significance: float | None = None
     confidence: float = 0.0
     extracted_at: datetime = Field(default_factory=datetime.utcnow)
+    mi_stage: str | None = None  # Added for MI-based profiling
 
     # Relationships
     profile: UserProfile = Relationship(back_populates="insights")
     user: User = Relationship()
-    conversation: Conversation | None = Relationship()
+    conversation: Conversation | None = Relationship(back_populates="insights")
 
 
 # User Goal model
@@ -344,6 +367,7 @@ class UserGoal(SQLModel, table=True):
     target_date: datetime | None = None
     status: str = "active"  # 'active', 'completed', 'abandoned'
     last_notification_sent: datetime | None = None
+    mi_related: bool = False  # Added to track if goal was created through MI process
 
     # Relationship
     user: User = Relationship()
@@ -365,24 +389,15 @@ class UserNotification(SQLModel, table=True):
     # Relationship
     user: User = Relationship()
 
-class AddictionType(str, Enum):
-    ALCOHOL = "alcohol"
-    DRUGS = "drugs"
-    GAMBLING = "gambling"
-    OTHER = "other"
 
-class RecoveryStage(str, Enum):
-    PRECONTEMPLATION = "precontemplation"
-    CONTEMPLATION = "contemplation"
-    PREPARATION = "preparation"
-    ACTION = "action"
-    MAINTENANCE = "maintenance"
-
+# Profile Attribute model for API responses
 class ProfileAttributeModel(BaseModel):
     value: Any
     confidence: float
     last_updated: datetime
 
+
+# Comprehensive User Profile model for API responses
 class UserProfileModel(BaseModel):
     user_id: str
     created_at: datetime
@@ -435,4 +450,28 @@ class UserProfileModel(BaseModel):
     support_resources: Optional[ProfileAttributeModel]
     
     # Keywords for notifications
-    notification_keywords: Optional[ProfileAttributeModel]
+    notification_keywords: Optional[List[str]]
+
+
+# API response models for profile data
+class UserInsightResponse(BaseModel):
+    id: str
+    insight_type: str
+    value: str
+    confidence: float
+    extracted_at: datetime
+    mi_stage: Optional[str]
+    day_of_week: Optional[str]
+    time_of_day: Optional[str]
+
+
+class UserProfileResponse(BaseModel):
+    id: str
+    user_id: str
+    addiction_type: Optional[str]
+    abstinence_days: int
+    abstinence_start_date: Optional[datetime]
+    motivation_level: Optional[int]
+    recovery_stage: Optional[str]
+    psychological_traits: Optional[dict]
+    last_updated: datetime

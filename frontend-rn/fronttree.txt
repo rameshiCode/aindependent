@@ -13,7 +13,9 @@
 │   │       ├── index.tsx
 │   │       ├── _layout.tsx
 │   │       ├── profile.tsx
-│   │       └── subscription.tsx
+│   │       ├── subscription-management.tsx
+│   │       ├── subscription.tsx
+│   │       └── user-profile.tsx
 │   ├── health-check.tsx
 │   ├── _layout.tsx
 │   ├── +not-found.tsx
@@ -48,19 +50,22 @@
 │   ├── HapticTab.tsx
 │   ├── HelloWave.tsx
 │   ├── ParallaxScrollView.tsx
+│   ├── PaymentHistory.tsx
 │   ├── Sidebar.tsx
 │   ├── StripePaymentForm.tsx
+│   ├── SubscriptionManager.tsx
 │   ├── __tests__
 │   │   ├── __snapshots__
 │   │   │   └── ThemedText-test.tsx.snap
 │   │   └── ThemedText-test.tsx
 │   ├── ThemedText.tsx
 │   ├── ThemedView.tsx
-│   └── ui
-│       ├── IconSymbol.ios.tsx
-│       ├── IconSymbol.tsx
-│       ├── TabBarBackground.ios.tsx
-│       └── TabBarBackground.tsx
+│   ├── ui
+│   │   ├── IconSymbol.ios.tsx
+│   │   ├── IconSymbol.tsx
+│   │   ├── TabBarBackground.ios.tsx
+│   │   └── TabBarBackground.tsx
+│   └── UsageLimitBanner.tsx
 ├── constants
 │   └── Colors.ts
 ├── context
@@ -74,15 +79,19 @@
 │   ├── useChat.ts
 │   ├── useColorScheme.ts
 │   ├── useColorScheme.web.ts
-│   └── useThemeColor.ts
+│   ├── useProfile.ts
+│   ├── useThemeColor.ts
+│   └── useUsage.ts
 ├── openapi.json
 ├── openapi-ts.config.ts
 ├── package.json
 ├── package-lock.json
 ├── readme4Implementation.md
+├── readmeGab.md
 ├── README.md
 ├── scripts
 │   └── reset-project.js
+├── services
 ├── src
 │   └── client
 │       ├── client.gen.ts
@@ -98,4 +107,4 @@
 └── utils
     └── utils.ts
 
-22 directories, 77 files
+23 directories, 85 files

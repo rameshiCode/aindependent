@@ -1,0 +1,138 @@
+.
+├── alembic.ini
+├── app
+│   ├── api
+│   │   ├── api.py
+│   │   ├── deps.py
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── __pycache__
+│   │   │   ├── deps.cpython-312.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   └── main.cpython-312.pyc
+│   │   └── routes
+│   │       ├── chat.py
+│   │       ├── __init__.py
+│   │       ├── login.py
+│   │       ├── notifications.py
+│   │       ├── openai.py
+│   │       ├── profile_1.py
+│   │       ├── profiles.py
+│   │       ├── __pycache__
+│   │       │   ├── __init__.cpython-312.pyc
+│   │       │   ├── items.cpython-312.pyc
+│   │       │   ├── login.cpython-312.pyc
+│   │       │   ├── notifications.cpython-312.pyc
+│   │       │   ├── openai.cpython-312.pyc
+│   │       │   ├── private.cpython-312.pyc
+│   │       │   ├── profiles.cpython-312.pyc
+│   │       │   ├── stripe.cpython-312.pyc
+│   │       │   ├── users.cpython-312.pyc
+│   │       │   ├── utils.cpython-312.pyc
+│   │       │   └── whstripe.cpython-312.pyc
+│   │       ├── stripe.py
+│   │       ├── users.py
+│   │       ├── utils.py
+│   │       └── whstripe.py
+│   ├── backend_pre_start.py
+│   ├── core
+│   │   ├── config.py
+│   │   ├── db.py
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── config.cpython-312.pyc
+│   │   │   ├── db.cpython-312.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── security.cpython-312.pyc
+│   │   │   └── stripe.cpython-312.pyc
+│   │   └── security.py
+│   ├── crud.py
+│   ├── email-templates
+│   │   ├── build
+│   │   │   ├── new_account.html
+│   │   │   ├── reset_password.html
+│   │   │   └── test_email.html
+│   │   └── src
+│   │       ├── new_account.mjml
+│   │       ├── reset_password.mjml
+│   │       └── test_email.mjml
+│   ├── initial_data.py
+│   ├── __init__.py
+│   ├── main.py
+│   ├── models.py
+│   ├── __pycache__
+│   │   ├── backend_pre_start.cpython-312.pyc
+│   │   ├── crud.cpython-312.pyc
+│   │   ├── __init__.cpython-312.pyc
+│   │   ├── main.cpython-312.pyc
+│   │   ├── models.cpython-312.pyc
+│   │   └── utils.cpython-312.pyc
+│   ├── services
+│   │   ├── conversation_analyzer.py
+│   │   ├── __init__.py
+│   │   ├── profile_extractor.py
+│   │   ├── profile_service.py
+│   │   └── __pycache__
+│   │       └── __init__.cpython-312.pyc
+│   ├── tests
+│   │   ├── api
+│   │   │   ├── __init__.py
+│   │   │   └── routes
+│   │   │       ├── __init__.py
+│   │   │       ├── test_items.py
+│   │   │       ├── test_login.py
+│   │   │       ├── test_private.py
+│   │   │       └── test_users.py
+│   │   ├── conftest.py
+│   │   ├── crud
+│   │   │   ├── __init__.py
+│   │   │   └── test_user.py
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── conftest.cpython-312-pytest-7.4.0.pyc
+│   │   │   └── __init__.cpython-312.pyc
+│   │   ├── scripts
+│   │   │   ├── __init__.py
+│   │   │   ├── test_backend_pre_start.py
+│   │   │   └── test_test_pre_start.py
+│   │   └── utils
+│   │       ├── __init__.py
+│   │       ├── item.py
+│   │       ├── user.py
+│   │       └── utils.py
+│   ├── tests_pre_start.py
+│   └── utils.py
+├── backtree.txt
+├── Dockerfile
+├── htmlcov
+├── pyproject.toml
+├── pytest_results.log
+├── README.md
+├── scripts
+│   ├── format.sh
+│   ├── lint.sh
+│   ├── prestart.sh
+│   ├── test.sh
+│   └── tests-start.sh
+├── tests
+│   ├── conftest.py
+│   ├── __pycache__
+│   │   ├── conftest.cpython-312-pytest-7.4.0.pyc
+│   │   └── test_openai.cpython-312-pytest-7.4.0.pyc
+│   ├── test_openai.py
+│   └── test-requirements.txt
+├── testsStripe
+│   ├── conftest.py
+│   ├── __pycache__
+│   │   ├── conftest.cpython-312-pytest-7.4.0.pyc
+│   │   ├── standalone_test_models_stripe.cpython-312-pytest-7.4.0.pyc
+│   │   ├── stripe_model_tests.cpython-312-pytest-7.4.0.pyc
+│   │   ├── test_models_stripe.cpython-312-pytest-7.4.0.pyc
+│   │   └── test_stripe.cpython-312-pytest-7.4.0.pyc
+│   ├── standalone_test_models_stripe.py
+│   ├── stripe_model_tests.py
+│   ├── test_models_stripe.py
+│   └── test_stripe.py
+└── uv.lock
+
+27 directories, 109 files
