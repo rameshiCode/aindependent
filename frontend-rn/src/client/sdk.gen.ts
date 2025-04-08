@@ -149,6 +149,13 @@ import type {
   ApiChatError,
   ApiEndChatData,
   ApiEndChatError,
+  NotificationsGetUserNotificationsData,
+  NotificationsGetUserNotificationsResponse,
+  NotificationsGetUserNotificationsError,
+  NotificationsMarkNotificationOpenedData,
+  NotificationsMarkNotificationOpenedError,
+  NotificationsGenerateNotificationsData,
+  NotificationsGenerateNotificationsResponse,
 } from "./types.gen"
 import { client as _heyApiClient } from "./client.gen"
 
@@ -1452,6 +1459,77 @@ export class DefaultService {
       ThrowOnError
     >({
       url: "/api/v1/chat/{user_id}/end",
+      ...options,
+    })
+  }
+}
+
+export class NotificationsService {
+  /**
+   * Get User Notifications
+   * Get notifications for the current user
+   */
+  public static getUserNotifications<ThrowOnError extends boolean = false>(
+    options?: Options<NotificationsGetUserNotificationsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      NotificationsGetUserNotificationsResponse,
+      NotificationsGetUserNotificationsError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/notifications/",
+      ...options,
+    })
+  }
+
+  /**
+   * Mark Notification Opened
+   * Mark a notification as opened
+   */
+  public static markNotificationOpened<ThrowOnError extends boolean = false>(
+    options: Options<NotificationsMarkNotificationOpenedData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      unknown,
+      NotificationsMarkNotificationOpenedError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/notifications/mark-opened/{notification_id}",
+      ...options,
+    })
+  }
+
+  /**
+   * Generate Notifications
+   * Generate notifications based on user insights
+   */
+  public static generateNotifications<ThrowOnError extends boolean = false>(
+    options?: Options<NotificationsGenerateNotificationsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).post<
+      NotificationsGenerateNotificationsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/notifications/generate",
       ...options,
     })
   }

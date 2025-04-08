@@ -5,6 +5,7 @@ This file implements API routes for managing user notifications based on profile
 
 import logging
 import uuid
+from datetime import timedelta
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlmodel import select
@@ -12,11 +13,11 @@ from sqlmodel import select
 from app.api.deps import CurrentUser, SessionDep
 from app.models import UserNotification
 
-router = APIRouter()
+router = APIRouter(prefix="/notifications", tags=["notifications"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("/notifications", response_model=list[dict])
+@router.get("/", response_model=list[dict])
 def get_user_notifications(
     session: SessionDep,
     current_user: CurrentUser,
@@ -47,7 +48,7 @@ def get_user_notifications(
     ]
 
 
-@router.post("/notifications/mark-opened/{notification_id}")
+@router.post("/mark-opened/{notification_id}")
 def mark_notification_opened(
     notification_id: uuid.UUID,
     session: SessionDep,
@@ -73,7 +74,7 @@ def mark_notification_opened(
     return {"success": True}
 
 
-@router.post("/notifications/generate", response_model=dict)
+@router.post("/generate", response_model=dict)
 def generate_notifications(
     background_tasks: BackgroundTasks,
     session: SessionDep,
@@ -90,15 +91,14 @@ def generate_notifications(
 
 async def _generate_notifications_task(user_id: str):
     """Background task to generate notifications based on user insights"""
-    from datetime import datetime
 
     from sqlmodel import Session, select
 
-    from app.core.db import engine as Engine
+    from app.core.db import engine
     from app.models import UserInsight, UserNotification, UserProfile
 
     try:
-        session = Session(Engine)
+        session = Session(engine)
 
         # Get user profile
         profile = session.exec(

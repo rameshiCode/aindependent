@@ -5,34 +5,36 @@ import { useThemeColor } from '../hooks/useThemeColor';
 import { useProfile } from '../hooks/useProfile';
 
 export const ProfileVisualizer = ({ userId }: { userId: string }) => {
-  const { profile, isLoadingProfile, profileError, getInsights, getGoals, refetchProfile } = useProfile();
-  
+  const { profile, isLoadingProfile, profileError, getInsights, refetchProfile } = useProfile();
+
   // Get insights using the hook function
-  const { 
+  const {
     data: insightsData,
     isLoading: isLoadingInsights,
     error: insightsError
   } = getInsights();
-  
+
   const isLoading = isLoadingProfile || isLoadingInsights;
   const error = profileError || insightsError;
-  
+
   // Create a helper function to group insights by type
   const [insightsByType, setInsightsByType] = useState<Record<string, any[]>>({});
-  
+
   useEffect(() => {
-    if (insightsData) {
+    if (insightsData && insightsData.length > 0) {
+      // Group insights by type
       const grouped = insightsData.reduce((acc: Record<string, any[]>, insight: any) => {
-        if (!acc[insight.insight_type]) {
-          acc[insight.insight_type] = [];
+        if (!acc[insight.type]) {
+          acc[insight.type] = [];
         }
-        acc[insight.insight_type].push(insight);
+        acc[insight.type].push(insight);
         return acc;
       }, {});
       setInsightsByType(grouped);
+      console.log("Grouped insights:", grouped);
     }
   }, [insightsData]);
-  
+
   // Use the theme colors
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -42,8 +44,24 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
 
   useEffect(() => {
     console.log("Profile data:", profile);
-    console.log("Insights data:", insightsData);
+    console.log("Raw insights data:", insightsData);
   }, [profile, insightsData]);
+
+  // Helper function to extract psychological traits
+  const getPsychologicalTraits = () => {
+    const traits = [];
+    if (insightsData) {
+      for (const insight of insightsData) {
+        if (insight.type === 'psychological_trait') {
+          const [trait, value] = insight.value.split(':');
+          if (value && value.toLowerCase() === 'true') {
+            traits.push(trait.replace(/_/g, ' '));
+          }
+        }
+      }
+    }
+    return traits;
+  };
 
   if (isLoading) {
     return (
@@ -69,6 +87,9 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
       </View>
     );
   }
+
+  // Extract psychological traits
+  const psychologicalTraits = getPsychologicalTraits();
 
   return (
     <ScrollView style={[styles.container, { backgroundColor }]}>
@@ -112,20 +133,14 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Psychological Traits</ThemedText>
             <View style={styles.chipContainer}>
-              {insightsByType?.psychological_trait ? (
-                insightsByType.psychological_trait.map((insight, index) => {
-                  const [trait, value] = insight.value.split(':');
-                  if (value === 'true') {
-                    return (
-                      <View key={index} style={[styles.chip, { borderColor: tintColor }]}>
-                        <ThemedText style={styles.chipText}>
-                          {trait.replace(/_/g, ' ')}
-                        </ThemedText>
-                      </View>
-                    );
-                  }
-                  return null;
-                })
+              {psychologicalTraits.length > 0 ? (
+                psychologicalTraits.map((trait, index) => (
+                  <View key={index} style={[styles.chip, { borderColor: tintColor }]}>
+                    <ThemedText style={styles.chipText}>
+                      {trait}
+                    </ThemedText>
+                  </View>
+                ))
               ) : (
                 <ThemedText>No traits identified yet</ThemedText>
               )}
@@ -137,21 +152,23 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
 
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Triggers</ThemedText>
-            {insightsByType?.trigger ? (
+            {insightsData && insightsData.some(insight => insight.type === 'trigger') ? (
               <View style={styles.listSection}>
-                {insightsByType.trigger.map((insight, index) => (
-                  <View key={index} style={styles.listItem}>
-                    <View style={[styles.listIcon, { backgroundColor: `${tintColor}30` }]}>
-                      <ThemedText style={{ color: tintColor }}>!</ThemedText>
+                {insightsData
+                  .filter(insight => insight.type === 'trigger')
+                  .map((insight, index) => (
+                    <View key={index} style={styles.listItem}>
+                      <View style={[styles.listIcon, { backgroundColor: `${tintColor}30` }]}>
+                        <ThemedText style={{ color: tintColor }}>!</ThemedText>
+                      </View>
+                      <View style={styles.listContent}>
+                        <ThemedText style={styles.listTitle}>{insight.value}</ThemedText>
+                        <ThemedText style={styles.listDescription}>
+                          {`${insight.day_of_week || ''} ${insight.time_of_day || ''}`}
+                        </ThemedText>
+                      </View>
                     </View>
-                    <View style={styles.listContent}>
-                      <ThemedText style={styles.listTitle}>{insight.value}</ThemedText>
-                      <ThemedText style={styles.listDescription}>
-                        {`${insight.day_of_week || ''} ${insight.time_of_day || ''}`}
-                      </ThemedText>
-                    </View>
-                  </View>
-                ))}
+                  ))}
               </View>
             ) : (
               <ThemedText>No triggers identified yet</ThemedText>
@@ -160,10 +177,21 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
 
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Recovery Stage</ThemedText>
-            {insightsByType?.recovery_stage ? (
+            {insightsData && insightsData.some(insight => insight.type === 'recovery_stage') ? (
+              (() => {
+                const recoveryStageInsight = insightsData.find(insight => insight.type === 'recovery_stage');
+                if (recoveryStageInsight && recoveryStageInsight.value) {
+                  return (
+                    <ThemedText>
+                      {recoveryStageInsight.value.charAt(0).toUpperCase() + recoveryStageInsight.value.slice(1)}
+                    </ThemedText>
+                  );
+                }
+                return <ThemedText>Not determined yet</ThemedText>;
+              })()
+            ) : profile.recovery_stage ? (
               <ThemedText>
-                {insightsByType.recovery_stage[0].value.charAt(0).toUpperCase() +
-                  insightsByType.recovery_stage[0].value.slice(1)}
+                {profile.recovery_stage.charAt(0).toUpperCase() + profile.recovery_stage.slice(1)}
               </ThemedText>
             ) : (
               <ThemedText>Not determined yet</ThemedText>
@@ -177,6 +205,13 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
             ) : (
               <ThemedText>Not tracked yet</ThemedText>
             )}
+          </View>
+
+          {/* Debug Section - You can remove this in production */}
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>Debug Information</ThemedText>
+            <ThemedText style={styles.debugText}>Insights Count: {insightsData?.length || 0}</ThemedText>
+            <ThemedText style={styles.debugText}>Profile Keys: {Object.keys(profile).join(', ')}</ThemedText>
           </View>
         </View>
       </View>
@@ -283,4 +318,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.7,
   },
+  debugText: {
+    fontSize: 12,
+    opacity: 0.7,
+    fontFamily: 'monospace',
+  }
 });

@@ -176,7 +176,9 @@ async def process_conversation_for_profile(
         is_goal_accepted: Whether a goal was accepted in this conversation
         goal_description: The description of the accepted goal if any
     """
-    logger.info(f"Starting profile extraction for conversation {conversation_id}, user {user_id}")
+    logger.info(
+        f"Starting profile extraction for conversation {conversation_id}, user {user_id}"
+    )
     try:
         # Create a new session
         session = session_factory()
@@ -238,7 +240,9 @@ async def process_conversation_for_profile(
             )
 
         # Extract psychological traits
+        logger.info("Extracting psychological traits...")
         traits = extract_psychological_traits(messages)
+        logger.info(f"Extracted traits: {traits}")
         for trait, value in traits.items():
             insights.append(
                 UserInsight(
@@ -274,7 +278,9 @@ async def process_conversation_for_profile(
                 )
 
         # Extract motivation level
+        logger.info("Extracting motivation level...")
         motivation_level = extract_motivation_level(messages)
+        logger.info(f"Extracted motivation level: {motivation_level}")
         if motivation_level and (
             not profile.motivation_level or profile.motivation_level != motivation_level
         ):
@@ -364,6 +370,7 @@ async def process_conversation_for_profile(
 
         # Save insights and profile updates
         for insight in insights:
+            logger.info(f"Saving insight: {insight.insight_type} - {insight.value}")
             session.add(insight)
 
         session.add(profile)
@@ -425,11 +432,11 @@ def extract_conversation_context(messages: list[Message]) -> dict[str, Any]:
 
     for message in messages:
         # Check if message has stage information in metadata
-        if hasattr(message, 'message_metadata') and message.message_metadata:
+        if hasattr(message, "message_metadata") and message.message_metadata:
             # Handle different types of metadata
             metadata = message.message_metadata
             stage = None
-            
+
             if isinstance(metadata, dict):
                 stage = metadata.get("stage")
             elif hasattr(metadata, "get"):
@@ -438,7 +445,7 @@ def extract_conversation_context(messages: list[Message]) -> dict[str, Any]:
             elif hasattr(metadata, "stage"):
                 # Direct attribute access
                 stage = metadata.stage
-            
+
             # If we found a stage, add it to context
             if stage:
                 if stage not in context["stages_visited"]:
@@ -516,16 +523,16 @@ def extract_psychological_traits(messages: list[Message]) -> dict[str, bool]:
                     trait_counts[trait] += 1
 
     # Set traits based on threshold counts
-    if trait_counts["need_for_approval"] >= 2:
+    if trait_counts["need_for_approval"] >= 1:
         traits["need_for_approval"] = True
 
-    if trait_counts["fear_of_rejection"] >= 2:
+    if trait_counts["fear_of_rejection"] >= 1:
         traits["fear_of_rejection"] = True
 
-    if trait_counts["low_self_confidence"] >= 2:
+    if trait_counts["low_self_confidence"] >= 1:
         traits["low_self_confidence"] = True
 
-    if trait_counts["submissiveness"] >= 2:
+    if trait_counts["submissiveness"] >= 1:
         traits["submissiveness"] = True
 
     return traits
@@ -632,7 +639,7 @@ def extract_motivation_level(messages: list[Message]) -> int | None:
     for message in messages:
         if message.role == "user":
             # Check if metadata exists and has the stage attribute
-            if hasattr(message, 'message_metadata') and message.message_metadata:
+            if hasattr(message, "message_metadata") and message.message_metadata:
                 # Convert to dict if it's not already
                 metadata = message.message_metadata
                 if isinstance(metadata, dict):
@@ -645,13 +652,19 @@ def extract_motivation_level(messages: list[Message]) -> int | None:
                     stage = metadata.stage
                 else:
                     stage = None
-                
+
                 # Check if the stage is one where motivation might be discussed
                 if stage in ["motivatie", "evoking"]:
                     content = message.content.lower()
                     # Look for numeric rating
-                    if "scale" in content or "scară" in content or "out of 10" in content or "from 1 to 10" in content:
+                    if (
+                        "scale" in content
+                        or "scară" in content
+                        or "out of 10" in content
+                        or "from 1 to 10" in content
+                    ):
                         import re
+
                         numbers = re.findall(r"\b([1-9]|10)\b", content)
                         if numbers:
                             try:
@@ -660,13 +673,14 @@ def extract_motivation_level(messages: list[Message]) -> int | None:
                                     return motivation
                             except ValueError:
                                 pass
-            
+
             # Even without proper metadata, check content for motivation scale mentions
             content = message.content.lower()
             if ("scale" in content or "on a scale" in content) and (
                 "motivation" in content or "important" in content or "ready" in content
             ):
                 import re
+
                 numbers = re.findall(r"\b([1-9]|10)\b", content)
                 if numbers:
                     try:
@@ -758,22 +772,23 @@ def extract_notification_keywords(messages: list[Message]) -> list[str]:
 
     return keywords
 
+
 def get_metadata_value(message: Message, key: str) -> Any:
     """
     Safely extract a value from message metadata, handling different types.
-    
+
     Args:
         message: The message object
         key: The metadata key to look for
-        
+
     Returns:
         The value if found, None otherwise
     """
-    if not hasattr(message, 'message_metadata') or not message.message_metadata:
+    if not hasattr(message, "message_metadata") or not message.message_metadata:
         return None
-        
+
     metadata = message.message_metadata
-    
+
     # Handle different metadata types
     if isinstance(metadata, dict):
         return metadata.get(key)
@@ -789,5 +804,5 @@ def get_metadata_value(message: Message, key: str) -> Any:
             return getattr(metadata, key)
         except:
             pass
-            
+
     return None

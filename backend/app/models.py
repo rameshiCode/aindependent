@@ -408,53 +408,53 @@ class UserProfileModel(BaseModel):
     last_updated: datetime
 
     # Core attributes
-    addiction_type: ProfileAttributeModel | None
-    addiction_severity: ProfileAttributeModel | None
-    addiction_duration: ProfileAttributeModel | None
-    previous_recovery_attempts: ProfileAttributeModel | None
+    addiction_type: ProfileAttributeModel | None = None
+    addiction_severity: ProfileAttributeModel | None = None
+    addiction_duration: ProfileAttributeModel | None = None
+    previous_recovery_attempts: ProfileAttributeModel | None = None
 
     # Family relationships
-    family_aware: ProfileAttributeModel | None
-    family_support_level: ProfileAttributeModel | None
-    family_communication: ProfileAttributeModel | None
-    family_triggers: ProfileAttributeModel | None
+    family_aware: ProfileAttributeModel | None = None
+    family_support_level: ProfileAttributeModel | None = None
+    family_communication: ProfileAttributeModel | None = None
+    family_triggers: ProfileAttributeModel | None = None
 
     # Psychological traits
-    need_for_approval: ProfileAttributeModel | None
-    fear_of_rejection: ProfileAttributeModel | None
-    low_self_confidence: ProfileAttributeModel | None
-    submissiveness: ProfileAttributeModel | None
+    need_for_approval: ProfileAttributeModel | None = None
+    fear_of_rejection: ProfileAttributeModel | None = None
+    low_self_confidence: ProfileAttributeModel | None = None
+    submissiveness: ProfileAttributeModel | None = None
 
     # Behavioral patterns
-    triggers: ProfileAttributeModel | None
-    motivation_level: ProfileAttributeModel | None
-    motivators: ProfileAttributeModel | None
-    barriers: ProfileAttributeModel | None
-    ambivalence_factors: ProfileAttributeModel | None
+    triggers: ProfileAttributeModel | None = None
+    motivation_level: ProfileAttributeModel | None = None
+    motivators: ProfileAttributeModel | None = None
+    barriers: ProfileAttributeModel | None = None
+    ambivalence_factors: ProfileAttributeModel | None = None
 
     # Recovery stage
-    recovery_stage: ProfileAttributeModel | None
+    recovery_stage: ProfileAttributeModel | None = None
 
     # Coping mechanisms
-    effective_strategies: ProfileAttributeModel | None
-    ineffective_patterns: ProfileAttributeModel | None
-    anxiety_management: ProfileAttributeModel | None
-    relapse_prevention: ProfileAttributeModel | None
+    effective_strategies: ProfileAttributeModel | None = None
+    ineffective_patterns: ProfileAttributeModel | None = None
+    anxiety_management: ProfileAttributeModel | None = None
+    relapse_prevention: ProfileAttributeModel | None = None
 
     # Contextual information
-    abstinence_start_date: ProfileAttributeModel | None
-    milestones: ProfileAttributeModel | None
-    high_risk_events: ProfileAttributeModel | None
-    regular_patterns: ProfileAttributeModel | None
+    abstinence_start_date: ProfileAttributeModel | None = None
+    milestones: ProfileAttributeModel | None = None
+    high_risk_events: ProfileAttributeModel | None = None
+    regular_patterns: ProfileAttributeModel | None = None
 
     # Environmental factors
-    living_situation: ProfileAttributeModel | None
-    work_environment: ProfileAttributeModel | None
-    social_circle: ProfileAttributeModel | None
-    support_resources: ProfileAttributeModel | None
+    living_situation: ProfileAttributeModel | None = None
+    work_environment: ProfileAttributeModel | None = None
+    social_circle: ProfileAttributeModel | None = None
+    support_resources: ProfileAttributeModel | None = None
 
     # Keywords for notifications
-    notification_keywords: list[str] | None
+    notification_keywords: ProfileAttributeModel | None = None
 
 
 # API response models for profile data

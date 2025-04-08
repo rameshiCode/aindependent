@@ -9,6 +9,7 @@ import {
   OpenaiService,
   ProfilesService,
   DefaultService,
+  NotificationsService,
 } from "../sdk.gen"
 import {
   queryOptions,
@@ -131,6 +132,11 @@ import type {
   ApiChatError,
   ApiEndChatData,
   ApiEndChatError,
+  NotificationsGetUserNotificationsData,
+  NotificationsMarkNotificationOpenedData,
+  NotificationsMarkNotificationOpenedError,
+  NotificationsGenerateNotificationsData,
+  NotificationsGenerateNotificationsResponse,
 } from "../types.gen"
 import { client as _heyApiClient } from "../client.gen"
 
@@ -1789,6 +1795,109 @@ export const apiEndChatMutation = (
   > = {
     mutationFn: async (localOptions) => {
       const { data } = await DefaultService.apiEndChat({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getUserNotificationsQueryKey = (
+  options?: Options<NotificationsGetUserNotificationsData>,
+) => createQueryKey("notificationsGetUserNotifications", options)
+
+export const getUserNotificationsOptions = (
+  options?: Options<NotificationsGetUserNotificationsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await NotificationsService.getUserNotifications({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getUserNotificationsQueryKey(options),
+  })
+}
+
+export const markNotificationOpenedQueryKey = (
+  options: Options<NotificationsMarkNotificationOpenedData>,
+) => createQueryKey("notificationsMarkNotificationOpened", options)
+
+export const markNotificationOpenedOptions = (
+  options: Options<NotificationsMarkNotificationOpenedData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await NotificationsService.markNotificationOpened({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: markNotificationOpenedQueryKey(options),
+  })
+}
+
+export const markNotificationOpenedMutation = (
+  options?: Partial<Options<NotificationsMarkNotificationOpenedData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    NotificationsMarkNotificationOpenedError,
+    Options<NotificationsMarkNotificationOpenedData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await NotificationsService.markNotificationOpened({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const generateNotificationsQueryKey = (
+  options?: Options<NotificationsGenerateNotificationsData>,
+) => createQueryKey("notificationsGenerateNotifications", options)
+
+export const generateNotificationsOptions = (
+  options?: Options<NotificationsGenerateNotificationsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await NotificationsService.generateNotifications({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: generateNotificationsQueryKey(options),
+  })
+}
+
+export const generateNotificationsMutation = (
+  options?: Partial<Options<NotificationsGenerateNotificationsData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    NotificationsGenerateNotificationsResponse,
+    DefaultError,
+    Options<NotificationsGenerateNotificationsData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await NotificationsService.generateNotifications({
         ...options,
         ...localOptions,
         throwOnError: true,

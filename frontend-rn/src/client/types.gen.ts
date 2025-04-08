@@ -1549,6 +1549,83 @@ export type ApiEndChatResponses = {
   200: unknown
 }
 
+export type NotificationsGetUserNotificationsData = {
+  body?: never
+  path?: never
+  query?: {
+    limit?: number
+    include_sent?: boolean
+  }
+  url: "/api/v1/notifications/"
+}
+
+export type NotificationsGetUserNotificationsErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type NotificationsGetUserNotificationsError =
+  NotificationsGetUserNotificationsErrors[keyof NotificationsGetUserNotificationsErrors]
+
+export type NotificationsGetUserNotificationsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<{
+    [key: string]: unknown
+  }>
+}
+
+export type NotificationsGetUserNotificationsResponse =
+  NotificationsGetUserNotificationsResponses[keyof NotificationsGetUserNotificationsResponses]
+
+export type NotificationsMarkNotificationOpenedData = {
+  body?: never
+  path: {
+    notification_id: string
+  }
+  query?: never
+  url: "/api/v1/notifications/mark-opened/{notification_id}"
+}
+
+export type NotificationsMarkNotificationOpenedErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type NotificationsMarkNotificationOpenedError =
+  NotificationsMarkNotificationOpenedErrors[keyof NotificationsMarkNotificationOpenedErrors]
+
+export type NotificationsMarkNotificationOpenedResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type NotificationsGenerateNotificationsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/notifications/generate"
+}
+
+export type NotificationsGenerateNotificationsResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type NotificationsGenerateNotificationsResponse =
+  NotificationsGenerateNotificationsResponses[keyof NotificationsGenerateNotificationsResponses]
+
 export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})
 }

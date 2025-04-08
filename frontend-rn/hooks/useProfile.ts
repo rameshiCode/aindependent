@@ -15,13 +15,16 @@ export interface UserProfile {
   recovery_stage: string | null;
   psychological_traits: Record<string, any> | null;
   last_updated: string;
+  insights: UserInsight[];
+  goals: UserGoal[];
   [key: string]: any;
 }
 
 export interface UserInsight {
   id: string;
-  insight_type: string;
+  type: string;
   value: string;
+  significance: number | null;
   confidence: number;
   extracted_at: string;
   mi_stage: string | null;
@@ -58,6 +61,9 @@ export interface UseProfileResult {
     error: Error | null;
     refetch: () => Promise<QueryObserverResult<UserGoal[], Error>>;
   };
+  updateAbstinence: (data: { reset?: boolean; days?: number }) => Promise<void>;
+  createGoal: (data: { description: string; target_date?: string }) => Promise<void>;
+  updateGoal: (goalId: string, data: { status?: string; description?: string; target_date?: string }) => Promise<void>;
 }
 
 export function useProfile(): UseProfileResult {
@@ -75,7 +81,18 @@ export function useProfile(): UseProfileResult {
     queryFn: async () => {
       try {
         const response = await ProfilesService.getMyProfile();
-        return response.data as unknown as UserProfile;
+        // Normalize the response data to our UserProfile interface
+        const profileData = response.data as any;
+
+        // Transform insights format if needed
+        if (profileData.insights) {
+          profileData.insights = profileData.insights.map((insight: any) => ({
+            ...insight,
+            type: insight.type, // Ensure we use type consistently (sometimes it's insight_type)
+          }));
+        }
+
+        return profileData as UserProfile;
       } catch (error) {
         console.error('Error fetching profile:', error);
         throw new Error('Failed to fetch profile');
@@ -98,7 +115,15 @@ export function useProfile(): UseProfileResult {
           const response = await ProfilesService.getUserInsights({
             query: type ? { insight_type: type } : undefined
           });
-          return response.data as unknown as UserInsight[];
+
+          // Normalize the response data
+          const insights = (response.data as any[]).map(insight => ({
+            ...insight,
+            // Ensure we have a consistent 'type' field
+            type: insight.type || insight.insight_type,
+          }));
+
+          return insights as UserInsight[];
         } catch (error) {
           console.error('Error fetching insights:', error);
           throw new Error('Failed to fetch insights');
@@ -146,6 +171,73 @@ export function useProfile(): UseProfileResult {
     };
   };
 
+  // Update abstinence status mutation
+  const updateAbstinenceMutation = useMutation({
+    mutationFn: async (data: { reset?: boolean; days?: number }) => {
+      const response = await ProfilesService.updateAbstinenceStatus({
+        body: data
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch profile
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    }
+  });
+
+  // Create goal mutation
+  const createGoalMutation = useMutation({
+    mutationFn: async (data: { description: string; target_date?: string }) => {
+      const response = await ProfilesService.createUserGoal({
+        body: data
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch goals
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
+    }
+  });
+
+  // Update goal mutation
+  const updateGoalMutation = useMutation({
+    mutationFn: async ({
+      goalId,
+      data
+    }: {
+      goalId: string;
+      data: { status?: string; description?: string; target_date?: string }
+    }) => {
+      const response = await ProfilesService.updateUserGoal({
+        path: { goal_id: goalId },
+        body: data
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch goals
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
+    }
+  });
+
+  // Helper function to update abstinence
+  const updateAbstinence = async (data: { reset?: boolean; days?: number }) => {
+    await updateAbstinenceMutation.mutateAsync(data);
+  };
+
+  // Helper function to create a goal
+  const createGoal = async (data: { description: string; target_date?: string }) => {
+    await createGoalMutation.mutateAsync(data);
+  };
+
+  // Helper function to update a goal
+  const updateGoal = async (
+    goalId: string,
+    data: { status?: string; description?: string; target_date?: string }
+  ) => {
+    await updateGoalMutation.mutateAsync({ goalId, data });
+  };
+
   return {
     profile: profile || null,
     isLoadingProfile,
@@ -153,5 +245,8 @@ export function useProfile(): UseProfileResult {
     refetchProfile,
     getInsights,
     getGoals,
+    updateAbstinence,
+    createGoal,
+    updateGoal
   };
 }
