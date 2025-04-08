@@ -141,6 +141,10 @@ import type {
   ProfilesUpdateProfileAttributeData,
   ProfilesUpdateProfileAttributeResponse,
   ProfilesUpdateProfileAttributeError,
+  ProfilesForceProfileExtractionData,
+  ProfilesForceProfileExtractionError,
+  ProfilesGenerateSampleProfileData,
+  ProfilesProcessAllConversationsData,
   ApiChatData,
   ApiChatError,
   ApiEndChatData,
@@ -1340,6 +1344,75 @@ export class ProfilesService {
         "Content-Type": "application/json",
         ...options?.headers,
       },
+    })
+  }
+
+  /**
+   * Force Profile Extraction
+   * Force profile extraction for a specific conversation
+   */
+  public static forceProfileExtraction<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesForceProfileExtractionData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      unknown,
+      ProfilesForceProfileExtractionError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/force-profile-extraction/{conversation_id}",
+      ...options,
+    })
+  }
+
+  /**
+   * Generate Sample Profile
+   * Generate a sample profile with insights for testing
+   */
+  public static generateSampleProfile<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesGenerateSampleProfileData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).post<
+      unknown,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/generate-sample-profile",
+      ...options,
+    })
+  }
+
+  /**
+   * Process All Conversations
+   * Process all conversations for the current user to extract profile insights
+   */
+  public static processAllConversations<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesProcessAllConversationsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).post<
+      unknown,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/process-all-conversations",
+      ...options,
     })
   }
 }

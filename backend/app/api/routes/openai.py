@@ -314,9 +314,14 @@ async def create_message(
             conversation_id=conversation_id,
             role=message.role,
             content=message.content,
+            # Add metadata if available
+            message_metadata=message.metadata or None
         )
         session.add(db_message)
         session.commit()
+        session.refresh(db_message)  # Get the ID for logging
+
+        logger.info(f"Saved user message with ID: {db_message.id}")
 
         # Get conversation history
         history = session.exec(
@@ -329,13 +334,26 @@ async def create_message(
             {"role": msg.role, "content": msg.content} for msg in history
         ]
 
-        # Add system message if not present
+        # Add system message if not present with specific motivational interviewing guidance
         if not any(msg["role"] == "system" for msg in messages_for_api):
             messages_for_api.insert(
                 0,
                 {
                     "role": "system",
-                    "content": "You are a caring, empathetic AI therapist helping people overcome addiction. Your goal is to motivate change using empathy and understanding. You're working with users anonymously to create a safe space where they can discuss their struggles. Always focus on their wellbeing.",
+                    "content": """You are a caring, empathetic AI therapist helping people overcome addiction. Your goal is to motivate change using motivational interviewing techniques:
+                    1. Express empathy through reflective listening
+                    2. Develop discrepancy between goals and behaviors
+                    3. Avoid argumentation and direct confrontation
+                    4. Adjust to client resistance
+                    5. Support self-efficacy and optimism
+
+                    Guide the conversation through these stages:
+                    - First engage and build rapport
+                    - Focus on specific addiction behaviors
+                    - Evoke the client's own motivations for change
+                    - Plan steps forward when ready
+
+                    Make sure to identify triggers, psychological traits, and possible coping strategies. Be warm, non-judgmental, and empathetic throughout.""",
                 },
             )
 
@@ -351,17 +369,24 @@ async def create_message(
         # Extract assistant message
         assistant_message = completion.choices[0].message.content
 
-        # Save assistant response to database
+        # Determine the current stage of motivational interviewing
+        mi_stage = determine_mi_stage(messages_for_api, assistant_message)
+        
+        # Save assistant response to database with MI stage metadata
         db_assistant_message = Message(
             conversation_id=conversation_id,
             role="assistant",
             content=assistant_message,
+            message_metadata={"stage": mi_stage}
         )
         session.add(db_assistant_message)
 
         # Update conversation timestamp
         conversation.updated_at = datetime.utcnow()
         session.commit()
+        session.refresh(db_assistant_message)  # Get the ID for logging
+
+        logger.info(f"Saved assistant message with ID: {db_assistant_message.id} and MI stage: {mi_stage}")
 
         # Check if the conversation has reached a goal-setting stage
         is_goal_accepted, goal_description = detect_goal_acceptance(
@@ -373,32 +398,52 @@ async def create_message(
 
             # Create the goal
             user_goal = UserGoal(
-                user_id=current_user.id, description=goal_description, status="active"
+                user_id=current_user.id, 
+                description=goal_description, 
+                status="active",
+                mi_related=True  # Mark this as MI-related goal
             )
             session.add(user_goal)
             session.commit()
+            session.refresh(user_goal)
+            
+            logger.info(f"Created goal with ID: {user_goal.id}")
 
             # Process the conversation with goal acceptance context
-            process_conversation_for_profile(
-                session_factory=lambda: Session(
-                    engine
-                ),  # Using the actual engine instance
-                conversation_id=str(conversation_id),
-                user_id=str(current_user.id),
-                is_goal_accepted=True,
-                goal_description=goal_description,
-            )
+            try:
+                await process_conversation_for_profile(
+                    session_factory=lambda: Session(engine),
+                    conversation_id=str(conversation_id),
+                    user_id=str(current_user.id),
+                    is_goal_accepted=True,
+                    goal_description=goal_description,
+                )
+                logger.info(f"Profile extraction completed for conversation {conversation_id} with goal acceptance")
+            except Exception as profile_error:
+                logger.error(f"Error in profile extraction with goal: {str(profile_error)}")
+                logger.error(traceback.format_exc())
+                # Continue execution even if profile extraction fails
         else:
-            # Regular background processing
-            background_tasks.add_task(
-                process_conversation_for_profile,
-                session_factory=lambda: Session(engine),  # Fix this line too
-                conversation_id=str(conversation_id),
-                user_id=str(current_user.id),
-            )
+            # Regular background processing - make it synchronous for better debugging
+            try:
+                logger.info(f"Starting background profile extraction for conversation {conversation_id}")
+                await process_conversation_for_profile(
+                    session_factory=lambda: Session(engine),
+                    conversation_id=str(conversation_id),
+                    user_id=str(current_user.id),
+                )
+                logger.info(f"Background profile extraction completed for conversation {conversation_id}")
+            except Exception as profile_error:
+                logger.error(f"Error in background profile extraction: {str(profile_error)}")
+                logger.error(traceback.format_exc())
+                # Continue execution even if profile extraction fails
 
-        # Return assistant message
-        return MessageSchema(role="assistant", content=assistant_message)
+        # Return assistant message with stage metadata
+        return MessageSchema(
+            role="assistant", 
+            content=assistant_message,
+            metadata={"stage": mi_stage}
+        )
 
     except HTTPException:
         # Re-raise HTTP exceptions
@@ -412,6 +457,69 @@ async def create_message(
             detail=f"Internal server error: {str(e)}",
         )
 
+
+def determine_mi_stage(messages: list[dict], current_message: str) -> str:
+    """
+    Determine the current stage of Motivational Interviewing based on the conversation context.
+    
+    Returns one of:
+    - "engaging": Building rapport and relationship
+    - "focusing": Identifying specific behaviors to change
+    - "evoking": Drawing out client's own motivations for change
+    - "planning": Developing commitment to change and specific plan
+    """
+    # Count of messages to establish context
+    message_count = len(messages)
+    
+    # Default to engaging for new conversations
+    if message_count <= 3:
+        return "engaging"
+    
+    # Look for key phrases in the current message
+    current_lower = current_message.lower()
+    
+    # Planning indicators
+    if any(phrase in current_lower for phrase in [
+        "what steps will you take",
+        "let's create a plan",
+        "how will you achieve",
+        "specific actions",
+        "your goal could be",
+        "i suggest setting a goal",
+        "commit to"
+    ]):
+        return "planning"
+    
+    # Evoking indicators
+    if any(phrase in current_lower for phrase in [
+        "why is this important to you",
+        "what would change look like",
+        "how would things be different",
+        "what are your reasons",
+        "on a scale of 1 to 10",
+        "what motivates you to change",
+        "what concerns you about"
+    ]):
+        return "evoking"
+    
+    # Focusing indicators
+    if any(phrase in current_lower for phrase in [
+        "tell me more about",
+        "could you describe",
+        "what specific aspects",
+        "which behaviors are most",
+        "how often do you",
+        "in what situations do you"
+    ]):
+        return "focusing"
+    
+    # Default to the most recent non-engaging stage to maintain continuity
+    for msg in reversed(messages):
+        if msg.get("role") == "assistant" and msg.get("metadata", {}).get("stage") in ["focusing", "evoking", "planning"]:
+            return msg["metadata"]["stage"]
+    
+    # Default to focusing if we can't determine the stage
+    return "focusing"
 
 def detect_goal_acceptance(messages, latest_assistant_message):
     """

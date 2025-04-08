@@ -176,6 +176,7 @@ async def process_conversation_for_profile(
         is_goal_accepted: Whether a goal was accepted in this conversation
         goal_description: The description of the accepted goal if any
     """
+    logger.info(f"Starting profile extraction for conversation {conversation_id}, user {user_id}")
     try:
         # Create a new session
         session = session_factory()
@@ -199,12 +200,15 @@ async def process_conversation_for_profile(
             logger.warning(f"No messages found for conversation {conversation_id}")
             return
 
+        logger.info(f"Processing {len(messages)} messages for profile extraction")
+
         # Get or create user profile
         profile = session.exec(
             select(UserProfile).where(UserProfile.user_id == uuid.UUID(user_id))
         ).first()
 
         if not profile:
+            logger.info(f"Creating new profile for user {user_id}")
             profile = UserProfile(user_id=uuid.UUID(user_id))
             session.add(profile)
             session.commit()
@@ -420,16 +424,26 @@ def extract_conversation_context(messages: list[Message]) -> dict[str, Any]:
     }
 
     for message in messages:
-        # Check if message has stage information
-        if (
-            hasattr(message, "metadata")
-            and message.metadata
-            and "stage" in message.metadata
-        ):
-            stage = message.metadata["stage"]
-            if stage not in context["stages_visited"]:
-                context["stages_visited"].append(stage)
-            context["current_stage"] = stage
+        # Check if message has stage information in metadata
+        if hasattr(message, 'message_metadata') and message.message_metadata:
+            # Handle different types of metadata
+            metadata = message.message_metadata
+            stage = None
+            
+            if isinstance(metadata, dict):
+                stage = metadata.get("stage")
+            elif hasattr(metadata, "get"):
+                # If it has get method but isn't a dict
+                stage = metadata.get("stage")
+            elif hasattr(metadata, "stage"):
+                # Direct attribute access
+                stage = metadata.stage
+            
+            # If we found a stage, add it to context
+            if stage:
+                if stage not in context["stages_visited"]:
+                    context["stages_visited"].append(stage)
+                context["current_stage"] = stage
 
     return context
 
@@ -449,7 +463,8 @@ def extract_addiction_type(messages: list[Message]) -> str | None:
         if (
             hasattr(message, "metadata")
             and message.metadata
-            and message.metadata.get("stage") == "tip_dependenta"
+            and hasattr(message.metadata, "stage")
+            and message.metadata.stage == "tip_dependenta"
             and message.role == "user"
         ):
             content = message.content.lower()
@@ -613,20 +628,45 @@ def extract_motivation_level(messages: list[Message]) -> int | None:
     Returns:
         Motivation level (1-10) or None if not found
     """
-    # Look for motivation level in messages with stage "motivatie"
+    # Look for motivation level in messages with stage "motivatie" or "evoking"
     for message in messages:
-        if (
-            hasattr(message, "metadata")
-            and message.metadata
-            and message.metadata.get("stage") == "motivatie"
-            and message.role == "user"
-        ):
+        if message.role == "user":
+            # Check if metadata exists and has the stage attribute
+            if hasattr(message, 'message_metadata') and message.message_metadata:
+                # Convert to dict if it's not already
+                metadata = message.message_metadata
+                if isinstance(metadata, dict):
+                    stage = metadata.get("stage")
+                elif hasattr(metadata, "get"):
+                    # If it has get method but isn't a dict
+                    stage = metadata.get("stage")
+                elif hasattr(metadata, "stage"):
+                    # Direct attribute access
+                    stage = metadata.stage
+                else:
+                    stage = None
+                
+                # Check if the stage is one where motivation might be discussed
+                if stage in ["motivatie", "evoking"]:
+                    content = message.content.lower()
+                    # Look for numeric rating
+                    if "scale" in content or "scară" in content or "out of 10" in content or "from 1 to 10" in content:
+                        import re
+                        numbers = re.findall(r"\b([1-9]|10)\b", content)
+                        if numbers:
+                            try:
+                                motivation = int(numbers[0])
+                                if 1 <= motivation <= 10:
+                                    return motivation
+                            except ValueError:
+                                pass
+            
+            # Even without proper metadata, check content for motivation scale mentions
             content = message.content.lower()
-
-            # Look for numeric rating
-            if "scale" in content or "scară" in content:
+            if ("scale" in content or "on a scale" in content) and (
+                "motivation" in content or "important" in content or "ready" in content
+            ):
                 import re
-
                 numbers = re.findall(r"\b([1-9]|10)\b", content)
                 if numbers:
                     try:
@@ -717,3 +757,37 @@ def extract_notification_keywords(messages: list[Message]) -> list[str]:
                             keywords.append(f"{time}:{activity}")
 
     return keywords
+
+def get_metadata_value(message: Message, key: str) -> Any:
+    """
+    Safely extract a value from message metadata, handling different types.
+    
+    Args:
+        message: The message object
+        key: The metadata key to look for
+        
+    Returns:
+        The value if found, None otherwise
+    """
+    if not hasattr(message, 'message_metadata') or not message.message_metadata:
+        return None
+        
+    metadata = message.message_metadata
+    
+    # Handle different metadata types
+    if isinstance(metadata, dict):
+        return metadata.get(key)
+    elif hasattr(metadata, "get"):
+        # If it has get method but isn't a dict
+        try:
+            return metadata.get(key)
+        except:
+            pass
+    elif hasattr(metadata, key):
+        # Direct attribute access
+        try:
+            return getattr(metadata, key)
+        except:
+            pass
+            
+    return None

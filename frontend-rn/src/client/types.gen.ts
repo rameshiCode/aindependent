@@ -1443,6 +1443,60 @@ export type ProfilesUpdateProfileAttributeResponses = {
 export type ProfilesUpdateProfileAttributeResponse =
   ProfilesUpdateProfileAttributeResponses[keyof ProfilesUpdateProfileAttributeResponses]
 
+export type ProfilesForceProfileExtractionData = {
+  body?: never
+  path: {
+    conversation_id: string
+  }
+  query?: never
+  url: "/api/v1/profiles/force-profile-extraction/{conversation_id}"
+}
+
+export type ProfilesForceProfileExtractionErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesForceProfileExtractionError =
+  ProfilesForceProfileExtractionErrors[keyof ProfilesForceProfileExtractionErrors]
+
+export type ProfilesForceProfileExtractionResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type ProfilesGenerateSampleProfileData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/generate-sample-profile"
+}
+
+export type ProfilesGenerateSampleProfileResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type ProfilesProcessAllConversationsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/process-all-conversations"
+}
+
+export type ProfilesProcessAllConversationsResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
 export type ApiChatData = {
   body: {
     [key: string]: unknown

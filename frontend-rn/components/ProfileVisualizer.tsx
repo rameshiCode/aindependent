@@ -1,19 +1,54 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '../hooks/useThemeColor';
 import { useProfile } from '../hooks/useProfile';
 
 export const ProfileVisualizer = ({ userId }: { userId: string }) => {
-  const { profile, insights, isLoading, error } = useProfile(userId);
+  const { profile, isLoadingProfile, profileError, getInsights, getGoals, refetchProfile } = useProfile();
+  
+  // Get insights using the hook function
+  const { 
+    data: insightsData,
+    isLoading: isLoadingInsights,
+    error: insightsError
+  } = getInsights();
+  
+  const isLoading = isLoadingProfile || isLoadingInsights;
+  const error = profileError || insightsError;
+  
+  // Create a helper function to group insights by type
+  const [insightsByType, setInsightsByType] = useState<Record<string, any[]>>({});
+  
+  useEffect(() => {
+    if (insightsData) {
+      const grouped = insightsData.reduce((acc: Record<string, any[]>, insight: any) => {
+        if (!acc[insight.insight_type]) {
+          acc[insight.insight_type] = [];
+        }
+        acc[insight.insight_type].push(insight);
+        return acc;
+      }, {});
+      setInsightsByType(grouped);
+    }
+  }, [insightsData]);
+  
+  // Use the theme colors
   const backgroundColor = useThemeColor({}, 'background');
-  const primaryColor = useThemeColor({}, 'primary');
-  const secondaryColor = useThemeColor({}, 'secondaryBackground');
   const textColor = useThemeColor({}, 'text');
+  const tintColor = useThemeColor({}, 'tint');
+  const cardBgColor = useThemeColor({}, 'inputBackground');
+  const borderColor = useThemeColor({}, 'inputBorder');
+
+  useEffect(() => {
+    console.log("Profile data:", profile);
+    console.log("Insights data:", insightsData);
+  }, [profile, insightsData]);
 
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor }]}>
+        <ActivityIndicator size="large" color={tintColor} />
         <ThemedText>Loading profile data...</ThemedText>
       </View>
     );
@@ -35,18 +70,9 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
     );
   }
 
-  // Group insights by type
-  const insightsByType = insights?.reduce((acc, insight) => {
-    if (!acc[insight.insight_type]) {
-      acc[insight.insight_type] = [];
-    }
-    acc[insight.insight_type].push(insight);
-    return acc;
-  }, {});
-
   return (
     <ScrollView style={[styles.container, { backgroundColor }]}>
-      <View style={[styles.card, { backgroundColor: secondaryColor }]}>
+      <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
         {/* Card Title */}
         <View style={styles.cardHeader}>
           <ThemedText style={styles.cardTitle}>User Profile</ThemedText>
@@ -71,7 +97,7 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
                       styles.progressBarFill,
                       {
                         width: `${profile.motivation_level * 10}%`,
-                        backgroundColor: primaryColor
+                        backgroundColor: tintColor
                       }
                     ]}
                   />
@@ -91,7 +117,7 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
                   const [trait, value] = insight.value.split(':');
                   if (value === 'true') {
                     return (
-                      <View key={index} style={[styles.chip, { borderColor: primaryColor }]}>
+                      <View key={index} style={[styles.chip, { borderColor: tintColor }]}>
                         <ThemedText style={styles.chipText}>
                           {trait.replace(/_/g, ' ')}
                         </ThemedText>
@@ -107,7 +133,7 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
           </View>
 
           {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: textColor + '30' }]} />
+          <View style={[styles.divider, { backgroundColor: `${textColor}30` }]} />
 
           <View style={styles.section}>
             <ThemedText style={styles.sectionTitle}>Triggers</ThemedText>
@@ -115,8 +141,8 @@ export const ProfileVisualizer = ({ userId }: { userId: string }) => {
               <View style={styles.listSection}>
                 {insightsByType.trigger.map((insight, index) => (
                   <View key={index} style={styles.listItem}>
-                    <View style={[styles.listIcon, { backgroundColor: primaryColor + '30' }]}>
-                      <ThemedText style={{ color: primaryColor }}>!</ThemedText>
+                    <View style={[styles.listIcon, { backgroundColor: `${tintColor}30` }]}>
+                      <ThemedText style={{ color: tintColor }}>!</ThemedText>
                     </View>
                     <View style={styles.listContent}>
                       <ThemedText style={styles.listTitle}>{insight.value}</ThemedText>
@@ -166,6 +192,7 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: 16,
     borderRadius: 8,
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

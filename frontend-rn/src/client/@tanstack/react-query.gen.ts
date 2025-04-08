@@ -123,6 +123,10 @@ import type {
   ProfilesUpdateProfileAttributeData,
   ProfilesUpdateProfileAttributeError,
   ProfilesUpdateProfileAttributeResponse,
+  ProfilesForceProfileExtractionData,
+  ProfilesForceProfileExtractionError,
+  ProfilesGenerateSampleProfileData,
+  ProfilesProcessAllConversationsData,
   ApiChatData,
   ApiChatError,
   ApiEndChatData,
@@ -1598,6 +1602,129 @@ export const updateProfileAttributeMutation = (
   return mutationOptions
 }
 
+export const forceProfileExtractionQueryKey = (
+  options: Options<ProfilesForceProfileExtractionData>,
+) => createQueryKey("profilesForceProfileExtraction", options)
+
+export const forceProfileExtractionOptions = (
+  options: Options<ProfilesForceProfileExtractionData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.forceProfileExtraction({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: forceProfileExtractionQueryKey(options),
+  })
+}
+
+export const forceProfileExtractionMutation = (
+  options?: Partial<Options<ProfilesForceProfileExtractionData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    ProfilesForceProfileExtractionError,
+    Options<ProfilesForceProfileExtractionData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.forceProfileExtraction({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const generateSampleProfileQueryKey = (
+  options?: Options<ProfilesGenerateSampleProfileData>,
+) => createQueryKey("profilesGenerateSampleProfile", options)
+
+export const generateSampleProfileOptions = (
+  options?: Options<ProfilesGenerateSampleProfileData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.generateSampleProfile({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: generateSampleProfileQueryKey(options),
+  })
+}
+
+export const generateSampleProfileMutation = (
+  options?: Partial<Options<ProfilesGenerateSampleProfileData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    DefaultError,
+    Options<ProfilesGenerateSampleProfileData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.generateSampleProfile({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const processAllConversationsQueryKey = (
+  options?: Options<ProfilesProcessAllConversationsData>,
+) => createQueryKey("profilesProcessAllConversations", options)
+
+export const processAllConversationsOptions = (
+  options?: Options<ProfilesProcessAllConversationsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.processAllConversations({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: processAllConversationsQueryKey(options),
+  })
+}
+
+export const processAllConversationsMutation = (
+  options?: Partial<Options<ProfilesProcessAllConversationsData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    DefaultError,
+    Options<ProfilesProcessAllConversationsData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.processAllConversations({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
 export const apiChatQueryKey = (options: Options<ApiChatData>) =>
   createQueryKey("apiChat", options)
 
@@ -1671,5 +1798,3 @@ export const apiEndChatMutation = (
   }
   return mutationOptions
 }
-
-export { OpenaiService }

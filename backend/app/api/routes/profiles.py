@@ -1,12 +1,13 @@
 # app/api/routes/profiles.py
+import traceback
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, status
-from sqlmodel import select
+from fastapi import APIRouter, BackgroundTasks, HTTPException, logger, status
+from sqlmodel import func, select
 
 from app.api.deps import CurrentUser, SessionDep
-from app.models import UserGoal, UserInsight, UserProfile
+from app.models import Conversation, Message, UserGoal, UserInsight, UserProfile
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -372,4 +373,276 @@ def update_profile_attribute(
         "name": attribute_name,
         "value": data["value"],
         "last_updated": profile.last_updated.isoformat(),
+    }
+
+@router.post("/force-profile-extraction/{conversation_id}")
+async def force_profile_extraction(
+    conversation_id: str,
+    background_tasks: BackgroundTasks,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """Force profile extraction for a specific conversation"""
+    from app.services.profile_extractor import process_conversation_for_profile
+    from app.core.db import engine
+    from sqlmodel import Session
+    
+    # Verify the conversation exists and belongs to the user
+    conversation = session.exec(
+        select(Conversation)
+        .where(Conversation.id == uuid.UUID(conversation_id))
+        .where(Conversation.user_id == current_user.id)
+    ).first()
+    
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found or doesn't belong to you"
+        )
+        
+    # Count the messages in the conversation
+    message_count = session.exec(
+        select(func.count(Message.id))
+        .where(Message.conversation_id == uuid.UUID(conversation_id))
+    ).one()
+    
+    if message_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Conversation has no messages to process"
+        )
+        
+    # Process the conversation
+    try:
+        # Run immediately for better debugging
+        await process_conversation_for_profile(
+            session_factory=lambda: Session(engine),
+            conversation_id=conversation_id,
+            user_id=str(current_user.id),
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Profile extraction completed for conversation {conversation_id}",
+            "message_count": message_count
+        }
+    except Exception as e:
+        # Log the error but don't expose details to the client
+        logger.error(f"Profile extraction failed: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Profile extraction failed. Check server logs for details."
+        )
+
+@router.post("/generate-sample-profile")
+async def generate_sample_profile(
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """Generate a sample profile with insights for testing"""
+    # Get or create profile
+    profile = session.exec(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    ).first()
+    
+    if not profile:
+        profile = UserProfile(
+            user_id=current_user.id,
+            addiction_type="alcohol",
+            motivation_level=7,
+            recovery_stage="contemplation",
+            abstinence_days=3,
+            abstinence_start_date=datetime.utcnow() - timedelta(days=3),
+            last_updated=datetime.utcnow()
+        )
+        session.add(profile)
+        session.commit()
+        session.refresh(profile)
+    else:
+        # Update existing profile with sample data
+        profile.addiction_type = "alcohol"
+        profile.motivation_level = 7
+        profile.recovery_stage = "contemplation"
+        profile.abstinence_days = 3
+        profile.abstinence_start_date = datetime.utcnow() - timedelta(days=3)
+        profile.last_updated = datetime.utcnow()
+        session.add(profile)
+        session.commit()
+    
+    # Create sample insights
+    insights = [
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="trigger",
+            value="weekend social events",
+            day_of_week="saturday",
+            emotional_significance=0.8,
+            confidence=0.9,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="trigger",
+            value="work stress",
+            time_of_day="evening",
+            emotional_significance=0.7,
+            confidence=0.8,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="psychological_trait",
+            value="fear_of_failure:true",
+            emotional_significance=0.6,
+            confidence=0.7,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="psychological_trait",
+            value="need_for_approval:true",
+            emotional_significance=0.65,
+            confidence=0.75,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="coping_strategy",
+            value="exercise after work",
+            emotional_significance=0.5,
+            confidence=0.6,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="recovery_stage",
+            value="contemplation",
+            emotional_significance=0.9,
+            confidence=0.85,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="psychological_trait",
+            value="fear_of_failure:true",
+            emotional_significance=0.6,
+            confidence=0.7,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="psychological_trait",
+            value="need_for_approval:true",
+            emotional_significance=0.65,
+            confidence=0.75,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="coping_strategy",
+            value="exercise after work",
+            emotional_significance=0.5,
+            confidence=0.6,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="recovery_stage",
+            value="contemplation",
+            emotional_significance=0.9,
+            confidence=0.85,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="motivation",
+            value="Motivation level: 7/10",
+            emotional_significance=0.8,
+            confidence=0.8,
+            extracted_at=datetime.utcnow(),
+        ),
+        UserInsight(
+            user_id=current_user.id,
+            profile_id=profile.id,
+            insight_type="notification_keyword",
+            value="saturday:drinking",
+            day_of_week="saturday",
+            emotional_significance=0.7,
+            confidence=0.75,
+            extracted_at=datetime.utcnow(),
+        )
+    ]
+
+@router.post("/process-all-conversations")
+async def process_all_conversations(
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """Process all conversations for the current user to extract profile insights"""
+    from app.services.profile_extractor import process_conversation_for_profile
+    from app.core.db import engine
+    from sqlmodel import Session
+    
+    # Get all conversations for the user
+    conversations = session.exec(
+        select(Conversation)
+        .where(Conversation.user_id == current_user.id)
+        .order_by(Conversation.updated_at.desc())
+    ).all()
+    
+    if not conversations:
+        return {
+            "status": "success",
+            "message": "No conversations found for processing",
+            "processed_count": 0
+        }
+        
+    processed_count = 0
+    errors = []
+    
+    # Process each conversation
+    for conversation in conversations:
+        # Check if conversation has messages
+        message_count = session.exec(
+            select(func.count(Message.id))
+            .where(Message.conversation_id == conversation.id)
+        ).one()
+        
+        if message_count == 0:
+            continue
+            
+        try:
+            # Process each conversation
+            await process_conversation_for_profile(
+                session_factory=lambda: Session(engine),
+                conversation_id=str(conversation.id),
+                user_id=str(current_user.id),
+            )
+            processed_count += 1
+            
+        except Exception as e:
+            # Log the error but continue with other conversations
+            logger.error(f"Failed to process conversation {conversation.id}: {str(e)}")
+            logger.error(traceback.format_exc())
+            errors.append(str(conversation.id))
+    
+    return {
+        "status": "success",
+        "message": f"Processed {processed_count} conversations",
+        "processed_count": processed_count,
+        "total_conversations": len(conversations),
+        "errors": errors
     }
