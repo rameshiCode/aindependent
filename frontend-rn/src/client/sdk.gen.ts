@@ -145,6 +145,11 @@ import type {
   ProfilesForceProfileExtractionError,
   ProfilesGenerateSampleProfileData,
   ProfilesProcessAllConversationsData,
+  ProfilesGetVisualizationDataData,
+  ProfilesAnalyzeConversationData,
+  ProfilesAnalyzeConversationError,
+  ProfilesAnalyzeMessageData,
+  ProfilesAnalyzeMessageError,
   ApiChatData,
   ApiChatError,
   ApiEndChatData,
@@ -1420,6 +1425,79 @@ export class ProfilesService {
       ],
       url: "/api/v1/profiles/process-all-conversations",
       ...options,
+    })
+  }
+
+  /**
+   * Get Visualization Data
+   * Get formatted data for profile visualizations
+   */
+  public static getVisualizationData<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesGetVisualizationDataData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      unknown,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/visualization-data",
+      ...options,
+    })
+  }
+
+  /**
+   * Analyze Conversation
+   * Analyze a conversation to extract profile insights
+   */
+  public static analyzeConversation<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesAnalyzeConversationData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      unknown,
+      ProfilesAnalyzeConversationError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/analyze-conversation",
+      ...options,
+    })
+  }
+
+  /**
+   * Analyze Message
+   * Analyze a single message to extract profile insights
+   */
+  public static analyzeMessage<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesAnalyzeMessageData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      unknown,
+      ProfilesAnalyzeMessageError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/analyze-message",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
     })
   }
 }

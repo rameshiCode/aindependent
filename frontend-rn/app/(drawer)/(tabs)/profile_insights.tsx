@@ -1,26 +1,15 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { ProfileVisualizer } from '../../../components/ProfileVisualizer';
-import { useAuth } from '../../../context/authProvider';
+// In frontend-rn/app/(drawer)/(tabs)/profile_insights.tsx
+
+import React from 'react';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { ThemedText } from '../../../components/ThemedText';
+import { useAuth } from '../../../context/authProvider';
+import EnhancedProfileVisualizer from '../../../components/ProfileVisualizer';
+import RecoveryStageTracker from '../../../components/RecoveryStageTracker';
 
 export default function ProfileScreen() {
-  const { currentUser, isLoading } = useAuth();
+  const { currentUser } = useAuth();
   const userId = currentUser?.id;
-
-  useEffect(() => {
-    console.log("Current user:", currentUser);
-    console.log("User ID:", userId);
-  }, [currentUser, userId]);
-
-  // Show loading state while auth is being determined
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <ThemedText>Loading authentication data...</ThemedText>
-      </View>
-    );
-  }
 
   if (!userId) {
     return (
@@ -31,14 +20,32 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <ProfileVisualizer userId={userId} />
-    </View>
+    <ScrollView style={styles.container}>
+      {/* Main profile summary card */}
+      <View style={styles.sectionContainer}>
+        <ThemedText style={styles.sectionTitle}>Recovery Progress</ThemedText>
+        <RecoveryStageTracker userId={userId} />
+      </View>
+
+      {/* Profile visualization */}
+      <View style={styles.sectionContainer}>
+        <ThemedText style={styles.sectionTitle}>Profile Insights</ThemedText>
+        <EnhancedProfileVisualizer userId={userId} />
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  sectionContainer: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    padding: 16,
   },
 });

@@ -1497,6 +1497,77 @@ export type ProfilesProcessAllConversationsResponses = {
   200: unknown
 }
 
+export type ProfilesGetVisualizationDataData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/visualization-data"
+}
+
+export type ProfilesGetVisualizationDataResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type ProfilesAnalyzeConversationData = {
+  body?: never
+  path?: never
+  query: {
+    conversation_id: string
+    user_id?: string
+    is_goal_accepted?: boolean
+    goal_description?: string
+  }
+  url: "/api/v1/profiles/analyze-conversation"
+}
+
+export type ProfilesAnalyzeConversationErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesAnalyzeConversationError =
+  ProfilesAnalyzeConversationErrors[keyof ProfilesAnalyzeConversationErrors]
+
+export type ProfilesAnalyzeConversationResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type ProfilesAnalyzeMessageData = {
+  body: {
+    [key: string]: unknown
+  }
+  path?: never
+  query?: {
+    user_id?: string
+  }
+  url: "/api/v1/profiles/analyze-message"
+}
+
+export type ProfilesAnalyzeMessageErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesAnalyzeMessageError =
+  ProfilesAnalyzeMessageErrors[keyof ProfilesAnalyzeMessageErrors]
+
+export type ProfilesAnalyzeMessageResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
 export type ApiChatData = {
   body: {
     [key: string]: unknown

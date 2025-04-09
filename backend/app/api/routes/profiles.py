@@ -375,6 +375,7 @@ def update_profile_attribute(
         "last_updated": profile.last_updated.isoformat(),
     }
 
+
 @router.post("/force-profile-extraction/{conversation_id}")
 async def force_profile_extraction(
     conversation_id: str,
@@ -383,58 +384,63 @@ async def force_profile_extraction(
     current_user: CurrentUser,
 ):
     """Force profile extraction for a specific conversation"""
-    from app.services.profile_extractor import process_conversation_for_profile
-    from app.core.db import engine
     from sqlmodel import Session
-    
+
+    from app.core.db import engine
+    from app.services.profile_analysis_service import ProfileAnalysisService
+
     # Verify the conversation exists and belongs to the user
     conversation = session.exec(
         select(Conversation)
         .where(Conversation.id == uuid.UUID(conversation_id))
         .where(Conversation.user_id == current_user.id)
     ).first()
-    
+
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found or doesn't belong to you"
+            detail="Conversation not found or doesn't belong to you",
         )
-        
+
     # Count the messages in the conversation
     message_count = session.exec(
-        select(func.count(Message.id))
-        .where(Message.conversation_id == uuid.UUID(conversation_id))
+        select(func.count(Message.id)).where(
+            Message.conversation_id == uuid.UUID(conversation_id)
+        )
     ).one()
-    
+
     if message_count == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Conversation has no messages to process"
+            detail="Conversation has no messages to process",
         )
-        
+
     # Process the conversation
     try:
+        # Create profile analyzer
+        profile_analyzer = ProfileAnalysisService(lambda: Session(engine))
+
         # Run immediately for better debugging
-        await process_conversation_for_profile(
-            session_factory=lambda: Session(engine),
-            conversation_id=conversation_id,
-            user_id=str(current_user.id),
+        result = await profile_analyzer.process_conversation(
+            conversation_id, str(current_user.id)
         )
-        
+
         return {
             "status": "success",
             "message": f"Profile extraction completed for conversation {conversation_id}",
-            "message_count": message_count
+            "message_count": message_count,
+            "insights_extracted": result.get("insights_count", 0),
         }
     except Exception as e:
         # Log the error but don't expose details to the client
         logger.error(f"Profile extraction failed: {str(e)}")
         logger.error(traceback.format_exc())
-        
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Profile extraction failed. Check server logs for details."
+            detail="Profile extraction failed. Check server logs for details.",
         )
+
 
 @router.post("/generate-sample-profile")
 async def generate_sample_profile(
@@ -446,7 +452,7 @@ async def generate_sample_profile(
     profile = session.exec(
         select(UserProfile).where(UserProfile.user_id == current_user.id)
     ).first()
-    
+
     if not profile:
         profile = UserProfile(
             user_id=current_user.id,
@@ -455,7 +461,7 @@ async def generate_sample_profile(
             recovery_stage="contemplation",
             abstinence_days=3,
             abstinence_start_date=datetime.utcnow() - timedelta(days=3),
-            last_updated=datetime.utcnow()
+            last_updated=datetime.utcnow(),
         )
         session.add(profile)
         session.commit()
@@ -470,7 +476,7 @@ async def generate_sample_profile(
         profile.last_updated = datetime.utcnow()
         session.add(profile)
         session.commit()
-    
+
     # Create sample insights
     insights = [
         UserInsight(
@@ -583,8 +589,9 @@ async def generate_sample_profile(
             emotional_significance=0.7,
             confidence=0.75,
             extracted_at=datetime.utcnow(),
-        )
+        ),
     ]
+
 
 @router.post("/process-all-conversations")
 async def process_all_conversations(
@@ -592,38 +599,40 @@ async def process_all_conversations(
     current_user: CurrentUser,
 ):
     """Process all conversations for the current user to extract profile insights"""
-    from app.services.profile_extractor import process_conversation_for_profile
-    from app.core.db import engine
     from sqlmodel import Session
-    
+
+    from app.core.db import engine
+    from app.services.profile_extractor import process_conversation_for_profile
+
     # Get all conversations for the user
     conversations = session.exec(
         select(Conversation)
         .where(Conversation.user_id == current_user.id)
         .order_by(Conversation.updated_at.desc())
     ).all()
-    
+
     if not conversations:
         return {
             "status": "success",
             "message": "No conversations found for processing",
-            "processed_count": 0
+            "processed_count": 0,
         }
-        
+
     processed_count = 0
     errors = []
-    
+
     # Process each conversation
     for conversation in conversations:
         # Check if conversation has messages
         message_count = session.exec(
-            select(func.count(Message.id))
-            .where(Message.conversation_id == conversation.id)
+            select(func.count(Message.id)).where(
+                Message.conversation_id == conversation.id
+            )
         ).one()
-        
+
         if message_count == 0:
             continue
-            
+
         try:
             # Process each conversation
             await process_conversation_for_profile(
@@ -632,17 +641,213 @@ async def process_all_conversations(
                 user_id=str(current_user.id),
             )
             processed_count += 1
-            
+
         except Exception as e:
             # Log the error but continue with other conversations
             logger.error(f"Failed to process conversation {conversation.id}: {str(e)}")
             logger.error(traceback.format_exc())
             errors.append(str(conversation.id))
-    
+
     return {
         "status": "success",
         "message": f"Processed {processed_count} conversations",
         "processed_count": processed_count,
         "total_conversations": len(conversations),
-        "errors": errors
+        "errors": errors,
     }
+
+
+@router.get("/visualization-data")
+async def get_visualization_data(session: SessionDep, current_user: CurrentUser):
+    """Get formatted data for profile visualizations"""
+
+    # Get user profile
+    profile = session.exec(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    ).first()
+
+    if not profile:
+        return {"profile": None, "insights": [], "connections": []}
+
+    # Get insights
+    insights = session.exec(
+        select(UserInsight)
+        .where(UserInsight.user_id == current_user.id)
+        .order_by(UserInsight.extracted_at.desc())
+    ).all()
+
+    # Format insights for the frontend
+    formatted_insights = []
+    for insight in insights:
+        formatted_insight = {
+            "id": str(insight.id),
+            "type": insight.insight_type,
+            "value": insight.value,
+            "significance": insight.emotional_significance,
+            "confidence": insight.confidence,
+            "day_of_week": insight.day_of_week,
+            "time_of_day": insight.time_of_day,
+            "extracted_at": insight.extracted_at.isoformat()
+            if insight.extracted_at
+            else None,
+        }
+        formatted_insights.append(formatted_insight)
+
+    # Generate connections between insights
+    connections = []
+
+    # Connect triggers with psychological traits
+    trigger_insights = [i for i in insights if i.insight_type == "trigger"]
+    trait_insights = [i for i in insights if i.insight_type == "psychological_trait"]
+    strategy_insights = [i for i in insights if i.insight_type == "coping_strategy"]
+
+    # Create connections between traits and triggers
+    for trait in trait_insights:
+        trait_value = trait.value.lower()
+
+        for trigger in trigger_insights:
+            trigger_value = trigger.value.lower()
+
+            # Check for relationships
+            is_related = False
+
+            # Need for approval related to social situations
+            if "need_for_approval" in trait_value and any(
+                word in trigger_value for word in ["social", "friend", "party"]
+            ):
+                is_related = True
+
+            # Low self-confidence related to stress/anxiety
+            if "low_self_confidence" in trait_value and any(
+                word in trigger_value for word in ["stress", "anxi", "pressure"]
+            ):
+                is_related = True
+
+            # Fear of rejection related to social situations
+            if "fear_of_rejection" in trait_value and any(
+                word in trigger_value for word in ["social", "family", "friend"]
+            ):
+                is_related = True
+
+            if is_related:
+                connections.append(
+                    {
+                        "source": str(trait.id),
+                        "target": str(trigger.id),
+                        "type": "influences",
+                        "strength": 0.7,
+                    }
+                )
+
+    # Connect coping strategies to triggers they help with
+    for strategy in strategy_insights:
+        strategy_value = strategy.value.lower()
+
+        for trigger in trigger_insights:
+            trigger_value = trigger.value.lower()
+
+            # Check for relationships
+            is_relevant = False
+
+            # Exercise helps with stress
+            if "exercise" in strategy_value and any(
+                word in trigger_value for word in ["stress", "anxiety"]
+            ):
+                is_relevant = True
+
+            # Meditation helps with anxiety
+            if "meditation" in strategy_value and any(
+                word in trigger_value for word in ["anxiety", "stress"]
+            ):
+                is_relevant = True
+
+            # Social support helps with loneliness
+            if any(
+                word in strategy_value for word in ["call", "friend", "support"]
+            ) and any(word in trigger_value for word in ["lone", "alone"]):
+                is_relevant = True
+
+            if is_relevant:
+                connections.append(
+                    {
+                        "source": str(strategy.id),
+                        "target": str(trigger.id),
+                        "type": "helps_with",
+                        "strength": 0.8,
+                    }
+                )
+
+    return {
+        "profile": {
+            "id": str(profile.id),
+            "addiction_type": profile.addiction_type,
+            "recovery_stage": profile.recovery_stage,
+            "motivation_level": profile.motivation_level,
+            "abstinence_days": profile.abstinence_days,
+            "abstinence_start_date": profile.abstinence_start_date.isoformat()
+            if profile.abstinence_start_date
+            else None,
+            "last_updated": profile.last_updated.isoformat()
+            if profile.last_updated
+            else None,
+        },
+        "insights": formatted_insights,
+        "connections": connections,
+    }
+
+
+# Add these to your profiles.py file
+@router.post("/analyze-conversation")
+async def analyze_conversation(
+    conversation_id: str,
+    user_id: str = None,
+    is_goal_accepted: bool = False,
+    goal_description: str = None,
+    session: SessionDep = None,
+    current_user: CurrentUser = None,
+):
+    """Analyze a conversation to extract profile insights"""
+    from sqlmodel import Session
+
+    from app.core.db import engine
+    from app.services.profile_analysis_service import ProfileAnalysisService
+
+    # Use current user ID if no specific user_id provided
+    if not user_id and current_user:
+        user_id = str(current_user.id)
+
+    # Initialize the analyzer service
+    analyzer = ProfileAnalysisService(lambda: Session(engine))
+
+    # Process the conversation
+    result = await analyzer.process_conversation(
+        conversation_id, user_id, is_goal_accepted, goal_description
+    )
+
+    return result
+
+
+@router.post("/analyze-message")
+async def analyze_message(
+    message: dict,
+    user_id: str = None,
+    session: SessionDep = None,
+    current_user: CurrentUser = None,
+):
+    """Analyze a single message to extract profile insights"""
+    from sqlmodel import Session
+
+    from app.core.db import engine
+    from app.services.profile_analysis_service import ProfileAnalysisService
+
+    # Use current user ID if no specific user_id provided
+    if not user_id and current_user:
+        user_id = str(current_user.id)
+
+    # Initialize the analyzer service
+    analyzer = ProfileAnalysisService(lambda: Session(engine))
+
+    # Analyze the message
+    insights = await analyzer.analyze_message(user_id, message)
+
+    return {"insights": insights}

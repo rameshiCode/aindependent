@@ -128,6 +128,11 @@ import type {
   ProfilesForceProfileExtractionError,
   ProfilesGenerateSampleProfileData,
   ProfilesProcessAllConversationsData,
+  ProfilesGetVisualizationDataData,
+  ProfilesAnalyzeConversationData,
+  ProfilesAnalyzeConversationError,
+  ProfilesAnalyzeMessageData,
+  ProfilesAnalyzeMessageError,
   ApiChatData,
   ApiChatError,
   ApiEndChatData,
@@ -1721,6 +1726,109 @@ export const processAllConversationsMutation = (
   > = {
     mutationFn: async (localOptions) => {
       const { data } = await ProfilesService.processAllConversations({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getVisualizationDataQueryKey = (
+  options?: Options<ProfilesGetVisualizationDataData>,
+) => createQueryKey("profilesGetVisualizationData", options)
+
+export const getVisualizationDataOptions = (
+  options?: Options<ProfilesGetVisualizationDataData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.getVisualizationData({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getVisualizationDataQueryKey(options),
+  })
+}
+
+export const analyzeConversationQueryKey = (
+  options: Options<ProfilesAnalyzeConversationData>,
+) => createQueryKey("profilesAnalyzeConversation", options)
+
+export const analyzeConversationOptions = (
+  options: Options<ProfilesAnalyzeConversationData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.analyzeConversation({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: analyzeConversationQueryKey(options),
+  })
+}
+
+export const analyzeConversationMutation = (
+  options?: Partial<Options<ProfilesAnalyzeConversationData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    ProfilesAnalyzeConversationError,
+    Options<ProfilesAnalyzeConversationData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.analyzeConversation({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const analyzeMessageQueryKey = (
+  options: Options<ProfilesAnalyzeMessageData>,
+) => createQueryKey("profilesAnalyzeMessage", options)
+
+export const analyzeMessageOptions = (
+  options: Options<ProfilesAnalyzeMessageData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.analyzeMessage({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: analyzeMessageQueryKey(options),
+  })
+}
+
+export const analyzeMessageMutation = (
+  options?: Partial<Options<ProfilesAnalyzeMessageData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    ProfilesAnalyzeMessageError,
+    Options<ProfilesAnalyzeMessageData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.analyzeMessage({
         ...options,
         ...localOptions,
         throwOnError: true,
