@@ -213,7 +213,7 @@ class PaymentMethod(SQLModel, table=True):
     customer: Customer = Relationship(back_populates="payment_methods")
 
 
-# Add to models.py
+# Payment Intent models
 class PaymentIntentCreate(BaseModel):
     price_id: str
     customer_id: str | None = None
@@ -235,6 +235,9 @@ class Conversation(SQLModel, table=True):
     title: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    # Optionally, you can add a field to directly track the latest MI stage
+    # For example:
+    # current_mi_stage: str | None = Field(default=None)
 
     # Relationships
     user: User = Relationship(back_populates="conversations")
@@ -254,7 +257,7 @@ class Message(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     message_metadata: dict | None = Field(
         default=None, sa_column=Column(JSON)
-    )  # Added for MI stage tracking
+    )  # Stores MI stage and wrap-up flag (e.g., {"stage": "planning", "summary_style": true})
 
     # Relationships
     conversation: Conversation | None = Relationship(back_populates="messages")
@@ -264,7 +267,7 @@ class Message(SQLModel, table=True):
 class MessageSchema(BaseModel):
     role: str
     content: str
-    metadata: dict | None = None  # Added for MI stage tracking
+    metadata: dict | None = None  # For MI stage tracking
 
 
 class ChatCompletionRequest(SQLModel):
@@ -327,14 +330,14 @@ class UserProfile(SQLModel, table=True):
     abstinence_start_date: datetime | None = None
     relapse_risk_score: int | None = None
     motivation_level: int | None = None
-    recovery_stage: str | None = None  # Added for MI-based profiling
+    recovery_stage: str | None = None  # MI-based profiling
     psychological_traits: dict | None = Field(
         default=None, sa_column=Column(JSON)
-    )  # Added for MI-based profiling
+    )  # Example: {"need_for_approval": true, "low_self_confidence": true}
     big_five_scores: dict | None = Field(default=None, sa_column=Column(JSON))
     last_updated: datetime = Field(default_factory=datetime.utcnow)
 
-    # Relationship
+    # Relationships
     user: User = Relationship(back_populates="profile")
     insights: list["UserInsight"] = Relationship(back_populates="profile")
 
@@ -354,7 +357,7 @@ class UserInsight(SQLModel, table=True):
     emotional_significance: float | None = None
     confidence: float = 0.0
     extracted_at: datetime = Field(default_factory=datetime.utcnow)
-    mi_stage: str | None = None  # Added for MI-based profiling
+    mi_stage: str | None = None  # Captures the MI stage when this insight was extracted
 
     # Relationships
     profile: UserProfile = Relationship(back_populates="insights")
@@ -371,7 +374,7 @@ class UserGoal(SQLModel, table=True):
     target_date: datetime | None = None
     status: str = "active"  # 'active', 'completed', 'abandoned'
     last_notification_sent: datetime | None = None
-    mi_related: bool = False  # Added to track if goal was created through MI process
+    mi_related: bool = False  # True if this goal was created via the MI process
 
     # Relationship
     user: User = Relationship()
@@ -383,10 +386,10 @@ class UserNotification(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
     title: str
     body: str
-    notification_type: str  # 'goal_reminder', 'risk_event', 'abstinence_milestone'
+    notification_type: str  # e.g., 'goal_reminder', 'risk_event', 'abstinence_milestone'
     scheduled_for: datetime
-    related_entity_id: uuid.UUID | None = None  # Could be insight_id or goal_id
-    priority: int = 3  # 1-5 scale
+    related_entity_id: uuid.UUID | None = None  # Could reference an insight or goal
+    priority: int = 3  # Scale from 1 (highest) to 5
     was_sent: bool = False
     was_opened: bool = False
 

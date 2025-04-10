@@ -1526,7 +1526,7 @@ export class DefaultService {
 
   /**
    * End Chat
-   * End the conversation and perform comprehensive profile analysis
+   * End the conversation and perform comprehensive profile analysis.
    */
   public static apiEndChat<ThrowOnError extends boolean = false>(
     options: Options<ApiEndChatData, ThrowOnError>,
