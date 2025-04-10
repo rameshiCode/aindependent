@@ -72,8 +72,9 @@ class ConversationAnalyzer:
                     user_id, "recovery_stage", recovery_stage, 0.7
                 )
 
-        # Process user messages for addiction type
+        # Process content for additional profile insights
         if role == "user" and message_text:
+        # [existing content analysis]
             text = message_text.lower()
 
             # Extract addiction type using trigger detector

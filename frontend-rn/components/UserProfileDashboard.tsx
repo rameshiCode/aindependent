@@ -52,10 +52,11 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
     
     const grouped: { [key: string]: any[] } = {};
     insightsData.forEach(insight => {
-      if (!grouped[insight.type]) {
-        grouped[insight.type] = [];
+      const type = insight.type || insight.insight_type; // Handle both field names
+      if (!grouped[type]) {
+        grouped[type] = [];
       }
-      grouped[insight.type].push(insight);
+      grouped[type].push(insight);
     });
     
     return grouped;
@@ -70,6 +71,7 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
       case 'recovery_stage': return '#3b82f6';
       case 'motivation': return '#10b981';
       case 'goal_acceptance': return '#8b5cf6';
+      case 'mi_progression': return '#06b6d4';
       default: return '#94a3b8';
     }
   };
@@ -97,6 +99,35 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
     return value;
   };
 
+  // Format MI stage name
+  const formatMiStage = (stage: string): string => {
+    if (!stage) return '';
+    
+    switch(stage) {
+      case 'engaging': return 'Building Rapport';
+      case 'focusing': return 'Identifying Goals';
+      case 'evoking': return 'Exploring Motivation';
+      case 'planning': return 'Creating Plans';
+      default: return stage.charAt(0).toUpperCase() + stage.slice(1);
+    }
+  };
+
+  // Get MI stage description
+  const getMiStageDescription = (stage: string): string => {
+    switch(stage) {
+      case 'engaging':
+        return 'Building a working relationship and understanding your situation';
+      case 'focusing':
+        return 'Identifying specific behaviors and areas to focus on changing';
+      case 'evoking':
+        return 'Drawing out your own motivations and reasons for making a change';
+      case 'planning':
+        return 'Developing specific steps and commitments to achieve your goals';
+      default:
+        return '';
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor }]}>
@@ -121,6 +152,21 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
       </View>
     );
   }
+
+  // Find MI progression insights
+  const miProgressionInsight = insightsData?.find(
+    insight => (insight.type === 'mi_progression' || insight.insight_type === 'mi_progression')
+  );
+  
+  // Parse MI stages from progression insight
+  const miStages = miProgressionInsight ? 
+    miProgressionInsight.value.split(',') : 
+    [];
+    
+  // Get the latest stage reached
+  const latestStage = miStages.length > 0 ? 
+    miStages[miStages.length - 1] : 
+    null;
 
   const handleProcessConversations = async () => {
     Alert.alert(
@@ -160,6 +206,86 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
           </TouchableOpacity>
         </View>
       </View>
+      
+      {/* MI Progress Section - New */}
+      {miStages.length > 0 && (
+        <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
+          <View style={styles.cardHeader}>
+            <ThemedText style={styles.cardTitle}>Motivational Interviewing Progress</ThemedText>
+            <ThemedText style={styles.cardSubtitle}>Your therapy journey</ThemedText>
+          </View>
+          
+          <View style={styles.miProgressContainer}>
+            <View style={styles.stageProgressBar}>
+              {['engaging', 'focusing', 'evoking', 'planning'].map((stage, index) => (
+                <View 
+                  key={stage}
+                  style={[
+                    styles.stageStep,
+                    miStages.includes(stage) && styles.completedStageStep,
+                    latestStage === stage && styles.activeStageStep
+                  ]}
+                >
+                  <ThemedText 
+                    style={[
+                      styles.stageStepText,
+                      latestStage === stage && styles.activeStageStepText
+                    ]}
+                  >
+                    {formatMiStage(stage)}
+                  </ThemedText>
+                </View>
+              ))}
+            </View>
+            
+            {latestStage && (
+              <View style={styles.currentStageContainer}>
+                <ThemedText style={styles.currentStageLabel}>
+                  Current stage:
+                </ThemedText>
+                <ThemedText style={styles.currentStageName}>
+                  {formatMiStage(latestStage)}
+                </ThemedText>
+                <ThemedText style={styles.currentStageDescription}>
+                  {getMiStageDescription(latestStage)}
+                </ThemedText>
+              </View>
+            )}
+            
+            <View style={styles.stageProgressStats}>
+              <View style={styles.stageProgressStat}>
+                <ThemedText style={styles.stageProgressStatValue}>
+                  {miStages.length}
+                </ThemedText>
+                <ThemedText style={styles.stageProgressStatLabel}>
+                  Stages Reached
+                </ThemedText>
+              </View>
+              
+              <View style={styles.stageProgressStat}>
+                <ThemedText style={styles.stageProgressStatValue}>
+                  {(['engaging', 'focusing', 'evoking', 'planning'].indexOf(latestStage || '') + 1) || 0}/4
+                </ThemedText>
+                <ThemedText style={styles.stageProgressStatLabel}>
+                  Current Position
+                </ThemedText>
+              </View>
+              
+              <View style={styles.stageProgressStat}>
+                <ThemedText style={styles.stageProgressStatValue}>
+                  {miStages.filter(
+                    (stage, index, array) => 
+                      array.indexOf(stage) === index
+                  ).length}
+                </ThemedText>
+                <ThemedText style={styles.stageProgressStatLabel}>
+                  Unique Stages
+                </ThemedText>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
       
       {/* Recovery Stage Tracker */}
       <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
@@ -214,10 +340,97 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
         <ProfileInsightsVisualization 
           insights={insightsData || []} 
           onSelectInsight={(insight: UserInsight) => {
-            setSelectedCategory(insight.type);
+            setSelectedCategory(insight.type || insight.insight_type);
           }}
         />
       </View>
+
+      {/* MI-Based Insights Section - New */}
+      {insightsData && insightsData.some(insight => insight.mi_stage) && (
+        <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
+          <View style={styles.cardHeader}>
+            <ThemedText style={styles.cardTitle}>Therapy Stage Insights</ThemedText>
+            <ThemedText style={styles.cardSubtitle}>Insights by MI stage</ThemedText>
+          </View>
+          
+          <View style={styles.miStageInsightsContainer}>
+            {['engaging', 'focusing', 'evoking', 'planning'].map(stage => {
+              const stageInsights = insightsData.filter(
+                insight => insight.mi_stage === stage
+              );
+              
+              if (stageInsights.length === 0) return null;
+              
+              return (
+                <View key={stage} style={styles.miStageSection}>
+                  <View 
+                    style={[
+                      styles.miStageBadge, 
+                      { 
+                        backgroundColor: 
+                          stage === 'engaging' ? '#4695eb' :
+                          stage === 'focusing' ? '#46eb8a' :
+                          stage === 'evoking' ? '#eb9846' :
+                          '#eb4646'
+                      }
+                    ]}
+                  >
+                    <ThemedText style={styles.miStageBadgeText}>
+                      {formatMiStage(stage)}
+                    </ThemedText>
+                  </View>
+                  
+                  <ThemedText style={styles.miStageInsightCount}>
+                    {stageInsights.length} insights
+                  </ThemedText>
+                  
+                  <View style={styles.miStageInsightsList}>
+                    {stageInsights.slice(0, 3).map((insight, idx) => (
+                      <View 
+                        key={`${stage}-${idx}`}
+                        style={[
+                          styles.miStageInsightItem,
+                          { backgroundColor: getTypeColor(insight.type || insight.insight_type) + '22' }
+                        ]}
+                      >
+                        <View 
+                          style={[
+                            styles.insightTypeBadge,
+                            { backgroundColor: getTypeColor(insight.type || insight.insight_type) }
+                          ]}
+                        >
+                          <ThemedText style={styles.insightTypeBadgeText}>
+                            {formatType(insight.type || insight.insight_type)}
+                          </ThemedText>
+                        </View>
+                        <ThemedText style={styles.miStageInsightValue}>
+                          {formatValue(insight.value)}
+                        </ThemedText>
+                      </View>
+                    ))}
+                    
+                    {stageInsights.length > 3 && (
+                      <TouchableOpacity 
+                        style={styles.viewMoreButton}
+                        onPress={() => Alert.alert(
+                          `${formatMiStage(stage)} Insights`,
+                          stageInsights.map(i => 
+                            `• ${formatType(i.type || i.insight_type)}: ${formatValue(i.value)}`
+                          ).join('\n\n')
+                        )}
+                      >
+                        <ThemedText style={styles.viewMoreText}>
+                          View {stageInsights.length - 3} more
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
       
       {/* Profile Insights List */}
       <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
@@ -255,14 +468,14 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
             
             {groupedInsights[selectedCategory].map((insight, index) => (
               <View 
-                key={`${insight.type}_${index}`}
+                key={`${insight.type || insight.insight_type}_${index}`}
                 style={[
                   styles.insightCard, 
-                  { backgroundColor: getTypeColor(insight.type) + '22' }
+                  { backgroundColor: getTypeColor(insight.type || insight.insight_type) + '22' }
                 ]}
               >
                 <View style={styles.insightHeader}>
-                  <View style={[styles.insightDot, { backgroundColor: getTypeColor(insight.type) }]} />
+                  <View style={[styles.insightDot, { backgroundColor: getTypeColor(insight.type || insight.insight_type) }]} />
                   <ThemedText style={styles.insightValue}>
                     {formatValue(insight.value)}
                   </ThemedText>
@@ -278,7 +491,7 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
                           styles.confidenceFill,
                           {
                             width: `${insight.confidence * 100}%`,
-                            backgroundColor: getTypeColor(insight.type)
+                            backgroundColor: getTypeColor(insight.type || insight.insight_type)
                           }
                         ]}
                       />
@@ -301,6 +514,15 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
                     <ThemedText style={styles.metadataLabel}>Time:</ThemedText>
                     <ThemedText style={styles.metadataValue}>
                       {insight.time_of_day.charAt(0).toUpperCase() + insight.time_of_day.slice(1)}
+                    </ThemedText>
+                  </View>
+                )}
+                
+                {insight.mi_stage && (
+                  <View style={styles.insightMetadata}>
+                    <ThemedText style={styles.metadataLabel}>MI Stage:</ThemedText>
+                    <ThemedText style={styles.metadataValue}>
+                      {formatMiStage(insight.mi_stage)}
                     </ThemedText>
                   </View>
                 )}
@@ -749,6 +971,133 @@ const styles = StyleSheet.create({
   },
   goalDetailValue: {
     fontSize: 12,
+  },
+  // MI Progress Styles - New
+  miProgressContainer: {
+    padding: 16,
+  },
+  stageProgressBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 12,
+  },
+  stageStep: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: '#f0f0f0',
+    marginHorizontal: 2,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  completedStageStep: {
+    backgroundColor: '#b8e6d4',
+  },
+  activeStageStep: {
+    backgroundColor: '#10a37f',
+  },
+  stageStepText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  activeStageStepText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  currentStageContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(16, 163, 127, 0.1)',
+    borderRadius: 8,
+  },
+  currentStageLabel: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  currentStageName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginVertical: 4,
+  },
+  currentStageDescription: {
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  stageProgressStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 16,
+    padding: 8,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderRadius: 8,
+  },
+  stageProgressStat: {
+    alignItems: 'center',
+  },
+  stageProgressStatValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  stageProgressStatLabel: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 4,
+  },
+  // MI Stage Insights Styles - New
+  miStageInsightsContainer: {
+    padding: 16,
+  },
+  miStageSection: {
+    marginBottom: 20,
+  },
+  miStageBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  miStageBadgeText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  miStageInsightCount: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginBottom: 8,
+  },
+  miStageInsightsList: {
+    marginLeft: 8,
+  },
+  miStageInsightItem: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  insightTypeBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  insightTypeBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  miStageInsightValue: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  viewMoreButton: {
+    alignItems: 'center',
+    padding: 8,
+  },
+  viewMoreText: {
+    fontSize: 12,
+    opacity: 0.7,
   },
 });
 

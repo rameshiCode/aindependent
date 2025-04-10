@@ -93,37 +93,36 @@ class ProfileAnalysisService:
             # Get current profile
             profile = self.profile_service.get_profile(user_id)
 
+            # Extract and store the MI stage if available in metadata
+            mi_stage = None
+            if message.get("metadata") and "stage" in message.get("metadata", {}):
+                mi_stage = message["metadata"]["stage"]
+                
+                # Update the recovery stage in the profile based on MI stage
+                if mi_stage == "engaging":
+                    recovery_stage = "precontemplation"
+                elif mi_stage == "focusing":
+                    recovery_stage = "contemplation"
+                elif mi_stage == "evoking":
+                    recovery_stage = "preparation"
+                elif mi_stage == "planning":
+                    recovery_stage = "action"
+                else:
+                    recovery_stage = None
+                    
+                # Only update if we have a mapping
+                if recovery_stage:
+                    self.profile_service.update_attribute(
+                        user_id, "recovery_stage", recovery_stage, 0.8
+                    )
+
             return {
                 "message_analyzed": True,
                 "insights": insights,
+                "mi_stage": mi_stage,
                 "current_profile": profile.dict(),
             }
 
         except Exception as e:
             logger.error(f"Error analyzing message: {str(e)}")
-            return {"status": "error", "message": str(e)}
-
-    async def end_conversation_analysis(self, user_id: str) -> dict[str, Any]:
-        """
-        Finalize analysis when a conversation ends.
-
-        Args:
-            user_id: The ID of the user
-
-        Returns:
-            Dictionary with results of the finalized analysis
-        """
-        logger.info(f"Ending conversation analysis for user {user_id}")
-
-        try:
-            # End the conversation in the analyzer
-            result = self.conversation_analyzer.end_conversation(user_id)
-
-            # Get updated profile
-            profile = self.profile_service.get_profile(user_id)
-
-            return {"analysis_completed": result, "profile": profile.dict()}
-
-        except Exception as e:
-            logger.error(f"Error ending conversation analysis: {str(e)}")
             return {"status": "error", "message": str(e)}

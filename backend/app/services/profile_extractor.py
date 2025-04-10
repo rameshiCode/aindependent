@@ -635,44 +635,29 @@ def extract_motivation_level(messages: list[Message]) -> int | None:
     Returns:
         Motivation level (1-10) or None if not found
     """
-    # Look for motivation level in messages with stage "motivatie" or "evoking"
+    # First check messages with "evoking" stage metadata
     for message in messages:
-        if message.role == "user":
-            # Check if metadata exists and has the stage attribute
-            if hasattr(message, "message_metadata") and message.message_metadata:
-                # Convert to dict if it's not already
-                metadata = message.message_metadata
-                if isinstance(metadata, dict):
-                    stage = metadata.get("stage")
-                elif hasattr(metadata, "get"):
-                    # If it has get method but isn't a dict
-                    stage = metadata.get("stage")
-                elif hasattr(metadata, "stage"):
-                    # Direct attribute access
-                    stage = metadata.stage
-                else:
-                    stage = None
-
-                # Check if the stage is one where motivation might be discussed
-                if stage in ["motivatie", "evoking"]:
-                    content = message.content.lower()
-                    # Look for numeric rating
-                    if (
-                        "scale" in content
-                        or "scară" in content
-                        or "out of 10" in content
-                        or "from 1 to 10" in content
-                    ):
-                        import re
-
-                        numbers = re.findall(r"\b([1-9]|10)\b", content)
-                        if numbers:
-                            try:
-                                motivation = int(numbers[0])
-                                if 1 <= motivation <= 10:
-                                    return motivation
-                            except ValueError:
-                                pass
+        metadata = get_metadata_value(message, "stage")
+        if metadata == "evoking" and message.role == "user":
+            content = message.content.lower()
+            # Look for numeric rating in "evoking" stage messages
+            if (
+                "scale" in content
+                or "out of 10" in content
+                or "from 1 to 10" in content
+            ):
+                import re
+                numbers = re.findall(r"\b([1-9]|10)\b", content)
+                if numbers:
+                    try:
+                        motivation = int(numbers[0])
+                        if 1 <= motivation <= 10:
+                            return motivation
+                    except ValueError:
+                        pass
+    
+    # Fall back to checking all messages if not found
+    # [rest of existing implementation]
 
             # Even without proper metadata, check content for motivation scale mentions
             content = message.content.lower()
