@@ -64,8 +64,14 @@ export interface UseProfileResult {
   updateAbstinence: (data: { reset?: boolean; days?: number }) => Promise<void>;
   createGoal: (data: { description: string; target_date?: string }) => Promise<void>;
   updateGoal: (goalId: string, data: { status?: string; description?: string; target_date?: string }) => Promise<void>;
+  triggerProfileExtraction: (conversationId: string) => Promise<void>;
+  processAllConversations: () => Promise<void>;
 }
 
+/**
+ * Custom hook for managing user profile data
+ * Provides access to profile data, insights, goals, and profile-related mutations
+ */
 export function useProfile(): UseProfileResult {
   const queryClient = useQueryClient();
   const { currentUser } = useAuth();
@@ -88,7 +94,7 @@ export function useProfile(): UseProfileResult {
         if (profileData.insights) {
           profileData.insights = profileData.insights.map((insight: any) => ({
             ...insight,
-            type: insight.type, // Ensure we use type consistently (sometimes it's insight_type)
+            type: insight.type || insight.insight_type, // Ensure we use type consistently
           }));
         }
 
@@ -220,6 +226,35 @@ export function useProfile(): UseProfileResult {
     }
   });
 
+  // Force profile extraction from a conversation
+  const triggerProfileExtractionMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      const response = await ProfilesService.forceProfileExtraction({
+        path: { conversation_id: conversationId }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch profile and insights
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['insights'] });
+    }
+  });
+
+  // Process all conversations mutation
+  const processAllConversationsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await ProfilesService.processAllConversations();
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch everything
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['insights'] });
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
+    }
+  });
+
   // Helper function to update abstinence
   const updateAbstinence = async (data: { reset?: boolean; days?: number }) => {
     await updateAbstinenceMutation.mutateAsync(data);
@@ -238,6 +273,16 @@ export function useProfile(): UseProfileResult {
     await updateGoalMutation.mutateAsync({ goalId, data });
   };
 
+  // Helper function to trigger profile extraction
+  const triggerProfileExtraction = async (conversationId: string) => {
+    await triggerProfileExtractionMutation.mutateAsync(conversationId);
+  };
+
+  // Helper function to process all conversations
+  const processAllConversations = async () => {
+    await processAllConversationsMutation.mutateAsync();
+  };
+
   return {
     profile: profile || null,
     isLoadingProfile,
@@ -247,6 +292,8 @@ export function useProfile(): UseProfileResult {
     getGoals,
     updateAbstinence,
     createGoal,
-    updateGoal
+    updateGoal,
+    triggerProfileExtraction,
+    processAllConversations
   };
 }

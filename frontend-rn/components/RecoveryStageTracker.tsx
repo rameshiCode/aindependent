@@ -1,32 +1,10 @@
-import React, { useState, useEffect } from 'react';
+// frontend-rn/components/RecoveryStageTracker.tsx
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '../hooks/useThemeColor';
-import { useProfile } from '../hooks/useProfile';
-
-// Define TypeScript interfaces for the recovery data
-interface UserInsight {
-  id: string;
-  type: string;
-  value: string;
-  extracted_at: string;
-  significance?: number;
-  confidence?: number;
-  day_of_week?: string;
-  time_of_day?: string;
-}
-
-interface UserProfile {
-  id: string;
-  user_id: string;
-  addiction_type: string | null;
-  recovery_stage?: string | null;
-  abstinence_days?: number;
-  abstinence_start_date?: string | null;
-  motivation_level?: number | null;
-  last_updated?: string;
-  [key: string]: any;
-}
+import { useProfile, UserInsight } from '../hooks/useProfile';
 
 interface StageInfo {
   name: string;
@@ -44,6 +22,15 @@ interface HistoryItem {
   date: Date;
   stageName: string;
   order: number;
+  insight?: UserInsight;
+}
+
+// Define the valid MI stage types
+type MIStageType = 'engaging' | 'focusing' | 'evoking' | 'planning';
+
+// Type guard to check if a string is a valid MI stage
+function isMIStage(stage: string): stage is MIStageType {
+  return ['engaging', 'focusing', 'evoking', 'planning'].includes(stage);
 }
 
 interface RecoveryStageTrackerProps {
@@ -51,12 +38,13 @@ interface RecoveryStageTrackerProps {
 }
 
 /**
- * Recovery Stage Tracker that visualizes a user's journey through
- * recovery stages without external dependencies
+ * Dynamic Recovery Stage Tracker that visualizes a user's journey through
+ * recovery stages based on actual conversation data
  */
 const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) => {
   const { profile, isLoadingProfile, profileError, getInsights } = useProfile();
   const [stageHistory, setStageHistory] = useState<HistoryItem[]>([]);
+  const [userThoughts, setUserThoughts] = useState<{ [stage: string]: string[] }>({});
 
   // Define recovery stages and their order
   const RECOVERY_STAGES: RecoveryStages = {
@@ -92,6 +80,14 @@ const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) =
     }
   };
 
+  // Mapping between MI stages and recovery stages with proper typing
+  const MI_STAGE_MAPPING: Record<MIStageType, string> = {
+    'engaging': 'precontemplation',
+    'focusing': 'contemplation',
+    'evoking': 'preparation',
+    'planning': 'action'
+  };
+
   // Get ordered stage names
   const stageOrder = Object.keys(RECOVERY_STAGES).sort(
     (a, b) => RECOVERY_STAGES[a].order - RECOVERY_STAGES[b].order
@@ -104,38 +100,59 @@ const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) =
   const cardBgColor = useThemeColor({}, 'inputBackground');
   const borderColor = useThemeColor({}, 'inputBorder');
 
-  // Get insights about recovery stages
+  // Get all insights to work with
   const {
-    data: insightsData,
-    isLoading: isLoadingInsights,
-    error: insightsError
+    data: allInsightsData,
+    isLoading: isLoadingAllInsights,
+    error: allInsightsError
+  } = getInsights();
+
+  // Get recovery stage insights specifically
+  const {
+    data: stageInsightsData,
+    isLoading: isLoadingStageInsights,
+    error: stageInsightsError
   } = getInsights('recovery_stage');
 
-  const isLoading = isLoadingProfile || isLoadingInsights;
-  const error = profileError || insightsError;
+  const isLoading = isLoadingProfile || isLoadingAllInsights || isLoadingStageInsights;
+  const error = profileError || allInsightsError || stageInsightsError;
 
   // Process profile and insights to build stage history
   useEffect(() => {
-    if (profile && insightsData) {
+    if (profile && allInsightsData) {
       // Get current recovery stage from profile
       const currentStage = profile.recovery_stage || 'contemplation';
 
       // Build stage history from insights
-      const stageInsights = [...(insightsData || [])].filter(
-        insight => insight.type === 'recovery_stage'
-      );
+      // Look for insights with recovery_stage type or mi_stage metadata
+      const stageRelatedInsights: UserInsight[] = [];
+      
+      allInsightsData.forEach(insight => {
+        if (insight.type === 'recovery_stage') {
+          stageRelatedInsights.push(insight);
+        } 
+        else if (insight.mi_stage && isMIStage(insight.mi_stage)) {
+          // Create a synthetic stage insight based on MI stage
+          stageRelatedInsights.push({
+            ...insight,
+            type: 'mi_derived_stage',
+            value: MI_STAGE_MAPPING[insight.mi_stage]
+          });
+        }
+      });
 
       // Sort insights by date (newest first)
-      stageInsights.sort((a, b) =>
+      stageRelatedInsights.sort((a, b) =>
         new Date(b.extracted_at).getTime() - new Date(a.extracted_at).getTime()
       );
 
       // Create history entries with dates and stages
-      const history: HistoryItem[] = stageInsights.map(insight => ({
+      const history: HistoryItem[] = stageRelatedInsights.map(insight => ({
         stage: insight.value,
         date: new Date(insight.extracted_at),
         stageName: RECOVERY_STAGES[insight.value]?.name || insight.value,
-        order: RECOVERY_STAGES[insight.value]?.order || 0
+        order: RECOVERY_STAGES[insight.value]?.order || 0,
+        insight: insight
       }));
 
       // Filter out duplicates (same stage) in sequence
@@ -154,8 +171,33 @@ const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) =
           order: RECOVERY_STAGES[currentStage]?.order || 0
         }]);
       }
+
+      // Extract user thoughts for each stage
+      const thoughts: { [stage: string]: string[] } = {};
+      
+      // Find user messages associated with specific stages
+      allInsightsData.forEach(insight => {
+        if (insight.mi_stage && isMIStage(insight.mi_stage) && insight.value) {
+          const stage = MI_STAGE_MAPPING[insight.mi_stage];
+          if (!thoughts[stage]) {
+            thoughts[stage] = [];
+          }
+          
+          // Add insight value as a thought if it's meaningful
+          if (insight.value.length > 10 && insight.value.length < 150) {
+            thoughts[stage].push(insight.value);
+          }
+        }
+      });
+
+      // Deduplicate thoughts
+      Object.keys(thoughts).forEach(stage => {
+        thoughts[stage] = [...new Set(thoughts[stage])].slice(0, 3);
+      });
+
+      setUserThoughts(thoughts);
     }
-  }, [profile, insightsData]);
+  }, [profile, allInsightsData]);
 
   // Helper functions
   const formatDate = (date: Date): string => {
@@ -174,8 +216,14 @@ const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) =
     return currentStage ? stageOrder.indexOf(currentStage) : -1;
   };
 
-  // Get typical thoughts for a specific stage
+  // Get user thoughts for a specific stage, or fallback to default thoughts
   const getThoughtsForStage = (stage: string): string[] => {
+    // If we have extracted user thoughts for this stage, use them
+    if (userThoughts[stage] && userThoughts[stage].length > 0) {
+      return userThoughts[stage];
+    }
+    
+    // Otherwise, fallback to default thoughts
     switch (stage) {
       case 'precontemplation':
         return [
@@ -212,9 +260,79 @@ const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) =
     }
   };
 
+  // Generate personalized recommendations based on stage and insights
+  const generateRecommendations = (stage: string): string[] => {
+    const recommendations: string[] = [];
+    const triggers = allInsightsData?.filter(i => i.type === 'trigger') || [];
+    const traits = allInsightsData?.filter(i => i.type === 'psychological_trait') || [];
+    const copingStrategies = allInsightsData?.filter(i => i.type === 'coping_strategy') || [];
+
+    // Add stage-specific recommendations
+    if (stage === 'precontemplation') {
+      recommendations.push('Learn more about the potential impacts of your behavior');
+      recommendations.push('Keep a journal to track behavior patterns and consequences');
+      recommendations.push('Consider what would be different if you made small changes');
+    } 
+    else if (stage === 'contemplation') {
+      recommendations.push('Write down pros and cons of continued use vs. changing');
+      recommendations.push('Imagine your future with and without changes');
+      
+      // Add personalized recommendation based on triggers
+      if (triggers.length > 0) {
+        recommendations.push(`Identify your key triggers like "${triggers[0].value}"`);
+      } else {
+        recommendations.push('Start thinking about small, achievable first steps');
+      }
+    }
+    else if (stage === 'preparation') {
+      recommendations.push('Set a specific change date within the next 2 weeks');
+      
+      // Add personalized recommendation based on psychological traits
+      if (traits.length > 0) {
+        const trait = traits[0].value.split(':')[0].replace(/_/g, ' ');
+        recommendations.push(`Consider how ${trait} might affect your recovery journey`);
+      } else {
+        recommendations.push('Create a detailed action plan with specific steps');
+      }
+      
+      recommendations.push('Tell supportive friends or family about your plans');
+    }
+    else if (stage === 'action') {
+      recommendations.push('Use the app daily to reinforce your commitment');
+      
+      // Add personalized recommendation based on triggers
+      if (triggers.length > 0) {
+        recommendations.push(`Practice avoiding "${triggers[0].value}" situations`);
+      } else {
+        recommendations.push('Avoid high-risk situations and practice refusal skills');
+      }
+      
+      // Add personalized recommendation based on coping strategies
+      if (copingStrategies.length > 0) {
+        recommendations.push(`Continue practicing "${copingStrategies[0].value}" when facing challenges`);
+      } else {
+        recommendations.push('Reward yourself for achieving milestones');
+      }
+    }
+    else if (stage === 'maintenance') {
+      recommendations.push('Develop long-term strategies for preventing relapse');
+      
+      // Add personalized recommendation based on coping strategies
+      if (copingStrategies.length > 0) {
+        recommendations.push(`Strengthen your "${copingStrategies[0].value}" practice`);
+      } else {
+        recommendations.push('Continue building a lifestyle that supports your recovery');
+      }
+      
+      recommendations.push('Consider mentoring others who are earlier in their journey');
+    }
+
+    return recommendations;
+  };
+
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor }]}>
+      <View style={styles.container}>
         <ThemedText style={styles.loadingText}>Loading recovery stage data...</ThemedText>
       </View>
     );
@@ -222,7 +340,7 @@ const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) =
 
   if (error) {
     return (
-      <View style={[styles.container, { backgroundColor }]}>
+      <View style={styles.container}>
         <ThemedText style={styles.errorText}>Error loading recovery data: {error.message}</ThemedText>
       </View>
     );
@@ -233,269 +351,161 @@ const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) =
   const activeStage = profile?.recovery_stage || stageHistory[0]?.stage || 'contemplation';
   const currentStageInfo = RECOVERY_STAGES[activeStage];
   const currentStageThoughts = getThoughtsForStage(activeStage);
+  
+  // Get personalized recommendations
+  const stageRecommendations = generateRecommendations(activeStage);
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor }]}>
-      <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
-        {/* Card Title */}
-        <View style={styles.cardHeader}>
-          <ThemedText style={styles.cardTitle}>Recovery Stage Tracker</ThemedText>
-          <ThemedText style={styles.cardSubtitle}>Based on the Stages of Change model</ThemedText>
-        </View>
-
-        {/* Progress Tracker Visualization - Simplified without SVG */}
-        <View style={[styles.progressContainer, { borderColor }]}>
-          <View style={styles.stageLabels}>
-            {stageOrder.map((stage, index) => (
-              <ThemedText
-                key={`label_${stage}`}
-                style={[
-                  styles.stageLabel,
-                  stage === activeStage && {
-                    color: tintColor,
-                    fontWeight: 'bold'
-                  }
-                ]}
-                numberOfLines={1}
-              >
-                {RECOVERY_STAGES[stage].name}
-              </ThemedText>
-            ))}
-          </View>
-
-          <View style={styles.progressTrack}>
-            {/* Background track */}
-            <View style={styles.trackBackground} />
-
-            {/* Progress fill */}
-            <View
+    <View style={styles.container}>
+      {/* Progress Tracker Visualization - Simplified without SVG */}
+      <View style={[styles.progressContainer, { borderColor }]}>
+        <View style={styles.stageLabels}>
+          {stageOrder.map((stage, index) => (
+            <ThemedText
+              key={`label_${stage}`}
               style={[
-                styles.trackFill,
-                {
-                  width: `${((currentStageIndex + 1) / stageOrder.length) * 100}%`,
-                  backgroundColor: tintColor
+                styles.stageLabel,
+                stage === activeStage && {
+                  color: tintColor,
+                  fontWeight: 'bold'
                 }
               ]}
-            />
-
-            {/* Stage points */}
-            <View style={styles.stagePoints}>
-              {stageOrder.map((stage, index) => {
-                const isCurrent = stage === activeStage;
-                const isPast = RECOVERY_STAGES[stage].order < RECOVERY_STAGES[activeStage].order;
-
-                return (
-                  <View
-                    key={`point_${stage}`}
-                    style={[
-                      styles.stagePoint,
-                      isCurrent && styles.currentStagePoint,
-                      isPast && { backgroundColor: tintColor },
-                      isCurrent && { backgroundColor: tintColor },
-                      isCurrent && { borderColor: 'white', borderWidth: 2 }
-                    ]}
-                  />
-                );
-              })}
-            </View>
-          </View>
+              numberOfLines={1}
+            >
+              {RECOVERY_STAGES[stage].name}
+            </ThemedText>
+          ))}
         </View>
 
-        {/* Current Stage Description */}
-        {currentStageInfo && (
-          <View style={[styles.stageInfoContainer, {
-            backgroundColor: currentStageInfo.color,
-            borderColor
-          }]}>
-            <ThemedText style={styles.stageInfoTitle}>
-              {currentStageInfo.name} Stage
-            </ThemedText>
-            <ThemedText style={styles.stageInfoDescription}>
-              {currentStageInfo.description}
-            </ThemedText>
+        <View style={styles.progressTrack}>
+          {/* Background track */}
+          <View style={styles.trackBackground} />
 
-            {/* Common thoughts in this stage */}
-            <View style={styles.thoughtsContainer}>
-              <ThemedText style={styles.thoughtsTitle}>Typical thoughts in this stage:</ThemedText>
-              {currentStageThoughts.map((thought, index) => (
-                <View key={`thought_${index}`} style={styles.thoughtItem}>
-                  <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                  <ThemedText style={styles.thoughtText}>{thought}</ThemedText>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
+          {/* Progress fill */}
+          <View
+            style={[
+              styles.trackFill,
+              {
+                width: `${((currentStageIndex + 1) / stageOrder.length) * 100}%`,
+                backgroundColor: tintColor
+              }
+            ]}
+          />
 
-        {/* Stage History Timeline */}
-        {stageHistory.length > 0 && (
-          <View style={[styles.historyContainer, { borderTopColor: borderColor }]}>
-            <ThemedText style={styles.historyTitle}>Your Recovery Journey</ThemedText>
-
-            {stageHistory.map((historyItem, index) => {
-              const isLatest = index === 0;
+          {/* Stage points */}
+          <View style={styles.stagePoints}>
+            {stageOrder.map((stage, index) => {
+              const isCurrent = stage === activeStage;
+              const isPast = RECOVERY_STAGES[stage].order < RECOVERY_STAGES[activeStage].order;
 
               return (
-                <View key={`history_${index}`} style={styles.historyItem}>
-                  {/* Timeline vertical line */}
-                  {index < stageHistory.length - 1 && (
-                    <View style={[styles.timelineConnector, { backgroundColor: tintColor }]} />
-                  )}
-
-                  {/* Timeline dot */}
-                  <View style={[styles.timelineDot, {
-                    backgroundColor: isLatest ? tintColor : cardBgColor,
-                    borderColor: tintColor
-                  }]} />
-
-                  {/* History content */}
-                  <View style={styles.historyContent}>
-                    <ThemedText style={[styles.historyStageName, { color: isLatest ? tintColor : textColor }]}>
-                      {historyItem.stageName}
-                    </ThemedText>
-                    <ThemedText style={styles.historyDate}>
-                      {formatDate(historyItem.date)}
-                    </ThemedText>
-
-                    {isLatest && (
-                      <ThemedText style={[styles.currentLabel, { color: tintColor }]}>
-                        Current Stage
-                      </ThemedText>
-                    )}
-                  </View>
-                </View>
+                <View
+                  key={`point_${stage}`}
+                  style={[
+                    styles.stagePoint,
+                    isCurrent && styles.currentStagePoint,
+                    isPast && { backgroundColor: tintColor },
+                    isCurrent && { backgroundColor: tintColor },
+                    isCurrent && { borderColor: 'white', borderWidth: 2 }
+                  ]}
+                />
               );
             })}
           </View>
-        )}
-
-        {/* Goals & Next Steps based on current stage */}
-        <View style={[styles.goalsContainer, { borderTopColor: borderColor }]}>
-          <ThemedText style={styles.goalsTitle}>Recommended Next Steps</ThemedText>
-
-          {activeStage === 'precontemplation' && (
-            <View style={styles.goalsList}>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Learn more about the potential impacts of your behavior
-                </ThemedText>
-              </View>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Keep a journal to track behavior patterns and consequences
-                </ThemedText>
-              </View>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Consider what would be different if you made small changes
-                </ThemedText>
-              </View>
-            </View>
-          )}
-
-          {activeStage === 'contemplation' && (
-            <View style={styles.goalsList}>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Write down pros and cons of continued use vs. changing
-                </ThemedText>
-              </View>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Imagine your future with and without changes
-                </ThemedText>
-              </View>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Start thinking about small, achievable first steps
-                </ThemedText>
-              </View>
-            </View>
-          )}
-
-          {activeStage === 'preparation' && (
-            <View style={styles.goalsList}>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Set a specific change date within the next 2 weeks
-                </ThemedText>
-              </View>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Create a detailed action plan with specific steps
-                </ThemedText>
-              </View>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Tell supportive friends or family about your plans
-                </ThemedText>
-              </View>
-            </View>
-          )}
-
-          {activeStage === 'action' && (
-            <View style={styles.goalsList}>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Use the app daily to reinforce your commitment
-                </ThemedText>
-              </View>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Avoid high-risk situations and practice refusal skills
-                </ThemedText>
-              </View>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Reward yourself for achieving milestones
-                </ThemedText>
-              </View>
-            </View>
-          )}
-
-          {activeStage === 'maintenance' && (
-            <View style={styles.goalsList}>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Develop long-term strategies for preventing relapse
-                </ThemedText>
-              </View>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Continue building a lifestyle that supports your recovery
-                </ThemedText>
-              </View>
-              <View style={styles.goalItem}>
-                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
-                <ThemedText style={styles.goalText}>
-                  Consider mentoring others who are earlier in their journey
-                </ThemedText>
-              </View>
-            </View>
-          )}
         </View>
       </View>
-    </ScrollView>
+
+      {/* Current Stage Description */}
+      {currentStageInfo && (
+        <View style={[styles.stageInfoContainer, {
+          backgroundColor: currentStageInfo.color,
+          borderColor
+        }]}>
+          <ThemedText style={styles.stageInfoTitle}>
+            {currentStageInfo.name} Stage
+          </ThemedText>
+          <ThemedText style={styles.stageInfoDescription}>
+            {currentStageInfo.description}
+          </ThemedText>
+
+          {/* Common thoughts in this stage - dynamically sourced when available */}
+          <View style={styles.thoughtsContainer}>
+            <ThemedText style={styles.thoughtsTitle}>
+              {userThoughts[activeStage] && userThoughts[activeStage].length > 0 
+                ? "Your thoughts at this stage:" 
+                : "Typical thoughts at this stage:"}
+            </ThemedText>
+            {currentStageThoughts.map((thought, index) => (
+              <View key={`thought_${index}`} style={styles.thoughtItem}>
+                <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
+                <ThemedText style={styles.thoughtText}>{thought}</ThemedText>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Stage History Timeline */}
+      {stageHistory.length > 0 && (
+        <View style={[styles.historyContainer, { borderTopColor: borderColor }]}>
+          <ThemedText style={styles.historyTitle}>Your Recovery Journey</ThemedText>
+
+          {stageHistory.map((historyItem, index) => {
+            const isLatest = index === 0;
+
+            return (
+              <View key={`history_${index}`} style={styles.historyItem}>
+                {/* Timeline vertical line */}
+                {index < stageHistory.length - 1 && (
+                  <View style={[styles.timelineConnector, { backgroundColor: tintColor }]} />
+                )}
+
+                {/* Timeline dot */}
+                <View style={[styles.timelineDot, {
+                  backgroundColor: isLatest ? tintColor : cardBgColor,
+                  borderColor: tintColor
+                }]} />
+
+                {/* History content */}
+                <View style={styles.historyContent}>
+                  <ThemedText style={[styles.historyStageName, { color: isLatest ? tintColor : textColor }]}>
+                    {historyItem.stageName}
+                  </ThemedText>
+                  <ThemedText style={styles.historyDate}>
+                    {formatDate(historyItem.date)}
+                  </ThemedText>
+
+                  {isLatest && (
+                    <ThemedText style={[styles.currentLabel, { color: tintColor }]}>
+                      Current Stage
+                    </ThemedText>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Goals & Next Steps based on current stage - dynamically generated */}
+      <View style={[styles.goalsContainer, { borderTopColor: borderColor }]}>
+        <ThemedText style={styles.goalsTitle}>Recommended Next Steps</ThemedText>
+
+        <View style={styles.goalsList}>
+          {stageRecommendations.map((recommendation, index) => (
+            <View key={`recommendation_${index}`} style={styles.goalItem}>
+              <View style={[styles.bulletPoint, { backgroundColor: tintColor }]} />
+              <ThemedText style={styles.goalText}>{recommendation}</ThemedText>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 16,
   },
   loadingText: {
@@ -506,30 +516,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     color: '#ff6b6b',
-  },
-  card: {
-    marginBottom: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    overflow: 'hidden',
-  },
-  cardHeader: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    opacity: 0.7,
   },
   progressContainer: {
     padding: 16,
