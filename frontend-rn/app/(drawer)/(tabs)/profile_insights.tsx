@@ -7,11 +7,12 @@ import { Stack } from 'expo-router';
 import { useProfile } from '../../../hooks/useProfile';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import EnhancedProfileDashboard from '../../../components/UserProfileDashboard';
+import UserProfileDashboard from '../../../components/UserProfileDashboard';
 
 export default function ProfileInsightsScreen() {
   const { currentUser } = useAuth();
   const userId = currentUser?.id;
-  const { processAllConversations, isLoadingProfile } = useProfile();
+  const { processAllConversations, isLoadingProfile, profile } = useProfile();
   const [isProcessing, setIsProcessing] = useState(false);
   
   const tintColor = useThemeColor({}, 'tint');
@@ -83,7 +84,7 @@ export default function ProfileInsightsScreen() {
       </View>
       
       {/* Enhanced Profile Dashboard - Replace UserProfileDashboard with this */}
-      <EnhancedProfileDashboard userId={userId} />
+      <UserProfileDashboard profileData={profile} />
     </View>
   );
 }
