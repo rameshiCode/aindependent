@@ -1,7 +1,7 @@
 from datetime import datetime
 import uuid
 
-from fastapi import APIRouter, Depends, logger
+from fastapi import APIRouter, BackgroundTasks, Depends, logger
 from sqlmodel import Session, select
 
 from app.api.deps import get_db
@@ -14,17 +14,30 @@ from app.core.db import engine
 from app.services.conversation_analyzer import ConversationAnalyzer
 from app.services.profile_analysis_service import ProfileAnalysisService
 from app.services.profile_service import ProfileService
-from models import Conversation, Message
+from app.models import Conversation, Message
 
 router = APIRouter()
 profile_service = ProfileService()
 conversation_analyzer = ConversationAnalyzer(profile_service)
 
+# Define the background task function
+async def analyze_full_conversation_structured(conversation_id: str, user_id: str):
+    """Background task to perform deep structured analysis of a conversation"""
+    try:
+        # Create a new session for this background task
+        with Session(engine) as session:
+            profile_analyzer = ProfileAnalysisService(lambda: Session(engine))
+            result = await profile_analyzer.process_conversation_with_structured_output(
+                conversation_id, 
+                user_id
+            )
+            logger.info(f"Background structured profile extraction completed: {result}")
+    except Exception as e:
+        logger.error(f"Error in background structured profile extraction: {str(e)}")
 
-# Add this code to your chat.py route file, specifically modify the @router.post("/chat/{user_id}") function
 
 @router.post("/chat/{user_id}")
-async def chat(user_id: str, message: dict, db: Session = Depends(get_db)):
+async def chat(user_id: str, message: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Process a chat message and analyze it for profile information"""
     # Get or initialize OpenAI client
     client = get_openai_client()
@@ -156,12 +169,14 @@ async def chat(user_id: str, message: dict, db: Session = Depends(get_db)):
             
             # If it's a wrap-up message or we're in planning stage, do deeper analysis
             if summary_style or mi_stage == "planning":
-                # Run background conversation analysis to extract comprehensive profile
-                await profile_analyzer.process_conversation_with_structured_output(
-                    str(conversation.id), user_id
+                # Schedule structured profile extraction as a background task
+                background_tasks.add_task(
+                    analyze_full_conversation_structured,
+                    str(conversation.id),
+                    user_id
                 )
-                logger.info(f"Comprehensive profile extraction triggered for conversation {conversation.id}")
-        
+                logger.info(f"Scheduled background structured profile extraction for conversation {conversation.id}")
+                
         except Exception as e:
             logger.error(f"Error in profile extraction: {str(e)}")
             # Continue even if profile extraction fails
@@ -170,35 +185,23 @@ async def chat(user_id: str, message: dict, db: Session = Depends(get_db)):
         logger.error(f"Database error: {str(db_error)}")
         # Continue with response even if database operations fail
 
-    # *** New Step: Check if the assistant's message signals a wrap-up ***
-    # You could have your determine_mi_stage function or an additional check that inspects the assistant response for a "summary_style"
+    # Check if the assistant's message signals a wrap-up
     summary_style = False
-    # For example, if the assistant response contains a phrase like "I recommend" or "let's review your plan",
-    # or if you've embedded a special token in the response metadata.
     if response.get("metadata", {}).get("summary_style"):
         summary_style = True
-    # Alternatively, you could inspect the response content:
+    # Alternatively, inspect the response content:
     if "i will" in assistant_content.lower() or "commit" in assistant_content.lower():
         summary_style = True
         response["metadata"]["summary_style"] = True
 
-    # If the MI stage is planning and the response signals wrap-up, trigger combined profile analysis.
-    if mi_stage == "planning" and summary_style:
-        try:
-            # Get the profile analyzer service instance
-            profile_analyzer = ProfileAnalysisService(lambda: Session(engine))
-            # You might want to trigger a combined conversation analysis here.
-            # This should do a short validation check to confirm that a plan + commitment have been stated
-            # and then extract structured profile insights.
-            result = await profile_analyzer.process_conversation(
-                conversation_id=str(conversation.id),  # Use the actual conversation ID
-                user_id=user_id,
-            )
-            # Log the result or update the profile as needed.
-            logger.info(f"Combined profile analysis triggered: {result}")
-        except Exception as e:
-            logger.error(f"Error in combined profile extraction: {str(e)}")
-            # Continue even if profile extraction fails.
+    # Check for MI stage = planning, or summary_style = true
+    if mi_stage == "planning" or summary_style == True:
+        # This is a significant point in the conversation - schedule background task
+        background_tasks.add_task(
+            analyze_full_conversation_structured,
+            str(conversation.id),
+            user_id
+        )
 
     return response
 
@@ -247,7 +250,7 @@ def detect_goal_acceptance_in_conversation(conversation_id, session):
 
 
 @router.post("/chat/{user_id}/end")
-async def end_chat(user_id: str):
+async def end_chat(user_id: str, background_tasks: BackgroundTasks):
     """End the conversation and perform comprehensive profile analysis."""
     # First, mark the conversation as finished using your conversation analyzer.
     success = conversation_analyzer.end_conversation(user_id)
@@ -257,7 +260,7 @@ async def end_chat(user_id: str):
 
         from app.core.db import engine
         from app.models import Conversation
-
+        
         with Session(engine) as session:
             # Find the most recent conversation for this user.
             conversation = session.exec(
@@ -267,15 +270,13 @@ async def end_chat(user_id: str):
             ).first()
 
             if conversation:
-                # Get an instance of your profile analysis service.
-                profile_analyzer = ProfileAnalysisService(lambda: Session(engine))
-
-                # Process the conversation to extract profile insights.
-                result = await profile_analyzer.process_conversation(
-                    str(conversation.id), user_id
+                # Add deep profile extraction as a background task
+                background_tasks.add_task(
+                    analyze_full_conversation_structured,
+                    str(conversation.id),
+                    user_id
                 )
-                logger.info(f"Profile analysis result: {result}")
-
+                
                 # Detect if a goal was accepted in this conversation.
                 (
                     is_goal_accepted,
@@ -283,6 +284,9 @@ async def end_chat(user_id: str):
                 ) = detect_goal_acceptance_in_conversation(conversation.id, session)
 
                 if is_goal_accepted and goal_description:
+                    # Get an instance of your profile analysis service.
+                    profile_analyzer = ProfileAnalysisService(lambda: Session(engine))
+                    
                     # Re-run processing with goal context (if required by your logic).
                     await profile_analyzer.process_conversation(
                         str(conversation.id),

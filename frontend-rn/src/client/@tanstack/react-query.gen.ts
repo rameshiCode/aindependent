@@ -133,6 +133,23 @@ import type {
   ProfilesAnalyzeConversationError,
   ProfilesAnalyzeMessageData,
   ProfilesAnalyzeMessageError,
+  ProfilesUpdateGoalProgressData,
+  ProfilesUpdateGoalProgressError,
+  ProfilesUpdateGoalProgressResponse,
+  ProfilesGoalCheckInData,
+  ProfilesGoalCheckInError,
+  ProfilesGoalCheckInResponse,
+  ProfilesGetGoalRecommendationsData,
+  ProfilesGetGoalJourneyData,
+  ProfilesAnalyzeFullConversationData,
+  ProfilesAnalyzeFullConversationError,
+  ProfilesRealTimeProfileUpdateData,
+  ProfilesRealTimeProfileUpdateError,
+  ProfilesGetStructuredProfileData,
+  ProfilesGenerateStructuredProfileData,
+  ProfilesGetRawInsightsDataData,
+  ProfilesGenerateProfileFromConversationsData,
+  ProfilesGenerateProfileFromConversationsResponse,
   ApiChatData,
   ApiChatError,
   ApiEndChatData,
@@ -1829,6 +1846,315 @@ export const analyzeMessageMutation = (
   > = {
     mutationFn: async (localOptions) => {
       const { data } = await ProfilesService.analyzeMessage({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const updateGoalProgressMutation = (
+  options?: Partial<Options<ProfilesUpdateGoalProgressData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    ProfilesUpdateGoalProgressResponse,
+    ProfilesUpdateGoalProgressError,
+    Options<ProfilesUpdateGoalProgressData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.updateGoalProgress({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const goalCheckInQueryKey = (
+  options: Options<ProfilesGoalCheckInData>,
+) => createQueryKey("profilesGoalCheckIn", options)
+
+export const goalCheckInOptions = (
+  options: Options<ProfilesGoalCheckInData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.goalCheckIn({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: goalCheckInQueryKey(options),
+  })
+}
+
+export const goalCheckInMutation = (
+  options?: Partial<Options<ProfilesGoalCheckInData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    ProfilesGoalCheckInResponse,
+    ProfilesGoalCheckInError,
+    Options<ProfilesGoalCheckInData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.goalCheckIn({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getGoalRecommendationsQueryKey = (
+  options?: Options<ProfilesGetGoalRecommendationsData>,
+) => createQueryKey("profilesGetGoalRecommendations", options)
+
+export const getGoalRecommendationsOptions = (
+  options?: Options<ProfilesGetGoalRecommendationsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.getGoalRecommendations({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getGoalRecommendationsQueryKey(options),
+  })
+}
+
+export const getGoalJourneyQueryKey = (
+  options?: Options<ProfilesGetGoalJourneyData>,
+) => createQueryKey("profilesGetGoalJourney", options)
+
+export const getGoalJourneyOptions = (
+  options?: Options<ProfilesGetGoalJourneyData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.getGoalJourney({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getGoalJourneyQueryKey(options),
+  })
+}
+
+export const analyzeFullConversationQueryKey = (
+  options: Options<ProfilesAnalyzeFullConversationData>,
+) => createQueryKey("profilesAnalyzeFullConversation", options)
+
+export const analyzeFullConversationOptions = (
+  options: Options<ProfilesAnalyzeFullConversationData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.analyzeFullConversation({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: analyzeFullConversationQueryKey(options),
+  })
+}
+
+export const analyzeFullConversationMutation = (
+  options?: Partial<Options<ProfilesAnalyzeFullConversationData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    ProfilesAnalyzeFullConversationError,
+    Options<ProfilesAnalyzeFullConversationData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.analyzeFullConversation({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const realTimeProfileUpdateQueryKey = (
+  options: Options<ProfilesRealTimeProfileUpdateData>,
+) => createQueryKey("profilesRealTimeProfileUpdate", options)
+
+export const realTimeProfileUpdateOptions = (
+  options: Options<ProfilesRealTimeProfileUpdateData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.realTimeProfileUpdate({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: realTimeProfileUpdateQueryKey(options),
+  })
+}
+
+export const realTimeProfileUpdateMutation = (
+  options?: Partial<Options<ProfilesRealTimeProfileUpdateData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    ProfilesRealTimeProfileUpdateError,
+    Options<ProfilesRealTimeProfileUpdateData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.realTimeProfileUpdate({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getStructuredProfileQueryKey = (
+  options?: Options<ProfilesGetStructuredProfileData>,
+) => createQueryKey("profilesGetStructuredProfile", options)
+
+export const getStructuredProfileOptions = (
+  options?: Options<ProfilesGetStructuredProfileData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.getStructuredProfile({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getStructuredProfileQueryKey(options),
+  })
+}
+
+export const generateStructuredProfileQueryKey = (
+  options?: Options<ProfilesGenerateStructuredProfileData>,
+) => createQueryKey("profilesGenerateStructuredProfile", options)
+
+export const generateStructuredProfileOptions = (
+  options?: Options<ProfilesGenerateStructuredProfileData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.generateStructuredProfile({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: generateStructuredProfileQueryKey(options),
+  })
+}
+
+export const generateStructuredProfileMutation = (
+  options?: Partial<Options<ProfilesGenerateStructuredProfileData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    unknown,
+    DefaultError,
+    Options<ProfilesGenerateStructuredProfileData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.generateStructuredProfile({
+        ...options,
+        ...localOptions,
+        throwOnError: true,
+      })
+      return data
+    },
+  }
+  return mutationOptions
+}
+
+export const getRawInsightsDataQueryKey = (
+  options?: Options<ProfilesGetRawInsightsDataData>,
+) => createQueryKey("profilesGetRawInsightsData", options)
+
+export const getRawInsightsDataOptions = (
+  options?: Options<ProfilesGetRawInsightsDataData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.getRawInsightsData({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: getRawInsightsDataQueryKey(options),
+  })
+}
+
+export const generateProfileFromConversationsQueryKey = (
+  options?: Options<ProfilesGenerateProfileFromConversationsData>,
+) => createQueryKey("profilesGenerateProfileFromConversations", options)
+
+export const generateProfileFromConversationsOptions = (
+  options?: Options<ProfilesGenerateProfileFromConversationsData>,
+) => {
+  return queryOptions({
+    queryFn: async ({ queryKey, signal }) => {
+      const { data } = await ProfilesService.generateProfileFromConversations({
+        ...options,
+        ...queryKey[0],
+        signal,
+        throwOnError: true,
+      })
+      return data
+    },
+    queryKey: generateProfileFromConversationsQueryKey(options),
+  })
+}
+
+export const generateProfileFromConversationsMutation = (
+  options?: Partial<Options<ProfilesGenerateProfileFromConversationsData>>,
+) => {
+  const mutationOptions: UseMutationOptions<
+    ProfilesGenerateProfileFromConversationsResponse,
+    DefaultError,
+    Options<ProfilesGenerateProfileFromConversationsData>
+  > = {
+    mutationFn: async (localOptions) => {
+      const { data } = await ProfilesService.generateProfileFromConversations({
         ...options,
         ...localOptions,
         throwOnError: true,

@@ -1,12 +1,14 @@
+// Import required modules
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Text } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '../hooks/useThemeColor';
 import RecoveryStageTracker from './RecoveryStageTracker';
 import ProfileInsightsVisualization from './ProfileInsightsVisualization';
-// import { useStructuredProfile } from '../hooks/useProfile';
+// Import client from the API client generated file
+import { ProfilesService } from '../src/client/sdk.gen';
 
-// Define the types for structured profile data
+// Fixed interface definitions to avoid TypeScript errors
 interface UserInsight {
   id: string;
   value: string;
@@ -45,6 +47,32 @@ interface StructuredProfile {
     goals_count: number;
     last_updated?: string;
   };
+  // Updated to fix TypeScript errors with other_traits
+  psychological_traits?: {
+    [key: string]: boolean | string[] | undefined;
+    need_for_approval?: boolean;
+    fear_of_rejection?: boolean;
+    low_self_confidence?: boolean;
+    submissiveness?: boolean;
+    other_traits?: string[];
+  };
+  motivation?: {
+    internal_motivators?: string[];
+    external_motivators?: string[];
+    ambivalence_factors?: string[];
+  };
+  triggers?: {
+    emotional?: string[];
+    social?: string[];
+    time_based?: {
+      days?: string[];
+      times?: string[];
+    };
+  };
+  analysis?: {
+    key_insights?: string[];
+    recommended_focus?: string;
+  };
 }
 
 interface EnhancedProfileDashboardProps {
@@ -75,24 +103,93 @@ const EnhancedProfileDashboard: React.FC<EnhancedProfileDashboardProps> = ({ use
     setError(null);
     
     try {
-      // Replace with your actual API call
-      const response = await fetch(`/api/v1/profiles/structured-profile`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+      // Use the ProfilesService from the SDK to fetch profile data
+      console.log("Fetching profile data...");
+      const { data } = await ProfilesService.getMyProfile({
+        throwOnError: true,
       });
+      console.log("Profile API raw response:", JSON.stringify(data, null, 2));
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch profile data');
-      }
+      // Log properties to see what's actually in the data
+      console.log("Profile data properties:", Object.keys(data || {}));
+      console.log("Has profile object?", data?.profile ? "Yes" : "No");
+      console.log("Has insights?", data?.insights ? `Yes (${Object.keys(data.insights || {}).length} types)` : "No");
       
-      const data = await response.json();
-      setProfileData(data);
+      setProfileData(data as unknown as StructuredProfile);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       console.error('Error fetching profile data:', err);
+      console.log('Error details:', JSON.stringify(err));
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchStructuredProfile = async () => {
+    console.log("Generating structured profile...");
+    try {
+      const response = await fetch('/api/v1/profiles/generate-structured-profile', {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
+      const data = await response.json();
+      console.log("Generated profile structure:", data);
+      setProfileData(data as unknown as StructuredProfile);
+      return data;
+    } catch (err) {
+      console.error("Error generating structured profile:", err);
+      return null;
+    }
+  };
+
+  const fetchRawInsights = async () => {
+    console.log("Fetching raw insights data...");
+    try {
+      const response = await fetch('/api/v1/profiles/raw-insights-data');
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
+      const data = await response.json();
+      console.log("Raw insights data:", data);
+      return data;
+    } catch (err) {
+      console.error("Error fetching raw insights:", err);
+      return null;
+    }
+  };
+
+  const generateFromConversations = async () => {
+    try {
+      console.log("Generating profile from existing conversations...");
+      // Use complete URL instead of relative path
+      const API_BASE_URL = 'http://10.0.2.2:8000'; // For Android emulator
+      // const API_BASE_URL = 'http://localhost:8000'; // For iOS simulator
+      
+      const response = await fetch(`${API_BASE_URL}/api/v1/profiles/generate-from-conversations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer YOUR_AUTH_TOKEN' // Add your auth token if required
+        }
+      });
+      
+      // Rest of function remains the same
+      const data = await response.json();
+      console.log("Generated profile from conversations:", JSON.stringify(data, null, 2));
+      
+      if (data && !data.error) {
+        setProfileData(data as unknown as StructuredProfile);
+        return true;
+      } else {
+        console.error("Error in response:", data.error);
+        return false;
+      }
+    } catch (err) {
+      console.error("Error generating profile from conversations:", err);
+      return false;
     }
   };
 
@@ -146,14 +243,45 @@ const EnhancedProfileDashboard: React.FC<EnhancedProfileDashboardProps> = ({ use
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <ThemedText style={styles.errorText}>Error: {error instanceof Error ? error.message : 'Unknown error'}</ThemedText>
+        <ThemedText style={styles.errorText}>Error: {error}</ThemedText>
         <TouchableOpacity 
           style={[styles.retryButton, { backgroundColor: tintColor }]}
-          onPress={() => refetch()}
+          onPress={() => fetchProfileData()}
         >
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
+    );
+  }
+
+  // Debug view to see raw data - remove for production
+  const showDebugView = true; // Change to false to hide
+  if (showDebugView) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
+          <View style={styles.cardHeader}>
+            <ThemedText style={styles.cardTitle}>Profile Data Debug View</ThemedText>
+          </View>
+          <View style={{ padding: 16 }}>
+            <ThemedText style={{ fontFamily: 'monospace', fontSize: 12 }}>
+              {profileData ? JSON.stringify(profileData, null, 2) : "No data received"}
+            </ThemedText>
+          </View>
+        </View>
+        <TouchableOpacity 
+          style={[styles.refreshButton, {backgroundColor: tintColor}]} 
+          onPress={() => fetchProfileData()}
+        >
+          <Text style={styles.refreshButtonText}>Refresh Profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.debugButton, {backgroundColor: '#8b5cf6', marginTop: 10}]} 
+          onPress={generateFromConversations}
+        >
+          <Text style={styles.buttonText}>Generate from Conversations</Text>
+        </TouchableOpacity>
+      </ScrollView>
     );
   }
 
@@ -174,7 +302,10 @@ const EnhancedProfileDashboard: React.FC<EnhancedProfileDashboardProps> = ({ use
         <View style={styles.cardHeader}>
           <ThemedText style={styles.cardTitle}>Recovery Journey</ThemedText>
         </View>
-        <RecoveryStageTracker userId={userId} initialStage={profileData.profile.recovery_stage} />
+        <RecoveryStageTracker 
+          userId={userId} 
+          initialStage={profileData.profile.recovery_stage} // Changed from stage to initialStage
+        />
       </View>
 
       {/* Abstinence Progress Section */}
@@ -262,19 +393,18 @@ const EnhancedProfileDashboard: React.FC<EnhancedProfileDashboardProps> = ({ use
         </View>
       </View>
 
-      {/* Psychological Traits */}
-      {profileData.profile.psychological_traits && 
-       Object.keys(profileData.profile.psychological_traits).length > 0 && (
+      {/* Enhanced Psychological Traits section */}
+      {profileData.psychological_traits && (
         <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
           <View style={styles.cardHeader}>
-            <ThemedText style={styles.cardTitle}>Psychological Traits</ThemedText>
+            <ThemedText style={styles.cardTitle}>Psychological Profile</ThemedText>
           </View>
           <View style={styles.traitsContainer}>
-            {Object.entries(profileData.profile.psychological_traits).map(([trait, value]) => (
+            {Object.entries(profileData.psychological_traits).filter(([key, value]) => 
+              key !== 'other_traits' && typeof value === 'boolean' && value
+            ).map(([trait, value]) => (
               <View key={trait} style={styles.traitItem}>
-                <View style={[styles.traitDot, { 
-                  backgroundColor: value ? '#4ecdc4' : '#ff6b6b' 
-                }]} />
+                <View style={[styles.traitDot, { backgroundColor: '#4ecdc4' }]} />
                 <ThemedText style={styles.traitText}>
                   {trait.split('_').map(word => 
                     word.charAt(0).toUpperCase() + word.slice(1)
@@ -282,114 +412,167 @@ const EnhancedProfileDashboard: React.FC<EnhancedProfileDashboardProps> = ({ use
                 </ThemedText>
               </View>
             ))}
+            
+            {profileData.psychological_traits.other_traits && 
+            profileData.psychological_traits.other_traits.length > 0 && (
+              <View style={styles.otherTraitsContainer}>
+                <ThemedText style={styles.sectionSubtitle}>Other Traits</ThemedText>
+                {profileData.psychological_traits.other_traits.map((trait, index) => (
+                  <View key={`other_trait_${index}`} style={styles.traitItem}>
+                    <View style={[styles.traitDot, { backgroundColor: '#94a3b8' }]} />
+                    <ThemedText style={styles.traitText}>{trait}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+      
+      {/* Motivation Factors */}
+      {profileData.motivation && (
+        <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
+          <View style={styles.cardHeader}>
+            <ThemedText style={styles.cardTitle}>Motivation Analysis</ThemedText>
+          </View>
+          <View style={styles.motivationContainer}>
+            {/* Level visualization - reuse your existing motivation bar */}
+            
+            {/* Internal motivators */}
+            {profileData.motivation.internal_motivators && 
+            profileData.motivation.internal_motivators.length > 0 && (
+              <View style={styles.motivationSection}>
+                <ThemedText style={styles.sectionSubtitle}>Internal Motivators</ThemedText>
+                {profileData.motivation.internal_motivators.map((motivator, index) => (
+                  <View key={`internal_${index}`} style={styles.motivatorItem}>
+                    <View style={[styles.motivatorDot, { backgroundColor: '#10b981' }]} />
+                    <ThemedText style={styles.motivatorText}>{motivator}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            )}
+            
+            {/* External motivators */}
+            {profileData.motivation.external_motivators && 
+            profileData.motivation.external_motivators.length > 0 && (
+              <View style={styles.motivationSection}>
+                <ThemedText style={styles.sectionSubtitle}>External Motivators</ThemedText>
+                {profileData.motivation.external_motivators.map((motivator, index) => (
+                  <View key={`external_${index}`} style={styles.motivatorItem}>
+                    <View style={[styles.motivatorDot, { backgroundColor: '#3b82f6' }]} />
+                    <ThemedText style={styles.motivatorText}>{motivator}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            )}
+            
+            {/* Ambivalence factors */}
+            {profileData.motivation.ambivalence_factors && 
+            profileData.motivation.ambivalence_factors.length > 0 && (
+              <View style={styles.motivationSection}>
+                <ThemedText style={styles.sectionSubtitle}>Ambivalence Factors</ThemedText>
+                {profileData.motivation.ambivalence_factors.map((factor, index) => (
+                  <View key={`ambivalence_${index}`} style={styles.motivatorItem}>
+                    <View style={[styles.motivatorDot, { backgroundColor: '#f59e0b' }]} />
+                    <ThemedText style={styles.motivatorText}>{factor}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+      
+      {/* Triggers Map */}
+      {profileData.triggers && (
+        <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
+          <View style={styles.cardHeader}>
+            <ThemedText style={styles.cardTitle}>Trigger Analysis</ThemedText>
+          </View>
+          <View style={styles.triggersContainer}>
+            {/* Emotional triggers */}
+            {profileData.triggers.emotional && profileData.triggers.emotional.length > 0 && (
+              <View style={styles.triggerSection}>
+                <ThemedText style={styles.sectionSubtitle}>Emotional Triggers</ThemedText>
+                {profileData.triggers.emotional.map((trigger, index) => (
+                  <View key={`emotional_${index}`} style={styles.triggerItem}>
+                    <View style={[styles.triggerDot, { backgroundColor: '#ff6b6b' }]} />
+                    <ThemedText style={styles.triggerText}>{trigger}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            )}
+            
+            {/* Social triggers */}
+            {profileData.triggers.social && profileData.triggers.social.length > 0 && (
+              <View style={styles.triggerSection}>
+                <ThemedText style={styles.sectionSubtitle}>Social Triggers</ThemedText>
+                {profileData.triggers.social.map((trigger, index) => (
+                  <View key={`social_${index}`} style={styles.triggerItem}>
+                    <View style={[styles.triggerDot, { backgroundColor: '#8b5cf6' }]} />
+                    <ThemedText style={styles.triggerText}>{trigger}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            )}
+            
+            {/* Time-based triggers */}
+            {profileData.triggers.time_based && (
+              <>
+                {profileData.triggers.time_based.days && profileData.triggers.time_based.days.length > 0 && (
+                  <View style={styles.triggerSection}>
+                    <ThemedText style={styles.sectionSubtitle}>Day Triggers</ThemedText>
+                    {profileData.triggers.time_based.days.map((day, index) => (
+                      <View key={`day_${index}`} style={styles.triggerItem}>
+                        <View style={[styles.triggerDot, { backgroundColor: '#4ecdc4' }]} />
+                        <ThemedText style={styles.triggerText}>{day}</ThemedText>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                
+                {profileData.triggers.time_based.times && profileData.triggers.time_based.times.length > 0 && (
+                  <View style={styles.triggerSection}>
+                    <ThemedText style={styles.sectionSubtitle}>Time Triggers</ThemedText>
+                    {profileData.triggers.time_based.times.map((time, index) => (
+                      <View key={`time_${index}`} style={styles.triggerItem}>
+                        <View style={[styles.triggerDot, { backgroundColor: '#4ecdc4' }]} />
+                        <ThemedText style={styles.triggerText}>{time}</ThemedText>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
           </View>
         </View>
       )}
 
-      {/* Insights Categories */}
-      {profileData.insights && Object.keys(profileData.insights).length > 0 && (
+      {/* Key Insights */}
+      {profileData.analysis && profileData.analysis.key_insights && profileData.analysis.key_insights.length > 0 && (
         <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
           <View style={styles.cardHeader}>
-            <ThemedText style={styles.cardTitle}>Your Insights</ThemedText>
+            <ThemedText style={styles.cardTitle}>Key Insights</ThemedText>
           </View>
-          <View style={styles.categoriesContainer}>
-            {Object.keys(profileData.insights).map(type => (
-              <TouchableOpacity
-                key={type}
-                style={[
-                  styles.categoryButton,
-                  { 
-                    backgroundColor: getTypeColor(type),
-                    borderWidth: selectedCategory === type ? 2 : 0,
-                    borderColor: 'white'
-                  }
-                ]}
-                onPress={() => setSelectedCategory(selectedCategory === type ? null : type)}
-              >
-                <ThemedText style={styles.categoryText}>
-                  {formatType(type)} ({profileData.insights[type].length})
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Selected category insights */}
-          {selectedCategory && profileData.insights[selectedCategory] && (
-            <View style={styles.insightsContainer}>
-              <ThemedText style={styles.sectionTitle}>{formatType(selectedCategory)}</ThemedText>
-              
-              {profileData.insights[selectedCategory].map((insight, index) => (
-                <View 
-                  key={insight.id || `${selectedCategory}_${index}`}
-                  style={[
-                    styles.insightCard, 
-                    { backgroundColor: getTypeColor(selectedCategory) + '22' }
-                  ]}
-                >
-                  <View style={styles.insightHeader}>
-                    <View style={[styles.insightDot, { backgroundColor: getTypeColor(selectedCategory) }]} />
-                    <ThemedText style={styles.insightValue}>
-                      {formatValue(insight.value)}
-                    </ThemedText>
-                  </View>
-                  
-                  {/* Metadata */}
-                  {insight.confidence && (
-                    <View style={styles.insightMetadata}>
-                      <ThemedText style={styles.metadataLabel}>Confidence:</ThemedText>
-                      <View style={styles.confidenceContainer}>
-                        <View
-                          style={[
-                            styles.confidenceFill,
-                            {
-                              width: `${insight.confidence * 100}%`,
-                              backgroundColor: getTypeColor(selectedCategory)
-                            }
-                          ]}
-                        />
-                      </View>
-                      <ThemedText style={styles.confidenceValue}>{Math.round(insight.confidence * 100)}%</ThemedText>
-                    </View>
-                  )}
-                  
-                  {insight.day_of_week && (
-                    <View style={styles.insightMetadata}>
-                      <ThemedText style={styles.metadataLabel}>Day:</ThemedText>
-                      <ThemedText style={styles.metadataValue}>
-                        {insight.day_of_week.charAt(0).toUpperCase() + insight.day_of_week.slice(1)}
-                      </ThemedText>
-                    </View>
-                  )}
-                  
-                  {insight.time_of_day && (
-                    <View style={styles.insightMetadata}>
-                      <ThemedText style={styles.metadataLabel}>Time:</ThemedText>
-                      <ThemedText style={styles.metadataValue}>
-                        {insight.time_of_day.charAt(0).toUpperCase() + insight.time_of_day.slice(1)}
-                      </ThemedText>
-                    </View>
-                  )}
-                  
-                  {insight.extracted_at && (
-                    <View style={styles.extractedAtContainer}>
-                      <ThemedText style={styles.extractedAtText}>
-                        Identified: {new Date(insight.extracted_at).toLocaleDateString()}
-                      </ThemedText>
-                    </View>
-                  )}
+          <View style={styles.insightsContainer}>
+            {profileData.analysis.key_insights.map((insight, index) => (
+              <View key={`insight_${index}`} style={styles.insightItem}>
+                <View style={styles.insightNumber}>
+                  <ThemedText style={styles.insightNumberText}>{index + 1}</ThemedText>
                 </View>
-              ))}
-            </View>
-          )}
-
-          {/* If no category is selected, show summary */}
-          {!selectedCategory && (
-            <View style={styles.summaryContainer}>
-              <ThemedText style={styles.summaryText}>
-                Select a category above to see detailed insights. Your profile is built automatically based on our conversations.
-              </ThemedText>
-            </View>
-          )}
+                <ThemedText style={styles.insightText}>{insight}</ThemedText>
+              </View>
+            ))}
+            
+            {profileData.analysis.recommended_focus && (
+              <View style={styles.recommendedFocusContainer}>
+                <ThemedText style={styles.recommendedFocusLabel}>Recommended Focus:</ThemedText>
+                <ThemedText style={styles.recommendedFocusText}>
+                  {profileData.analysis.recommended_focus}
+                </ThemedText>
+              </View>
+            )}
+          </View>
         </View>
       )}
 
@@ -763,6 +946,101 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   refreshButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  // Updated styles with new definitions
+  sectionSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    opacity: 0.8,
+  },
+  otherTraitsContainer: {
+    marginTop: 12,
+  },
+  motivationSection: {
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  motivatorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  motivatorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 12,
+  },
+  motivatorText: {
+    fontSize: 14,
+  },
+  triggersContainer: {
+    padding: 16,
+  },
+  triggerSection: {
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  triggerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  triggerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 12,
+  },
+  triggerText: {
+    fontSize: 14,
+  },
+  insightItem: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  insightNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  insightNumberText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  insightText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  recommendedFocusContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 8,
+  },
+  recommendedFocusLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  recommendedFocusText: {
+    fontSize: 14,
+  },
+  debugButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
     color: 'white',
     fontWeight: '600',
   },

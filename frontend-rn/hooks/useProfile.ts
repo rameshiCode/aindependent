@@ -415,4 +415,4 @@ export function useProfile(): UseProfileResult {
     analyzeConversation,
     isAnalyzingConversation: analyzeConversationMutation.isPending
   };
-}
+} 

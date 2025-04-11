@@ -1568,6 +1568,223 @@ export type ProfilesAnalyzeMessageResponses = {
   200: unknown
 }
 
+export type ProfilesUpdateGoalProgressData = {
+  body: {
+    [key: string]: unknown
+  }
+  path: {
+    goal_id: string
+  }
+  query?: never
+  url: "/api/v1/profiles/goals/{goal_id}/progress"
+}
+
+export type ProfilesUpdateGoalProgressErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesUpdateGoalProgressError =
+  ProfilesUpdateGoalProgressErrors[keyof ProfilesUpdateGoalProgressErrors]
+
+export type ProfilesUpdateGoalProgressResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type ProfilesUpdateGoalProgressResponse =
+  ProfilesUpdateGoalProgressResponses[keyof ProfilesUpdateGoalProgressResponses]
+
+export type ProfilesGoalCheckInData = {
+  body: {
+    [key: string]: unknown
+  }
+  path: {
+    goal_id: string
+  }
+  query?: never
+  url: "/api/v1/profiles/goals/{goal_id}/check-in"
+}
+
+export type ProfilesGoalCheckInErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesGoalCheckInError =
+  ProfilesGoalCheckInErrors[keyof ProfilesGoalCheckInErrors]
+
+export type ProfilesGoalCheckInResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type ProfilesGoalCheckInResponse =
+  ProfilesGoalCheckInResponses[keyof ProfilesGoalCheckInResponses]
+
+export type ProfilesGetGoalRecommendationsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/goal-recommendations"
+}
+
+export type ProfilesGetGoalRecommendationsResponses = {
+  /**
+   * Successful Response
+   */
+  200: Array<{
+    [key: string]: unknown
+  }>
+}
+
+export type ProfilesGetGoalRecommendationsResponse =
+  ProfilesGetGoalRecommendationsResponses[keyof ProfilesGetGoalRecommendationsResponses]
+
+export type ProfilesGetGoalJourneyData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/goal-journey"
+}
+
+export type ProfilesGetGoalJourneyResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type ProfilesGetGoalJourneyResponse =
+  ProfilesGetGoalJourneyResponses[keyof ProfilesGetGoalJourneyResponses]
+
+export type ProfilesAnalyzeFullConversationData = {
+  body?: never
+  path: {
+    conversation_id: string
+  }
+  query?: never
+  url: "/api/v1/profiles/analyze-full-conversation/{conversation_id}"
+}
+
+export type ProfilesAnalyzeFullConversationErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesAnalyzeFullConversationError =
+  ProfilesAnalyzeFullConversationErrors[keyof ProfilesAnalyzeFullConversationErrors]
+
+export type ProfilesAnalyzeFullConversationResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type ProfilesRealTimeProfileUpdateData = {
+  body: {
+    [key: string]: unknown
+  }
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/real-time-profile-update"
+}
+
+export type ProfilesRealTimeProfileUpdateErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type ProfilesRealTimeProfileUpdateError =
+  ProfilesRealTimeProfileUpdateErrors[keyof ProfilesRealTimeProfileUpdateErrors]
+
+export type ProfilesRealTimeProfileUpdateResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type ProfilesGetStructuredProfileData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/structured-profile"
+}
+
+export type ProfilesGetStructuredProfileResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type ProfilesGenerateStructuredProfileData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/generate-structured-profile"
+}
+
+export type ProfilesGenerateStructuredProfileResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type ProfilesGetRawInsightsDataData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/raw-insights-data"
+}
+
+export type ProfilesGetRawInsightsDataResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
+
+export type ProfilesGenerateProfileFromConversationsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/v1/profiles/generate-from-conversations"
+}
+
+export type ProfilesGenerateProfileFromConversationsResponses = {
+  /**
+   * Successful Response
+   */
+  200: {
+    [key: string]: unknown
+  }
+}
+
+export type ProfilesGenerateProfileFromConversationsResponse =
+  ProfilesGenerateProfileFromConversationsResponses[keyof ProfilesGenerateProfileFromConversationsResponses]
+
 export type ApiChatData = {
   body: {
     [key: string]: unknown

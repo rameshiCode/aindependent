@@ -1523,3 +1523,267 @@ async def get_structured_profile(
                 if profile.last_updated else None,
         }
     }
+
+
+@router.post("/generate-structured-profile")
+async def generate_structured_profile(session: SessionDep, current_user: CurrentUser):
+    """
+    Analyze all user data and generate a complete structured profile using AI
+    that matches the frontend's expected format.
+    """
+    import logging
+    import json
+    from app.services.profile_analysis_service import ProfileAnalysisService
+    from sqlmodel import Session
+    from app.core.db import engine
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Generating structured profile for user {current_user.id}")
+    
+    # Get all messages from this user's conversations
+    conversations = session.exec(
+        select(Conversation)
+        .where(Conversation.user_id == current_user.id)
+        .order_by(Conversation.updated_at.desc())
+    ).all()
+    
+    if not conversations:
+        return {
+            "error": "No conversations found for analysis"
+        }
+    
+    # Get the most recent conversation with messages
+    recent_conversation = None
+    for conv in conversations:
+        message_count = session.exec(
+            select(func.count(Message.id)).where(
+                Message.conversation_id == conv.id
+            )
+        ).one()
+        
+        if message_count > 0:
+            recent_conversation = conv
+            break
+    
+    if not recent_conversation:
+        return {
+            "error": "No conversations with messages found"
+        }
+    
+    # Get messages from the conversation
+    messages = session.exec(
+        select(Message)
+        .where(Message.conversation_id == recent_conversation.id)
+        .order_by(Message.created_at)
+    ).all()
+    
+    if not messages:
+        return {
+            "error": "No messages found in the conversation"
+        }
+    
+    # Initialize the profile analyzer
+    analyzer = ProfileAnalysisService(lambda: Session(engine))
+    
+    # Extract structured profile
+    try:
+        # Use the existing method to generate structured data
+        structured_data = await analyzer.extract_structured_profile(messages)
+        
+        # Transform the structured data into a format expected by the frontend
+        frontend_format = {
+            "profile": {
+                "id": str(current_user.id),
+                "addiction_type": structured_data.get("basic_info", {}).get("addiction_type"),
+                "recovery_stage": structured_data.get("basic_info", {}).get("recovery_stage"),
+                "motivation_level": structured_data.get("motivation", {}).get("level"),
+                "abstinence_days": structured_data.get("basic_info", {}).get("abstinence_days"),
+                "last_updated": datetime.utcnow().isoformat()
+            },
+            "insights": {
+                "trigger": [
+                    {"id": f"t{i}", "value": trigger, "confidence": 0.8} 
+                    for i, trigger in enumerate(
+                        structured_data.get("triggers", {}).get("emotional", []) +
+                        structured_data.get("triggers", {}).get("situational", []) +
+                        structured_data.get("triggers", {}).get("social", []) +
+                        structured_data.get("triggers", {}).get("time_based", {}).get("times", [])
+                    )
+                ],
+                "recovery_stage": [
+                    {"id": "rs1", "value": structured_data.get("basic_info", {}).get("recovery_stage"), "confidence": 0.85}
+                ] if structured_data.get("basic_info", {}).get("recovery_stage") else []
+            },
+            "goals": [{
+                "id": f"g{i}", 
+                "description": goal,
+                "created_at": datetime.utcnow().isoformat(),
+                "status": "active"
+            } for i, goal in enumerate(structured_data.get("goals", {}).get("short_term", [])[:3])],
+            "summary": {
+                "has_profile": True,
+                "insight_count": len(structured_data.get("triggers", {}).get("emotional", [])) +
+                                len(structured_data.get("triggers", {}).get("situational", [])) +
+                                len(structured_data.get("triggers", {}).get("social", [])) +
+                                len(structured_data.get("triggers", {}).get("time_based", {}).get("times", [])) +
+                                (1 if structured_data.get("basic_info", {}).get("recovery_stage") else 0),
+                "insight_types": ["trigger", "recovery_stage"],
+                "goals_count": len(structured_data.get("goals", {}).get("short_term", [])[:3]),
+                "last_updated": datetime.utcnow().isoformat()
+            },
+            "psychological_traits": {
+                "need_for_approval": structured_data.get("psychological_traits", {}).get("need_for_approval", False),
+                "fear_of_rejection": structured_data.get("psychological_traits", {}).get("fear_of_rejection", False),
+                "low_self_confidence": structured_data.get("psychological_traits", {}).get("low_self_confidence", False),
+                "submissiveness": structured_data.get("psychological_traits", {}).get("submissiveness", False),
+                "other_traits": structured_data.get("psychological_traits", {}).get("other_traits", [])
+            },
+            "motivation": {
+                "internal_motivators": structured_data.get("motivation", {}).get("internal_motivators", []),
+                "external_motivators": structured_data.get("motivation", {}).get("external_motivators", []),
+                "ambivalence_factors": structured_data.get("motivation", {}).get("ambivalence_factors", [])
+            },
+            "triggers": {
+                "emotional": structured_data.get("triggers", {}).get("emotional", []),
+                "social": structured_data.get("triggers", {}).get("social", []),
+                "time_based": {
+                    "days": structured_data.get("triggers", {}).get("time_based", {}).get("days", []),
+                    "times": structured_data.get("triggers", {}).get("time_based", {}).get("times", [])
+                }
+            },
+            "analysis": {
+                "key_insights": structured_data.get("analysis", {}).get("key_insights", []),
+                "recommended_focus": structured_data.get("analysis", {}).get("recommended_focus")
+            }
+        }
+        
+        logger.info(f"Generated structured profile with keys: {list(frontend_format.keys())}")
+        
+        # Save this formatted data to the database
+        # (This would be added in a more complete implementation)
+        
+        return frontend_format
+        
+    except Exception as e:
+        logger.error(f"Error generating structured profile: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        return {
+            "error": f"Failed to generate structured profile: {str(e)}",
+            "raw_data_available": True
+        }
+
+@router.get("/raw-insights-data")
+def get_raw_insights_data(session: SessionDep, current_user: CurrentUser):
+    """Return raw insights data for debugging purposes"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Get user profile
+    profile = session.exec(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    ).first()
+    
+    # Get all insights
+    insights = session.exec(
+        select(UserInsight)
+        .where(UserInsight.user_id == current_user.id)
+        .order_by(UserInsight.extracted_at.desc())
+    ).all()
+    
+    # Group insights by type
+    insights_by_type = {}
+    for insight in insights:
+        if insight.insight_type not in insights_by_type:
+            insights_by_type[insight.insight_type] = []
+        
+        insights_by_type[insight.insight_type].append({
+            "id": str(insight.id),
+            "value": insight.value,
+            "confidence": insight.confidence,
+            "emotional_significance": insight.emotional_significance,
+            "extracted_at": insight.extracted_at.isoformat() if insight.extracted_at else None,
+        })
+    
+    logger.info(f"Found {len(insights)} insights of types: {list(insights_by_type.keys())}")
+    
+    return {
+        "profile": {
+            "id": str(profile.id) if profile else None,
+            "addiction_type": profile.addiction_type if profile else None,
+            "recovery_stage": profile.recovery_stage if profile else None,
+            "motivation_level": profile.motivation_level if profile else None,
+            "last_updated": profile.last_updated.isoformat() if profile and profile.last_updated else None,
+        },
+        "insights_by_type": insights_by_type,
+        "insights_count": len(insights),
+        "types": list(insights_by_type.keys())
+    }
+
+# debug endpoint for json from api delete this
+@router.post("/generate-from-conversations", response_model=dict)
+async def generate_profile_from_conversations(current_user: CurrentUser, session: SessionDep):
+    """
+    Generate a complete profile structure from the user's existing conversation history.
+    Uses the most recent conversation with messages.
+    """
+    import logging
+    from sqlmodel import select, func
+    from app.models import Conversation, Message
+    from app.services.profile_analysis_service import ProfileAnalysisService
+    from datetime import datetime
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Manually generating profile from existing conversations for user {current_user.id}")
+    
+    # Get all conversations for this user
+    conversations = session.exec(
+        select(Conversation)
+        .where(Conversation.user_id == current_user.id)
+        .order_by(Conversation.updated_at.desc())
+    ).all()
+    
+    if not conversations:
+        logger.warning("No conversations found")
+        return {"error": "No conversations found"}
+    
+    # Find the most recent conversation with messages
+    conversation_id = None
+    messages = []
+    
+    for conv in conversations:
+        msgs = session.exec(
+            select(Message)
+            .where(Message.conversation_id == conv.id)
+            .order_by(Message.created_at)
+        ).all()
+        
+        if msgs:
+            conversation_id = conv.id
+            messages = msgs
+            logger.info(f"Using conversation {conversation_id} with {len(messages)} messages")
+            break
+    
+    if not messages:
+        logger.warning("No messages found in any conversations")
+        return {"error": "No messages found in any conversations"}
+    
+    try:
+        # Get the ProfileAnalysisService to access extract_structured_profile
+        logger.info("Initializing ProfileAnalysisService...")
+        analysis_service = ProfileAnalysisService(lambda: session)
+        
+        # Use the extract_structured_profile method to generate profile data
+        logger.info("Extracting structured profile...")
+        structured_data = await analysis_service.extract_structured_profile(messages)
+        
+        logger.info(f"Raw structured data: {structured_data}")
+        
+        # Return the structured data directly to see what it contains
+        return structured_data
+    except Exception as e:
+        logger.error(f"Error generating profile from conversations: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"error": f"Failed to generate profile: {str(e)}"}

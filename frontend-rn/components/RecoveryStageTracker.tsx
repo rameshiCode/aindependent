@@ -35,13 +35,14 @@ function isMIStage(stage: string): stage is MIStageType {
 
 interface RecoveryStageTrackerProps {
   userId: string;
+  initialStage?: string; // Add this line
 }
 
 /**
  * Dynamic Recovery Stage Tracker that visualizes a user's journey through
  * recovery stages based on actual conversation data
  */
-const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) => {
+const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId, initialStage }) => {
   const { profile, isLoadingProfile, profileError, getInsights } = useProfile();
   const [stageHistory, setStageHistory] = useState<HistoryItem[]>([]);
   const [userThoughts, setUserThoughts] = useState<{ [stage: string]: string[] }>({});
@@ -212,7 +213,7 @@ const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) =
 
   // Get current stage index based on active stage
   const getCurrentStageIndex = (): number => {
-    const currentStage = profile?.recovery_stage || stageHistory[0]?.stage;
+    const currentStage = initialStage || profile?.recovery_stage || stageHistory[0]?.stage;
     return currentStage ? stageOrder.indexOf(currentStage) : -1;
   };
 
@@ -348,7 +349,7 @@ const RecoveryStageTracker: React.FC<RecoveryStageTrackerProps> = ({ userId }) =
 
   // Get current stage info
   const currentStageIndex = getCurrentStageIndex();
-  const activeStage = profile?.recovery_stage || stageHistory[0]?.stage || 'contemplation';
+  const activeStage = initialStage || profile?.recovery_stage || stageHistory[0]?.stage || 'contemplation';
   const currentStageInfo = RECOVERY_STAGES[activeStage];
   const currentStageThoughts = getThoughtsForStage(activeStage);
   

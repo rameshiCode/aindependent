@@ -150,6 +150,25 @@ import type {
   ProfilesAnalyzeConversationError,
   ProfilesAnalyzeMessageData,
   ProfilesAnalyzeMessageError,
+  ProfilesUpdateGoalProgressData,
+  ProfilesUpdateGoalProgressResponse,
+  ProfilesUpdateGoalProgressError,
+  ProfilesGoalCheckInData,
+  ProfilesGoalCheckInResponse,
+  ProfilesGoalCheckInError,
+  ProfilesGetGoalRecommendationsData,
+  ProfilesGetGoalRecommendationsResponse,
+  ProfilesGetGoalJourneyData,
+  ProfilesGetGoalJourneyResponse,
+  ProfilesAnalyzeFullConversationData,
+  ProfilesAnalyzeFullConversationError,
+  ProfilesRealTimeProfileUpdateData,
+  ProfilesRealTimeProfileUpdateError,
+  ProfilesGetStructuredProfileData,
+  ProfilesGenerateStructuredProfileData,
+  ProfilesGetRawInsightsDataData,
+  ProfilesGenerateProfileFromConversationsData,
+  ProfilesGenerateProfileFromConversationsResponse,
   ApiChatData,
   ApiChatError,
   ApiEndChatData,
@@ -1498,6 +1517,255 @@ export class ProfilesService {
         "Content-Type": "application/json",
         ...options?.headers,
       },
+    })
+  }
+
+  /**
+   * Update Goal Progress
+   * Update progress on a goal
+   */
+  public static updateGoalProgress<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesUpdateGoalProgressData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).put<
+      ProfilesUpdateGoalProgressResponse,
+      ProfilesUpdateGoalProgressError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/goals/{goal_id}/progress",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Goal Check In
+   * Record a check-in for a goal with reflections
+   */
+  public static goalCheckIn<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesGoalCheckInData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      ProfilesGoalCheckInResponse,
+      ProfilesGoalCheckInError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/goals/{goal_id}/check-in",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Get Goal Recommendations
+   * Generate personalized goal recommendations based on user profile
+   */
+  public static getGoalRecommendations<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesGetGoalRecommendationsData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      ProfilesGetGoalRecommendationsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/goal-recommendations",
+      ...options,
+    })
+  }
+
+  /**
+   * Get Goal Journey
+   * Get data for visualizing the user's goal and recovery journey
+   */
+  public static getGoalJourney<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesGetGoalJourneyData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      ProfilesGetGoalJourneyResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/goal-journey",
+      ...options,
+    })
+  }
+
+  /**
+   * Analyze Full Conversation
+   * Analyze a complete conversation and return structured profile insights
+   */
+  public static analyzeFullConversation<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesAnalyzeFullConversationData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      unknown,
+      ProfilesAnalyzeFullConversationError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/analyze-full-conversation/{conversation_id}",
+      ...options,
+    })
+  }
+
+  /**
+   * Real Time Profile Update
+   * Update profile in real-time based on a single message
+   */
+  public static realTimeProfileUpdate<ThrowOnError extends boolean = false>(
+    options: Options<ProfilesRealTimeProfileUpdateData, ThrowOnError>,
+  ) {
+    return (options.client ?? _heyApiClient).post<
+      unknown,
+      ProfilesRealTimeProfileUpdateError,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/real-time-profile-update",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Get Structured Profile
+   * Get structured profile information with insights grouped by category
+   */
+  public static getStructuredProfile<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesGetStructuredProfileData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      unknown,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/structured-profile",
+      ...options,
+    })
+  }
+
+  /**
+   * Generate Structured Profile
+   * Analyze all user data and generate a complete structured profile using AI
+   * that matches the frontend's expected format.
+   */
+  public static generateStructuredProfile<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesGenerateStructuredProfileData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).post<
+      unknown,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/generate-structured-profile",
+      ...options,
+    })
+  }
+
+  /**
+   * Get Raw Insights Data
+   * Return raw insights data for debugging purposes
+   */
+  public static getRawInsightsData<ThrowOnError extends boolean = false>(
+    options?: Options<ProfilesGetRawInsightsDataData, ThrowOnError>,
+  ) {
+    return (options?.client ?? _heyApiClient).get<
+      unknown,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/raw-insights-data",
+      ...options,
+    })
+  }
+
+  /**
+   * Generate Profile From Conversations
+   * Generate a complete profile structure from the user's existing conversation history.
+   * Uses the most recent conversation with messages.
+   */
+  public static generateProfileFromConversations<
+    ThrowOnError extends boolean = false,
+  >(
+    options?: Options<
+      ProfilesGenerateProfileFromConversationsData,
+      ThrowOnError
+    >,
+  ) {
+    return (options?.client ?? _heyApiClient).post<
+      ProfilesGenerateProfileFromConversationsResponse,
+      unknown,
+      ThrowOnError
+    >({
+      security: [
+        {
+          scheme: "bearer",
+          type: "http",
+        },
+      ],
+      url: "/api/v1/profiles/generate-from-conversations",
+      ...options,
     })
   }
 }
