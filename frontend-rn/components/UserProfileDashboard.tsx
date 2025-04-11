@@ -1,44 +1,63 @@
-// frontend-rn/components/UserProfileDashboard.tsx
-
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Text } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useThemeColor } from '../hooks/useThemeColor';
-import { useProfile, UserInsight } from '../hooks/useProfile';
 import RecoveryStageTracker from './RecoveryStageTracker';
 import ProfileInsightsVisualization from './ProfileInsightsVisualization';
-import RecoverySuggestions from './RecoverySuggestions';
+// import { useStructuredProfile } from '../hooks/useProfile';
 
-interface UserProfileDashboardProps {
-  userId: string;
+// Define the types for structured profile data
+interface UserInsight {
+  id: string;
+  value: string;
+  confidence: number;
+  emotional_significance?: number;
+  day_of_week?: string;
+  time_of_day?: string;
+  extracted_at?: string;
 }
 
-/**
- * A comprehensive dashboard displaying all profile insights about the user
- * based on conversation analysis and motivational interviewing
- */
-const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) => {
-  const { 
-    profile, 
-    isLoadingProfile, 
-    profileError, 
-    getInsights,
-    createGoal,
-    processAllConversations
-  } = useProfile();
-  
+interface UserGoal {
+  id: string;
+  description: string;
+  created_at: string;
+  target_date?: string;
+  status: string;
+}
+
+interface StructuredProfile {
+  profile: {
+    id: string;
+    addiction_type?: string;
+    recovery_stage?: string;
+    motivation_level?: number;
+    abstinence_days?: number;
+    abstinence_start_date?: string;
+    psychological_traits?: Record<string, boolean>;
+    last_updated?: string;
+  };
+  insights: Record<string, UserInsight[]>;
+  goals: UserGoal[];
+  summary: {
+    has_profile: boolean;
+    insight_count: number;
+    insight_types: string[];
+    goals_count: number;
+    last_updated?: string;
+  };
+}
+
+interface EnhancedProfileDashboardProps {
+  userId: string;
+  onRefresh?: () => void;
+}
+
+const EnhancedProfileDashboard: React.FC<EnhancedProfileDashboardProps> = ({ userId, onRefresh }) => {
+  const [profileData, setProfileData] = useState<StructuredProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
-  // Get insights using the hook function
-  const {
-    data: insightsData,
-    isLoading: isLoadingInsights,
-    error: insightsError
-  } = getInsights();
-
-  const isLoading = isLoadingProfile || isLoadingInsights;
-  const error = profileError || insightsError;
-
   // Theme colors
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -46,21 +65,36 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
   const cardBgColor = useThemeColor({}, 'inputBackground');
   const borderColor = useThemeColor({}, 'inputBorder');
 
-  // Group insights by type
-  const groupedInsights = React.useMemo(() => {
-    if (!insightsData) return {};
+  // Fetch structured profile data
+  useEffect(() => {
+    fetchProfileData();
+  }, [userId]);
+
+  const fetchProfileData = async () => {
+    setIsLoading(true);
+    setError(null);
     
-    const grouped: { [key: string]: any[] } = {};
-    insightsData.forEach(insight => {
-      const type = insight.type || insight.insight_type; // Handle both field names
-      if (!grouped[type]) {
-        grouped[type] = [];
+    try {
+      // Replace with your actual API call
+      const response = await fetch(`/api/v1/profiles/structured-profile`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile data');
       }
-      grouped[type].push(insight);
-    });
-    
-    return grouped;
-  }, [insightsData]);
+      
+      const data = await response.json();
+      setProfileData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      console.error('Error fetching profile data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Get color for insight type
   const getTypeColor = (type: string): string => {
@@ -71,7 +105,8 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
       case 'recovery_stage': return '#3b82f6';
       case 'motivation': return '#10b981';
       case 'goal_acceptance': return '#8b5cf6';
-      case 'mi_progression': return '#06b6d4';
+      case 'notification_keyword': return '#f59e0b';
+      case 'addiction_type': return '#ec4899';
       default: return '#94a3b8';
     }
   };
@@ -99,38 +134,9 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
     return value;
   };
 
-  // Format MI stage name
-  const formatMiStage = (stage: string): string => {
-    if (!stage) return '';
-    
-    switch(stage) {
-      case 'engaging': return 'Building Rapport';
-      case 'focusing': return 'Identifying Goals';
-      case 'evoking': return 'Exploring Motivation';
-      case 'planning': return 'Creating Plans';
-      default: return stage.charAt(0).toUpperCase() + stage.slice(1);
-    }
-  };
-
-  // Get MI stage description
-  const getMiStageDescription = (stage: string): string => {
-    switch(stage) {
-      case 'engaging':
-        return 'Building a working relationship and understanding your situation';
-      case 'focusing':
-        return 'Identifying specific behaviors and areas to focus on changing';
-      case 'evoking':
-        return 'Drawing out your own motivations and reasons for making a change';
-      case 'planning':
-        return 'Developing specific steps and commitments to achieve your goals';
-      default:
-        return '';
-    }
-  };
-
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor }]}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={tintColor} />
         <ThemedText style={styles.loadingText}>Loading profile data...</ThemedText>
       </View>
@@ -139,176 +145,54 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
 
   if (error) {
     return (
-      <View style={[styles.container, { backgroundColor }]}>
-        <ThemedText style={styles.errorText}>Error loading profile: {error.message}</ThemedText>
+      <View style={styles.errorContainer}>
+        <ThemedText style={styles.errorText}>Error: {error instanceof Error ? error.message : 'Unknown error'}</ThemedText>
+        <TouchableOpacity 
+          style={[styles.retryButton, { backgroundColor: tintColor }]}
+          onPress={() => refetch()}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
-  if (!profile) {
+  if (!profileData || !profileData.profile) {
     return (
-      <View style={[styles.container, { backgroundColor }]}>
-        <ThemedText>No profile data available yet. Start chatting to build your profile.</ThemedText>
+      <View style={styles.emptyContainer}>
+        <ThemedText style={styles.emptyText}>
+          No profile data available yet. Start chatting to build your profile.
+        </ThemedText>
       </View>
     );
   }
-
-  // Find MI progression insights
-  const miProgressionInsight = insightsData?.find(
-    insight => (insight.type === 'mi_progression' || insight.insight_type === 'mi_progression')
-  );
-  
-  // Parse MI stages from progression insight
-  const miStages = miProgressionInsight ? 
-    miProgressionInsight.value.split(',') : 
-    [];
-    
-  // Get the latest stage reached
-  const latestStage = miStages.length > 0 ? 
-    miStages[miStages.length - 1] : 
-    null;
-
-  const handleProcessConversations = async () => {
-    Alert.alert(
-      'Process Conversations',
-      'This will analyze all your past conversations to update your profile. Continue?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
-        {
-          text: 'Process',
-          onPress: async () => {
-            try {
-              await processAllConversations();
-              Alert.alert('Success', 'All conversations processed successfully!');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to process conversations. Please try again.');
-            }
-          }
-        }
-      ]
-    );
-  };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor }]}>
-      {/* Admin Tools */}
-      <View style={[styles.toolsCard, { backgroundColor: cardBgColor, borderColor }]}>
-        <ThemedText style={styles.toolsTitle}>Profile Tools</ThemedText>
-        <View style={styles.toolsButtonContainer}>
-          <TouchableOpacity
-            style={[styles.toolsButton, { backgroundColor: tintColor }]}
-            onPress={handleProcessConversations}
-          >
-            <ThemedText style={styles.toolsButtonText}>Process All Conversations</ThemedText>
-          </TouchableOpacity>
-        </View>
-      </View>
-      
-      {/* MI Progress Section - New */}
-      {miStages.length > 0 && (
-        <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
-          <View style={styles.cardHeader}>
-            <ThemedText style={styles.cardTitle}>Motivational Interviewing Progress</ThemedText>
-            <ThemedText style={styles.cardSubtitle}>Your therapy journey</ThemedText>
-          </View>
-          
-          <View style={styles.miProgressContainer}>
-            <View style={styles.stageProgressBar}>
-              {['engaging', 'focusing', 'evoking', 'planning'].map((stage, index) => (
-                <View 
-                  key={stage}
-                  style={[
-                    styles.stageStep,
-                    miStages.includes(stage) && styles.completedStageStep,
-                    latestStage === stage && styles.activeStageStep
-                  ]}
-                >
-                  <ThemedText 
-                    style={[
-                      styles.stageStepText,
-                      latestStage === stage && styles.activeStageStepText
-                    ]}
-                  >
-                    {formatMiStage(stage)}
-                  </ThemedText>
-                </View>
-              ))}
-            </View>
-            
-            {latestStage && (
-              <View style={styles.currentStageContainer}>
-                <ThemedText style={styles.currentStageLabel}>
-                  Current stage:
-                </ThemedText>
-                <ThemedText style={styles.currentStageName}>
-                  {formatMiStage(latestStage)}
-                </ThemedText>
-                <ThemedText style={styles.currentStageDescription}>
-                  {getMiStageDescription(latestStage)}
-                </ThemedText>
-              </View>
-            )}
-            
-            <View style={styles.stageProgressStats}>
-              <View style={styles.stageProgressStat}>
-                <ThemedText style={styles.stageProgressStatValue}>
-                  {miStages.length}
-                </ThemedText>
-                <ThemedText style={styles.stageProgressStatLabel}>
-                  Stages Reached
-                </ThemedText>
-              </View>
-              
-              <View style={styles.stageProgressStat}>
-                <ThemedText style={styles.stageProgressStatValue}>
-                  {(['engaging', 'focusing', 'evoking', 'planning'].indexOf(latestStage || '') + 1) || 0}/4
-                </ThemedText>
-                <ThemedText style={styles.stageProgressStatLabel}>
-                  Current Position
-                </ThemedText>
-              </View>
-              
-              <View style={styles.stageProgressStat}>
-                <ThemedText style={styles.stageProgressStatValue}>
-                  {miStages.filter(
-                    (stage, index, array) => 
-                      array.indexOf(stage) === index
-                  ).length}
-                </ThemedText>
-                <ThemedText style={styles.stageProgressStatLabel}>
-                  Unique Stages
-                </ThemedText>
-              </View>
-            </View>
-          </View>
-        </View>
-      )}
-      
-      {/* Recovery Stage Tracker */}
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* Recovery Stage Section */}
       <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
         <View style={styles.cardHeader}>
           <ThemedText style={styles.cardTitle}>Recovery Journey</ThemedText>
         </View>
-        <RecoveryStageTracker userId={userId} />
+        <RecoveryStageTracker userId={userId} initialStage={profileData.profile.recovery_stage} />
       </View>
 
-      {/* Abstinence Tracker */}
+      {/* Abstinence Progress Section */}
       <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
         <View style={styles.cardHeader}>
           <ThemedText style={styles.cardTitle}>Abstinence Progress</ThemedText>
         </View>
         <View style={styles.abstinenceContainer}>
           <View style={styles.abstinenceDaysContainer}>
-            <ThemedText style={styles.abstinenceDaysValue}>{profile.abstinence_days || 0}</ThemedText>
+            <ThemedText style={styles.abstinenceDaysValue}>
+              {profileData.profile.abstinence_days || 0}
+            </ThemedText>
             <ThemedText style={styles.abstinenceDaysLabel}>Days</ThemedText>
           </View>
           <View style={styles.abstinenceDetails}>
-            {profile.abstinence_start_date && (
+            {profileData.profile.abstinence_start_date && (
               <ThemedText style={styles.abstinenceStartDate}>
-                Since: {new Date(profile.abstinence_start_date).toLocaleDateString()}
+                Since: {new Date(profileData.profile.abstinence_start_date).toLocaleDateString()}
               </ThemedText>
             )}
             <View style={styles.motivationContainer}>
@@ -318,284 +202,207 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
                   style={[
                     styles.motivationBarFill, 
                     { 
-                      width: `${(profile.motivation_level || 0) * 10}%`,
+                      width: `${(profileData.profile.motivation_level || 0) * 10}%`,
                       backgroundColor: tintColor
                     }
                   ]} 
                 />
               </View>
-              <ThemedText style={styles.motivationValue}>{profile.motivation_level || 0}/10</ThemedText>
+              <ThemedText style={styles.motivationValue}>
+                {profileData.profile.motivation_level || 0}/10
+              </ThemedText>
             </View>
           </View>
         </View>
       </View>
 
-      {/* Profile Insights Visualization */}
+      {/* Profile Summary */}
       <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
         <View style={styles.cardHeader}>
-          <ThemedText style={styles.cardTitle}>Profile Network</ThemedText>
-          <ThemedText style={styles.cardSubtitle}>How your insights connect</ThemedText>
+          <ThemedText style={styles.cardTitle}>Profile Summary</ThemedText>
         </View>
-        
-        <ProfileInsightsVisualization 
-          insights={insightsData || []} 
-          onSelectInsight={(insight: UserInsight) => {
-            setSelectedCategory(insight.type || insight.insight_type);
-          }}
-        />
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <ThemedText style={styles.summaryLabel}>Addiction Type</ThemedText>
+              <ThemedText style={styles.summaryValue}>
+                {profileData.profile.addiction_type ? 
+                  profileData.profile.addiction_type.charAt(0).toUpperCase() + profileData.profile.addiction_type.slice(1) : 
+                  'Not identified'}
+              </ThemedText>
+            </View>
+            <View style={styles.summaryItem}>
+              <ThemedText style={styles.summaryLabel}>Recovery Stage</ThemedText>
+              <ThemedText style={styles.summaryValue}>
+                {profileData.profile.recovery_stage ? 
+                  profileData.profile.recovery_stage.charAt(0).toUpperCase() + profileData.profile.recovery_stage.slice(1) : 
+                  'Not determined'}
+              </ThemedText>
+            </View>
+          </View>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <ThemedText style={styles.summaryLabel}>Insights</ThemedText>
+              <ThemedText style={styles.summaryValue}>
+                {profileData.summary.insight_count || 0}
+              </ThemedText>
+            </View>
+            <View style={styles.summaryItem}>
+              <ThemedText style={styles.summaryLabel}>Active Goals</ThemedText>
+              <ThemedText style={styles.summaryValue}>
+                {profileData.summary.goals_count || 0}
+              </ThemedText>
+            </View>
+          </View>
+          {profileData.profile.last_updated && (
+            <ThemedText style={styles.lastUpdatedText}>
+              Last updated: {new Date(profileData.profile.last_updated).toLocaleString()}
+            </ThemedText>
+          )}
+        </View>
       </View>
 
-      {/* MI-Based Insights Section - New */}
-      {insightsData && insightsData.some(insight => insight.mi_stage) && (
+      {/* Psychological Traits */}
+      {profileData.profile.psychological_traits && 
+       Object.keys(profileData.profile.psychological_traits).length > 0 && (
         <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
           <View style={styles.cardHeader}>
-            <ThemedText style={styles.cardTitle}>Therapy Stage Insights</ThemedText>
-            <ThemedText style={styles.cardSubtitle}>Insights by MI stage</ThemedText>
+            <ThemedText style={styles.cardTitle}>Psychological Traits</ThemedText>
           </View>
-          
-          <View style={styles.miStageInsightsContainer}>
-            {['engaging', 'focusing', 'evoking', 'planning'].map(stage => {
-              const stageInsights = insightsData.filter(
-                insight => insight.mi_stage === stage
-              );
-              
-              if (stageInsights.length === 0) return null;
-              
-              return (
-                <View key={stage} style={styles.miStageSection}>
-                  <View 
-                    style={[
-                      styles.miStageBadge, 
-                      { 
-                        backgroundColor: 
-                          stage === 'engaging' ? '#4695eb' :
-                          stage === 'focusing' ? '#46eb8a' :
-                          stage === 'evoking' ? '#eb9846' :
-                          '#eb4646'
-                      }
-                    ]}
-                  >
-                    <ThemedText style={styles.miStageBadgeText}>
-                      {formatMiStage(stage)}
-                    </ThemedText>
-                  </View>
-                  
-                  <ThemedText style={styles.miStageInsightCount}>
-                    {stageInsights.length} insights
-                  </ThemedText>
-                  
-                  <View style={styles.miStageInsightsList}>
-                    {stageInsights.slice(0, 3).map((insight, idx) => (
-                      <View 
-                        key={`${stage}-${idx}`}
-                        style={[
-                          styles.miStageInsightItem,
-                          { backgroundColor: getTypeColor(insight.type || insight.insight_type) + '22' }
-                        ]}
-                      >
-                        <View 
-                          style={[
-                            styles.insightTypeBadge,
-                            { backgroundColor: getTypeColor(insight.type || insight.insight_type) }
-                          ]}
-                        >
-                          <ThemedText style={styles.insightTypeBadgeText}>
-                            {formatType(insight.type || insight.insight_type)}
-                          </ThemedText>
-                        </View>
-                        <ThemedText style={styles.miStageInsightValue}>
-                          {formatValue(insight.value)}
-                        </ThemedText>
-                      </View>
-                    ))}
-                    
-                    {stageInsights.length > 3 && (
-                      <TouchableOpacity 
-                        style={styles.viewMoreButton}
-                        onPress={() => Alert.alert(
-                          `${formatMiStage(stage)} Insights`,
-                          stageInsights.map(i => 
-                            `• ${formatType(i.type || i.insight_type)}: ${formatValue(i.value)}`
-                          ).join('\n\n')
-                        )}
-                      >
-                        <ThemedText style={styles.viewMoreText}>
-                          View {stageInsights.length - 3} more
-                        </ThemedText>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
+          <View style={styles.traitsContainer}>
+            {Object.entries(profileData.profile.psychological_traits).map(([trait, value]) => (
+              <View key={trait} style={styles.traitItem}>
+                <View style={[styles.traitDot, { 
+                  backgroundColor: value ? '#4ecdc4' : '#ff6b6b' 
+                }]} />
+                <ThemedText style={styles.traitText}>
+                  {trait.split('_').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1)
+                  ).join(' ')}
+                </ThemedText>
+              </View>
+            ))}
           </View>
         </View>
       )}
-      
-      {/* Profile Insights List */}
-      <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
-        <View style={styles.cardHeader}>
-          <ThemedText style={styles.cardTitle}>Your Profile Insights</ThemedText>
-          <ThemedText style={styles.cardSubtitle}>Built from our conversations</ThemedText>
-        </View>
 
-        {/* Categories */}
-        <View style={styles.categoriesContainer}>
-          {Object.keys(groupedInsights).map(type => (
-            <TouchableOpacity
-              key={type}
-              style={[
-                styles.categoryButton,
-                { 
-                  backgroundColor: getTypeColor(type),
-                  borderWidth: selectedCategory === type ? 2 : 0,
-                  borderColor: 'white'
-                }
-              ]}
-              onPress={() => setSelectedCategory(selectedCategory === type ? null : type)}
-            >
-              <ThemedText style={styles.categoryText}>
-                {formatType(type)} ({groupedInsights[type].length})
-              </ThemedText>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Selected category insights */}
-        {selectedCategory && groupedInsights[selectedCategory] && (
-          <View style={styles.insightsContainer}>
-            <ThemedText style={styles.sectionTitle}>{formatType(selectedCategory)}</ThemedText>
-            
-            {groupedInsights[selectedCategory].map((insight, index) => (
-              <View 
-                key={`${insight.type || insight.insight_type}_${index}`}
+      {/* Insights Categories */}
+      {profileData.insights && Object.keys(profileData.insights).length > 0 && (
+        <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
+          <View style={styles.cardHeader}>
+            <ThemedText style={styles.cardTitle}>Your Insights</ThemedText>
+          </View>
+          <View style={styles.categoriesContainer}>
+            {Object.keys(profileData.insights).map(type => (
+              <TouchableOpacity
+                key={type}
                 style={[
-                  styles.insightCard, 
-                  { backgroundColor: getTypeColor(insight.type || insight.insight_type) + '22' }
+                  styles.categoryButton,
+                  { 
+                    backgroundColor: getTypeColor(type),
+                    borderWidth: selectedCategory === type ? 2 : 0,
+                    borderColor: 'white'
+                  }
                 ]}
+                onPress={() => setSelectedCategory(selectedCategory === type ? null : type)}
               >
-                <View style={styles.insightHeader}>
-                  <View style={[styles.insightDot, { backgroundColor: getTypeColor(insight.type || insight.insight_type) }]} />
-                  <ThemedText style={styles.insightValue}>
-                    {formatValue(insight.value)}
-                  </ThemedText>
-                </View>
-                
-                {/* Metadata */}
-                {insight.confidence && (
-                  <View style={styles.insightMetadata}>
-                    <ThemedText style={styles.metadataLabel}>Confidence:</ThemedText>
-                    <View style={styles.confidenceContainer}>
-                      <View
-                        style={[
-                          styles.confidenceFill,
-                          {
-                            width: `${insight.confidence * 100}%`,
-                            backgroundColor: getTypeColor(insight.type || insight.insight_type)
-                          }
-                        ]}
-                      />
+                <ThemedText style={styles.categoryText}>
+                  {formatType(type)} ({profileData.insights[type].length})
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Selected category insights */}
+          {selectedCategory && profileData.insights[selectedCategory] && (
+            <View style={styles.insightsContainer}>
+              <ThemedText style={styles.sectionTitle}>{formatType(selectedCategory)}</ThemedText>
+              
+              {profileData.insights[selectedCategory].map((insight, index) => (
+                <View 
+                  key={insight.id || `${selectedCategory}_${index}`}
+                  style={[
+                    styles.insightCard, 
+                    { backgroundColor: getTypeColor(selectedCategory) + '22' }
+                  ]}
+                >
+                  <View style={styles.insightHeader}>
+                    <View style={[styles.insightDot, { backgroundColor: getTypeColor(selectedCategory) }]} />
+                    <ThemedText style={styles.insightValue}>
+                      {formatValue(insight.value)}
+                    </ThemedText>
+                  </View>
+                  
+                  {/* Metadata */}
+                  {insight.confidence && (
+                    <View style={styles.insightMetadata}>
+                      <ThemedText style={styles.metadataLabel}>Confidence:</ThemedText>
+                      <View style={styles.confidenceContainer}>
+                        <View
+                          style={[
+                            styles.confidenceFill,
+                            {
+                              width: `${insight.confidence * 100}%`,
+                              backgroundColor: getTypeColor(selectedCategory)
+                            }
+                          ]}
+                        />
+                      </View>
+                      <ThemedText style={styles.confidenceValue}>{Math.round(insight.confidence * 100)}%</ThemedText>
                     </View>
-                    <ThemedText style={styles.confidenceValue}>{Math.round(insight.confidence * 100)}%</ThemedText>
-                  </View>
-                )}
-                
-                {insight.day_of_week && (
-                  <View style={styles.insightMetadata}>
-                    <ThemedText style={styles.metadataLabel}>Day:</ThemedText>
-                    <ThemedText style={styles.metadataValue}>
-                      {insight.day_of_week.charAt(0).toUpperCase() + insight.day_of_week.slice(1)}
-                    </ThemedText>
-                  </View>
-                )}
-                
-                {insight.time_of_day && (
-                  <View style={styles.insightMetadata}>
-                    <ThemedText style={styles.metadataLabel}>Time:</ThemedText>
-                    <ThemedText style={styles.metadataValue}>
-                      {insight.time_of_day.charAt(0).toUpperCase() + insight.time_of_day.slice(1)}
-                    </ThemedText>
-                  </View>
-                )}
-                
-                {insight.mi_stage && (
-                  <View style={styles.insightMetadata}>
-                    <ThemedText style={styles.metadataLabel}>MI Stage:</ThemedText>
-                    <ThemedText style={styles.metadataValue}>
-                      {formatMiStage(insight.mi_stage)}
-                    </ThemedText>
-                  </View>
-                )}
-                
-                {insight.extracted_at && (
-                  <View style={styles.extractedAtContainer}>
-                    <ThemedText style={styles.extractedAtText}>
-                      Identified: {new Date(insight.extracted_at).toLocaleDateString()}
-                    </ThemedText>
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* If no category is selected, show summary */}
-        {!selectedCategory && (
-          <View style={styles.summaryContainer}>
-            <ThemedText style={styles.summaryText}>
-              Select a category above to see detailed insights. Your profile is built automatically based on our conversations.
-            </ThemedText>
-            
-            <View style={styles.summaryStats}>
-              <View style={styles.summaryStatItem}>
-                <ThemedText style={styles.summaryStatValue}>
-                  {Object.keys(groupedInsights).length}
-                </ThemedText>
-                <ThemedText style={styles.summaryStatLabel}>Categories</ThemedText>
-              </View>
-              
-              <View style={styles.summaryStatItem}>
-                <ThemedText style={styles.summaryStatValue}>
-                  {insightsData?.length || 0}
-                </ThemedText>
-                <ThemedText style={styles.summaryStatLabel}>Total Insights</ThemedText>
-              </View>
-              
-              <View style={styles.summaryStatItem}>
-                <ThemedText style={styles.summaryStatValue}>
-                  {profile.recovery_stage || 'N/A'}
-                </ThemedText>
-                <ThemedText style={styles.summaryStatLabel}>Current Stage</ThemedText>
-              </View>
+                  )}
+                  
+                  {insight.day_of_week && (
+                    <View style={styles.insightMetadata}>
+                      <ThemedText style={styles.metadataLabel}>Day:</ThemedText>
+                      <ThemedText style={styles.metadataValue}>
+                        {insight.day_of_week.charAt(0).toUpperCase() + insight.day_of_week.slice(1)}
+                      </ThemedText>
+                    </View>
+                  )}
+                  
+                  {insight.time_of_day && (
+                    <View style={styles.insightMetadata}>
+                      <ThemedText style={styles.metadataLabel}>Time:</ThemedText>
+                      <ThemedText style={styles.metadataValue}>
+                        {insight.time_of_day.charAt(0).toUpperCase() + insight.time_of_day.slice(1)}
+                      </ThemedText>
+                    </View>
+                  )}
+                  
+                  {insight.extracted_at && (
+                    <View style={styles.extractedAtContainer}>
+                      <ThemedText style={styles.extractedAtText}>
+                        Identified: {new Date(insight.extracted_at).toLocaleDateString()}
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+              ))}
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Legend */}
-        <View style={styles.legendContainer}>
-          <ThemedText style={styles.legendTitle}>Categories Legend</ThemedText>
-          <View style={styles.legendGrid}>
-            {Object.keys(groupedInsights).map(type => (
-              <View key={`legend_${type}`} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: getTypeColor(type) }]} />
-                <ThemedText style={styles.legendText}>{formatType(type)}</ThemedText>
-              </View>
-            ))}
-          </View>
+          {/* If no category is selected, show summary */}
+          {!selectedCategory && (
+            <View style={styles.summaryContainer}>
+              <ThemedText style={styles.summaryText}>
+                Select a category above to see detailed insights. Your profile is built automatically based on our conversations.
+              </ThemedText>
+            </View>
+          )}
         </View>
-      </View>
+      )}
 
-      {/* User Goals Section */}
-      {profile?.goals && profile.goals.length > 0 && (
+      {/* Active Goals */}
+      {profileData.goals && profileData.goals.length > 0 && (
         <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
           <View style={styles.cardHeader}>
             <ThemedText style={styles.cardTitle}>Your Recovery Goals</ThemedText>
           </View>
-          
           <View style={styles.goalsContainer}>
-            {profile.goals.map((goal, index) => (
+            {profileData.goals.map(goal => (
               <View 
-                key={`goal_${index}`}
+                key={goal.id}
                 style={[
                   styles.goalCard, 
                   { 
@@ -644,42 +451,17 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
           </View>
         </View>
       )}
-      
-      {/* Recovery Suggestions */}
-      <View style={[styles.card, { backgroundColor: cardBgColor, borderColor }]}>
-        <View style={styles.cardHeader}>
-          <ThemedText style={styles.cardTitle}>Personalized Suggestions</ThemedText>
-        </View>
-        <RecoverySuggestions 
-          profile={profile} 
-          insights={insightsData || []}
-          onCreateGoal={(goalDescription) => {
-            Alert.alert(
-              'Create Goal',
-              'Do you want to add this as a recovery goal?',
-              [
-                {
-                  text: 'Cancel',
-                  style: 'cancel'
-                },
-                {
-                  text: 'Create Goal',
-                  onPress: async () => {
-                    try {
-                      await createGoal({
-                        description: goalDescription
-                      });
-                      Alert.alert('Success', 'New goal created successfully!');
-                    } catch (error) {
-                      Alert.alert('Error', 'Failed to create goal. Please try again.');
-                    }
-                  }
-                }
-              ]
-            );
-          }}
-        />
-      </View>
+
+      {/* Refresh Button */}
+      <TouchableOpacity 
+        style={[styles.refreshButton, {backgroundColor: tintColor}]} 
+        onPress={() => {
+          fetchProfileData();
+          if (onRefresh) onRefresh();
+        }}
+      >
+        <Text style={styles.refreshButtonText}>Refresh Profile</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -687,41 +469,50 @@ const UserProfileDashboard: React.FC<UserProfileDashboardProps> = ({ userId }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
   },
   loadingText: {
+    marginTop: 16,
     textAlign: 'center',
-    marginTop: 20,
   },
-  errorText: {
-    textAlign: 'center',
-    marginTop: 20,
-    color: '#ff6b6b',
-  },
-  toolsCard: {
-    marginBottom: 16,
-    borderRadius: 12,
-    borderWidth: 1,
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
   },
-  toolsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  errorText: {
+    marginBottom: 16,
+    textAlign: 'center',
+    color: '#ff6b6b',
   },
-  toolsButtonContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  retryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
   },
-  toolsButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
-  toolsButtonText: {
-    color: 'white',
-    fontWeight: '500',
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 16,
   },
   card: {
     marginBottom: 16,
@@ -738,10 +529,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    opacity: 0.7,
   },
   abstinenceContainer: {
     padding: 16,
@@ -794,6 +581,51 @@ const styles = StyleSheet.create({
   motivationValue: {
     fontSize: 12,
   },
+  summaryContainer: {
+    padding: 16,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  summaryItem: {
+    flex: 1,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    opacity: 0.7,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  lastUpdatedText: {
+    fontSize: 12,
+    opacity: 0.6,
+    marginTop: 8,
+    textAlign: 'right',
+  },
+  traitsContainer: {
+    padding: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  traitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '50%',
+    marginBottom: 12,
+  },
+  traitDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  traitText: {
+    fontSize: 14,
+  },
   categoriesContainer: {
     padding: 16,
     flexDirection: 'row',
@@ -811,15 +643,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontSize: 14,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
   insightsContainer: {
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
   },
   insightCard: {
     padding: 12,
@@ -879,59 +711,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     opacity: 0.6,
   },
-  summaryContainer: {
-    padding: 16,
-    alignItems: 'center',
-  },
   summaryText: {
     textAlign: 'center',
     marginBottom: 16,
-  },
-  summaryStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    marginTop: 16,
-  },
-  summaryStatItem: {
-    alignItems: 'center',
-  },
-  summaryStatValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  summaryStatLabel: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  legendContainer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
-  },
-  legendTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  legendGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '50%',
-    marginBottom: 8,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
-  },
-  legendText: {
-    fontSize: 12,
   },
   goalsContainer: {
     padding: 16,
@@ -972,133 +754,18 @@ const styles = StyleSheet.create({
   goalDetailValue: {
     fontSize: 12,
   },
-  // MI Progress Styles - New
-  miProgressContainer: {
-    padding: 16,
-  },
-  stageProgressBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 12,
-  },
-  stageStep: {
-    flex: 1,
-    padding: 12,
-    backgroundColor: '#f0f0f0',
-    marginHorizontal: 2,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  completedStageStep: {
-    backgroundColor: '#b8e6d4',
-  },
-  activeStageStep: {
-    backgroundColor: '#10a37f',
-  },
-  stageStepText: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  activeStageStepText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  currentStageContainer: {
+  refreshButton: {
     marginTop: 16,
-    padding: 12,
-    backgroundColor: 'rgba(16, 163, 127, 0.1)',
-    borderRadius: 8,
-  },
-  currentStageLabel: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  currentStageName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginVertical: 4,
-  },
-  currentStageDescription: {
-    fontSize: 14,
-    fontStyle: 'italic',
-  },
-  stageProgressStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 16,
-    padding: 8,
-    backgroundColor: 'rgba(0,0,0,0.03)',
-    borderRadius: 8,
-  },
-  stageProgressStat: {
-    alignItems: 'center',
-  },
-  stageProgressStatValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  stageProgressStatLabel: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 4,
-  },
-  // MI Stage Insights Styles - New
-  miStageInsightsContainer: {
-    padding: 16,
-  },
-  miStageSection: {
-    marginBottom: 20,
-  },
-  miStageBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 12,
-  },
-  miStageBadgeText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  miStageInsightCount: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginBottom: 8,
-  },
-  miStageInsightsList: {
-    marginLeft: 8,
-  },
-  miStageInsightItem: {
+    marginBottom: 32,
     padding: 12,
     borderRadius: 8,
-    marginBottom: 8,
-  },
-  insightTypeBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  insightTypeBadgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  miStageInsightValue: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  viewMoreButton: {
     alignItems: 'center',
-    padding: 8,
+    alignSelf: 'center',
   },
-  viewMoreText: {
-    fontSize: 12,
-    opacity: 0.7,
+  refreshButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
 });
 
-export default UserProfileDashboard;
+export default EnhancedProfileDashboard;

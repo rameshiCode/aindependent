@@ -113,9 +113,9 @@ logger.info("======== OPENAI CLIENT SETUP COMPLETE ========")
 
 # Models to try in order of preference (fallback mechanism)
 MODELS_TO_TRY = [
-    "gpt-3.5-turbo",  # Most reliable model
-    "gpt-4",  # Alternative if available
-    "gpt-4o",  # Try this last as it might be blocked in some environments
+    "gpt-4o",  # Make this your primary model
+    "gpt-4",   # Secondary fallback
+    "gpt-3.5-turbo",  # Last resort
 ]
 
 
@@ -362,7 +362,7 @@ async def create_message(
         # Call OpenAI API with fallback mechanism
         completion = await call_openai_with_fallback(
             messages_for_api,
-            requested_model="gpt-3.5-turbo",
+            requested_model="gpt-4o",
             max_retries=3,
         )
 

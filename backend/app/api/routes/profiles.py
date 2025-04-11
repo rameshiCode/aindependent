@@ -8,6 +8,9 @@ from sqlmodel import func, select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.models import Conversation, Message, UserGoal, UserInsight, UserProfile
+from app.services.profile_analysis_service import ProfileAnalysisService
+from sqlmodel import Session
+from app.core.db import engine
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -851,3 +854,672 @@ async def analyze_message(
     insights = await analyzer.analyze_message(user_id, message)
 
     return {"insights": insights}
+
+# Add this to backend/app/api/routes/profiles.py
+
+@router.put("/goals/{goal_id}/progress", response_model=dict)
+def update_goal_progress(
+    goal_id: uuid.UUID, 
+    progress_data: dict, 
+    session: SessionDep, 
+    current_user: CurrentUser
+):
+    """Update progress on a goal"""
+    goal = session.exec(
+        select(UserGoal)
+        .where(UserGoal.id == goal_id)
+        .where(UserGoal.user_id == current_user.id)
+    ).first()
+
+    if not goal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found"
+        )
+    
+    # Validate progress percentage
+    progress = progress_data.get("progress")
+    if progress is None or not (0 <= progress <= 100):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Progress must be a number between 0 and 100"
+        )
+    
+    # Make sure metadata exists
+    if not hasattr(goal, "metadata") or goal.metadata is None:
+        goal.metadata = {}
+    
+    # Convert to regular dict if it's not already
+    if not isinstance(goal.metadata, dict):
+        goal.metadata = {}
+    
+    # Update progress and last_updated
+    goal.metadata["progress"] = progress
+    goal.metadata["last_updated"] = datetime.utcnow().isoformat()
+    
+    # Auto-complete goal if progress reaches 100%
+    if progress == 100 and goal.status == "active":
+        goal.status = "completed"
+        goal.metadata["completed_at"] = datetime.utcnow().isoformat()
+        
+        # Create an insight about goal completion
+        insight = UserInsight(
+            user_id=current_user.id,
+            insight_type="goal_completion",
+            value=f"Completed goal: {goal.description}",
+            confidence=1.0,
+            extracted_at=datetime.utcnow(),
+            emotional_significance=0.9
+        )
+        session.add(insight)
+    
+    session.add(goal)
+    session.commit()
+    
+    return {
+        "id": str(goal.id),
+        "description": goal.description,
+        "created_at": goal.created_at.isoformat(),
+        "target_date": goal.target_date.isoformat() if goal.target_date else None,
+        "status": goal.status,
+        "progress": progress,
+        "last_updated": goal.metadata.get("last_updated")
+    }
+
+# Add this to backend/app/api/routes/profiles.py
+
+@router.post("/goals/{goal_id}/check-in", response_model=dict)
+def goal_check_in(
+    goal_id: uuid.UUID,
+    check_in_data: dict,
+    session: SessionDep,
+    current_user: CurrentUser
+):
+    """Record a check-in for a goal with reflections"""
+    goal = session.exec(
+        select(UserGoal)
+        .where(UserGoal.id == goal_id)
+        .where(UserGoal.user_id == current_user.id)
+    ).first()
+
+    if not goal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found"
+        )
+    
+    if goal.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot check in on a goal with status '{goal.status}'"
+        )
+    
+    # Initialize metadata if needed
+    if not hasattr(goal, "metadata") or goal.metadata is None:
+        goal.metadata = {}
+    
+    # Convert to regular dict if it's not already
+    if not isinstance(goal.metadata, dict):
+        goal.metadata = {}
+    
+    if "check_ins" not in goal.metadata:
+        goal.metadata["check_ins"] = []
+    
+    # Create check-in record
+    check_in = {
+        "date": datetime.utcnow().isoformat(),
+        "reflection": check_in_data.get("reflection", ""),
+        "obstacles": check_in_data.get("obstacles", ""),
+        "next_steps": check_in_data.get("next_steps", ""),
+        "mood": check_in_data.get("mood", 5)  # 1-10 scale
+    }
+    
+    # Add to check-ins list
+    goal.metadata["check_ins"].append(check_in)
+    
+    # Update goal last activity
+    goal.metadata["last_check_in"] = datetime.utcnow().isoformat()
+    
+    # Increment check-in streak if within 48 hours of last check-in
+    streak = goal.metadata.get("streak", 0)
+    last_check_in = goal.metadata.get("last_check_in")
+    
+    if last_check_in:
+        try:
+            last_date = datetime.fromisoformat(last_check_in)
+            hours_since = (datetime.utcnow() - last_date).total_seconds() / 3600
+            
+            if hours_since <= 48:  # Within 48 hours counts as maintaining streak
+                goal.metadata["streak"] = streak + 1
+            else:
+                # Reset streak if too much time passed
+                goal.metadata["streak"] = 1
+        except (ValueError, TypeError):
+            goal.metadata["streak"] = 1
+    else:
+        goal.metadata["streak"] = 1
+    
+    # Update progress if provided
+    if "progress" in check_in_data and isinstance(check_in_data["progress"], (int, float)):
+        progress = min(max(0, check_in_data["progress"]), 100)  # Ensure it's 0-100
+        goal.metadata["progress"] = progress
+        
+        # Auto-complete goal if progress reaches 100%
+        if progress == 100 and goal.status == "active":
+            goal.status = "completed"
+            goal.metadata["completed_at"] = datetime.utcnow().isoformat()
+    
+    session.add(goal)
+    session.commit()
+    
+    return {
+        "id": str(goal.id),
+        "description": goal.description,
+        "check_in": check_in,
+        "streak": goal.metadata.get("streak", 1),
+        "message": f"Check-in recorded. Your streak is now {goal.metadata.get('streak', 1)} days!"
+    }
+
+# Add this to backend/app/api/routes/profiles.py
+
+@router.get("/goal-recommendations", response_model=list[dict])
+def get_goal_recommendations(session: SessionDep, current_user: CurrentUser):
+    """Generate personalized goal recommendations based on user profile"""
+    # Get user profile
+    profile = session.exec(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    ).first()
+    
+    if not profile:
+        # Create a default profile if none exists
+        profile = UserProfile(user_id=current_user.id)
+        session.add(profile)
+        session.commit()
+        session.refresh(profile)
+    
+    # Get user insights to base recommendations on
+    insights = session.exec(
+        select(UserInsight)
+        .where(UserInsight.user_id == current_user.id)
+        .order_by(UserInsight.extracted_at.desc())
+        .limit(20)
+    ).all()
+    
+    # Create recommendations based on recovery stage
+    recommendations = []
+    
+    # Recovery stage specific recommendations
+    recovery_stage = profile.recovery_stage or "contemplation"  # Default to contemplation
+    
+    if recovery_stage == "precontemplation":
+        recommendations.append({
+            "description": "Keep a daily journal about how you feel about your habits",
+            "reason": "Helps build awareness without requiring immediate change",
+            "difficulty": "easy",
+            "type": "awareness"
+        })
+        recommendations.append({
+            "description": "Read one article about recovery each week",
+            "reason": "Builds knowledge without pressure",
+            "difficulty": "easy",
+            "type": "education"
+        })
+        
+    elif recovery_stage == "contemplation":
+        recommendations.append({
+            "description": "Write down three reasons why change would be beneficial",
+            "reason": "Helps clarify your personal motivations",
+            "difficulty": "medium",
+            "type": "motivation"
+        })
+        recommendations.append({
+            "description": "Talk to someone who has successfully made similar changes",
+            "reason": "Builds confidence that change is possible",
+            "difficulty": "medium",
+            "type": "social"
+        })
+        
+    elif recovery_stage == "preparation":
+        recommendations.append({
+            "description": "Create a list of specific situations that trigger urges",
+            "reason": "Helps prepare for challenges ahead",
+            "difficulty": "medium",
+            "type": "planning"
+        })
+        recommendations.append({
+            "description": "Choose one day this week to practice your planned coping strategies",
+            "reason": "Tests strategies in a controlled way",
+            "difficulty": "medium",
+            "type": "practice"
+        })
+        
+    elif recovery_stage == "action":
+        recommendations.append({
+            "description": "Avoid your top three triggers completely for one week",
+            "reason": "Builds confidence in your ability to resist",
+            "difficulty": "hard",
+            "type": "avoidance"
+        })
+        recommendations.append({
+            "description": "Practice your chosen relaxation technique daily",
+            "reason": "Strengthens your coping skills",
+            "difficulty": "medium",
+            "type": "coping"
+        })
+        
+    elif recovery_stage == "maintenance":
+        recommendations.append({
+            "description": "Create a relapse prevention plan",
+            "reason": "Prepares you for unexpected challenges",
+            "difficulty": "medium",
+            "type": "prevention"
+        })
+        recommendations.append({
+            "description": "Share your recovery story with someone who might benefit",
+            "reason": "Reinforces your progress and helps others",
+            "difficulty": "hard",
+            "type": "advocacy"
+        })
+    
+    # Add insight-specific recommendations
+    triggers = []
+    psych_traits = []
+    
+    for insight in insights:
+        # Extract triggers
+        if insight.insight_type == "trigger" and insight.value:
+            triggers.append(insight.value)
+            
+        # Extract psychological traits
+        elif insight.insight_type == "psychological_trait" and insight.value:
+            trait = insight.value.split(':')[0] if ':' in insight.value else insight.value
+            psych_traits.append(trait)
+    
+    # Add trigger-based recommendations
+    for trigger in triggers[:2]:  # Limit to 2 trigger recommendations
+        recommendations.append({
+            "description": f"Practice a coping strategy before encountering '{trigger}'",
+            "reason": f"Directly addresses your identified trigger",
+            "difficulty": "medium",
+            "type": "trigger_specific"
+        })
+    
+    # Add trait-based recommendations
+    trait_recommendations = {
+        "need_for_approval": {
+            "description": "Practice saying 'no' to a small request this week",
+            "reason": "Helps reduce dependency on others' approval",
+            "difficulty": "medium",
+            "type": "independence"
+        },
+        "fear_of_rejection": {
+            "description": "Share a small personal concern with someone you trust",
+            "reason": "Builds confidence in being authentic with others",
+            "difficulty": "medium",
+            "type": "vulnerability"
+        },
+        "low_self_confidence": {
+            "description": "Write down one personal achievement each day, no matter how small",
+            "reason": "Builds self-confidence gradually",
+            "difficulty": "easy",
+            "type": "confidence_building"
+        },
+        "submissiveness": {
+            "description": "Make one decision without asking for input from others",
+            "reason": "Strengthens independent decision-making",
+            "difficulty": "medium",
+            "type": "autonomy"
+        }
+    }
+    
+    for trait in psych_traits:
+        if trait in trait_recommendations:
+            recommendations.append(trait_recommendations[trait])
+    
+    # Limit to 5 recommendations and ensure they're unique
+    unique_recommendations = []
+    descriptions = set()
+    
+    for rec in recommendations:
+        if rec["description"] not in descriptions:
+            descriptions.add(rec["description"])
+            unique_recommendations.append(rec)
+            
+            if len(unique_recommendations) >= 5:
+                break
+    
+    return unique_recommendations
+
+# Add this to backend/app/api/routes/profiles.py
+
+@router.get("/goal-journey", response_model=dict)
+def get_goal_journey(session: SessionDep, current_user: CurrentUser):
+    """Get data for visualizing the user's goal and recovery journey"""
+    # Get all goals, completed and active
+    goals = session.exec(
+        select(UserGoal)
+        .where(UserGoal.user_id == current_user.id)
+        .order_by(UserGoal.created_at)
+    ).all()
+    
+    # Get user profile
+    profile = session.exec(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    ).first()
+    
+    if not profile:
+        profile = UserProfile(user_id=current_user.id)
+        session.add(profile)
+        session.commit()
+        session.refresh(profile)
+    
+    # Get key insights
+    insights = session.exec(
+        select(UserInsight)
+        .where(UserInsight.user_id == current_user.id)
+        .where(UserInsight.insight_type.in_(["recovery_stage", "abstinence", "motivation"]))
+        .order_by(UserInsight.extracted_at)
+    ).all()
+    
+    # Format timeline events
+    timeline_events = []
+    
+    # Add goals to timeline
+    for goal in goals:
+        event = {
+            "type": "goal_created",
+            "date": goal.created_at.isoformat(),
+            "title": f"Goal Set: {goal.description[:30]}{'...' if len(goal.description) > 30 else ''}",
+            "details": goal.description,
+            "id": str(goal.id)
+        }
+        timeline_events.append(event)
+        
+        # Add completion events for completed goals
+        if goal.status == "completed":
+            # Check if we have completion metadata
+            completed_at = None
+            if hasattr(goal, "metadata") and isinstance(goal.metadata, dict):
+                completed_at = goal.metadata.get("completed_at")
+                
+            # Use current time if no completion timestamp is available
+            if not completed_at:
+                completed_at = datetime.utcnow().isoformat()
+                
+            event = {
+                "type": "goal_completed",
+                "date": completed_at,
+                "title": f"Goal Achieved: {goal.description[:30]}{'...' if len(goal.description) > 30 else ''}",
+                "details": goal.description,
+                "id": str(goal.id)
+            }
+            timeline_events.append(event)
+    
+    # Add abstinence milestones
+    if profile and profile.abstinence_start_date:
+        # Calculate milestones (1 day, 1 week, 1 month, etc.)
+        start_date = profile.abstinence_start_date
+        milestones = [
+            (1, "First day of abstinence"),
+            (7, "One week milestone"),
+            (30, "One month milestone"),
+            (90, "Three month milestone"),
+            (180, "Six month milestone"),
+            (365, "One year milestone")
+        ]
+        
+        for days, title in milestones:
+            milestone_date = start_date + timedelta(days=days)
+            
+            # Only include passed milestones
+            if milestone_date <= datetime.utcnow():
+                event = {
+                    "type": "abstinence_milestone",
+                    "date": milestone_date.isoformat(),
+                    "title": title,
+                    "details": f"Maintained abstinence for {days} days",
+                }
+                timeline_events.append(event)
+    
+    # Add recovery stage changes
+    current_stage = None
+    for insight in insights:
+        if insight.insight_type == "recovery_stage" and insight.value != current_stage:
+            current_stage = insight.value
+            event = {
+                "type": "stage_change",
+                "date": insight.extracted_at.isoformat(),
+                "title": f"Entered {insight.value.capitalize()} Stage",
+                "details": f"Your recovery journey progressed to the {insight.value} stage",
+            }
+            timeline_events.append(event)
+    
+    # Sort all events by date
+    timeline_events.sort(key=lambda x: x["date"])
+    
+    # Get active goals with their progress
+    active_goals = []
+    for goal in goals:
+        if goal.status == "active":
+            progress = 0
+            streak = 0
+            last_check_in = None
+            
+            # Extract metadata if available
+            if hasattr(goal, "metadata") and isinstance(goal.metadata, dict):
+                progress = goal.metadata.get("progress", 0)
+                streak = goal.metadata.get("streak", 0)
+                last_check_in = goal.metadata.get("last_check_in")
+            
+            active_goals.append({
+                "id": str(goal.id),
+                "description": goal.description,
+                "created_at": goal.created_at.isoformat(),
+                "target_date": goal.target_date.isoformat() if goal.target_date else None,
+                "progress": progress,
+                "streak": streak,
+                "last_check_in": last_check_in,
+                "days_since_creation": (datetime.utcnow() - goal.created_at).days
+            })
+    
+    return {
+        "timeline": timeline_events,
+        "current_stage": profile.recovery_stage if profile else None,
+        "abstinence_days": profile.abstinence_days if profile else 0,
+        "total_goals": len(goals),
+        "completed_goals": sum(1 for goal in goals if goal.status == "completed"),
+        "active_goals": active_goals
+    }
+
+
+# Add these functions to your profiles.py file
+
+@router.post("/analyze-full-conversation/{conversation_id}")
+async def analyze_full_conversation(
+    conversation_id: str,
+    background_tasks: BackgroundTasks,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """Analyze a complete conversation and return structured profile insights"""
+    import traceback
+    from sqlmodel import Session
+    from app.core.db import engine
+    from app.services.profile_analysis_service import ProfileAnalysisService
+    
+    # Verify the conversation exists and belongs to the user
+    conversation = session.exec(
+        select(Conversation)
+        .where(Conversation.id == uuid.UUID(conversation_id))
+        .where(Conversation.user_id == current_user.id)
+    ).first()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found or doesn't belong to you",
+        )
+    
+    # Create profile analyzer
+    profile_analyzer = ProfileAnalysisService(lambda: Session(engine))
+    
+    # Process conversation and get structured results
+    try:
+        result = await profile_analyzer.process_conversation_with_structured_output(
+            conversation_id, str(current_user.id)
+        )
+        
+        # Return the already well-formatted results
+        return result
+        
+    except Exception as e:
+        logger.error(f"Profile extraction failed: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        raise HTTPException(
+            status_code=500,
+            detail="Error processing conversation for profile extraction",
+        )
+
+
+@router.post("/real-time-profile-update")
+async def real_time_profile_update(
+    message_data: dict,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """Update profile in real-time based on a single message"""
+    from sqlmodel import Session
+    from app.core.db import engine
+    from app.services.profile_analysis_service import ProfileAnalysisService
+    
+    # Validate message data
+    if "content" not in message_data or "role" not in message_data:
+        raise HTTPException(
+            status_code=400,
+            detail="Message must contain 'content' and 'role' fields",
+        )
+    
+    # Create profile analyzer
+    profile_analyzer = ProfileAnalysisService(lambda: Session(engine))
+    
+    # Analyze message for profile updates
+    try:
+        result = await profile_analyzer.analyze_message(
+            str(current_user.id), message_data
+        )
+        
+        return {
+            "status": "success",
+            "insights_extracted": len(result.get("insights", {})),
+            "profile_updated": True,
+            "current_profile": {
+                "addiction_type": result["current_profile"].get("addiction_type"),
+                "recovery_stage": result["current_profile"].get("recovery_stage"),
+                "motivation_level": result["current_profile"].get("motivation_level"),
+                "psychological_traits": result["current_profile"].get("psychological_traits"),
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Real-time profile update failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        raise HTTPException(
+            status_code=500,
+            detail="Error updating profile in real-time",
+        )
+
+
+@router.get("/structured-profile")
+async def get_structured_profile(
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """Get structured profile information with insights grouped by category"""
+    # Get user profile
+    profile = session.exec(
+        select(UserProfile).where(UserProfile.user_id == current_user.id)
+    ).first()
+
+    if not profile:
+        return {
+            "profile": None,
+            "insights": {},
+            "summary": {
+                "has_profile": False,
+                "message": "No profile found. Start chatting to build your profile."
+            }
+        }
+
+    # Get all insights for the user
+    insights = session.exec(
+        select(UserInsight)
+        .where(UserInsight.user_id == current_user.id)
+        .order_by(UserInsight.extracted_at.desc())
+    ).all()
+
+    # Group insights by type
+    grouped_insights = {}
+    for insight in insights:
+        if insight.insight_type not in grouped_insights:
+            grouped_insights[insight.insight_type] = []
+        
+        grouped_insights[insight.insight_type].append({
+            "id": str(insight.id),
+            "value": insight.value,
+            "confidence": insight.confidence,
+            "emotional_significance": insight.emotional_significance,
+            "day_of_week": insight.day_of_week,
+            "time_of_day": insight.time_of_day,
+            "extracted_at": insight.extracted_at.isoformat() if insight.extracted_at else None,
+        })
+
+    # Get active goals
+    goals = session.exec(
+        select(UserGoal)
+        .where(UserGoal.user_id == current_user.id)
+        .where(UserGoal.status == "active")
+    ).all()
+    
+    # Extract psychological traits
+    psychological_traits = {}
+    for insight in insights:
+        if insight.insight_type == "psychological_trait":
+            if ":" in insight.value:
+                key, value = insight.value.split(":", 1)
+                psychological_traits[key] = value.lower() == "true"
+    
+    # Format the response
+    return {
+        "profile": {
+            "id": str(profile.id),
+            "addiction_type": profile.addiction_type,
+            "recovery_stage": profile.recovery_stage,
+            "motivation_level": profile.motivation_level,
+            "abstinence_days": profile.abstinence_days,
+            "abstinence_start_date": profile.abstinence_start_date.isoformat() 
+                if profile.abstinence_start_date else None,
+            "psychological_traits": psychological_traits or profile.psychological_traits,
+            "last_updated": profile.last_updated.isoformat() 
+                if profile.last_updated else None,
+        },
+        "insights": grouped_insights,
+        "goals": [
+            {
+                "id": str(goal.id),
+                "description": goal.description,
+                "created_at": goal.created_at.isoformat(),
+                "target_date": goal.target_date.isoformat() if goal.target_date else None,
+                "status": goal.status,
+            }
+            for goal in goals
+        ],
+        "summary": {
+            "has_profile": True,
+            "insight_count": len(insights),
+            "insight_types": list(grouped_insights.keys()),
+            "goals_count": len(goals),
+            "last_updated": profile.last_updated.isoformat() 
+                if profile.last_updated else None,
+        }
+    }

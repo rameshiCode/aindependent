@@ -1,7 +1,8 @@
+from datetime import datetime
 import uuid
 
 from fastapi import APIRouter, Depends, logger
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.deps import get_db
 from app.api.routes.openai import (
@@ -13,11 +14,14 @@ from app.core.db import engine
 from app.services.conversation_analyzer import ConversationAnalyzer
 from app.services.profile_analysis_service import ProfileAnalysisService
 from app.services.profile_service import ProfileService
+from models import Conversation, Message
 
 router = APIRouter()
 profile_service = ProfileService()
 conversation_analyzer = ConversationAnalyzer(profile_service)
 
+
+# Add this code to your chat.py route file, specifically modify the @router.post("/chat/{user_id}") function
 
 @router.post("/chat/{user_id}")
 async def chat(user_id: str, message: dict, db: Session = Depends(get_db)):
@@ -40,6 +44,8 @@ async def chat(user_id: str, message: dict, db: Session = Depends(get_db)):
             "For every response, include a metadata field 'mi_stage' with one of these values. "
             "Additionally, if you are summarizing or wrapping up—when you have provided a clear plan or detected commitment from the user—and you are no longer asking further questions, include 'summary_style': true in your metadata. "
             "Begin by asking an open-ended question if the conversation is just starting."
+            "Look for opportunities to identify the user's addiction type, motivations, triggers, barriers, and possible coping strategies. "
+            "Remember that your responses will be used to build a profile of the user to better assist them in future sessions."
         ),
     }
 
@@ -74,6 +80,96 @@ async def chat(user_id: str, message: dict, db: Session = Depends(get_db)):
     # Analyze the assistant's response too, capturing additional insights as needed
     conversation_analyzer.analyze_message(user_id, response)
 
+    # Store messages in the database for later profile extraction
+    try:
+        # First, check if we have an existing conversation for this user
+        conversation = db.exec(
+            select(Conversation)
+            .where(Conversation.user_id == uuid.UUID(user_id))
+            .order_by(Conversation.updated_at.desc())
+        ).first()
+
+        # If no conversation exists, create one
+        if not conversation:
+            conversation = Conversation(
+                id=uuid.uuid4(),
+                user_id=uuid.UUID(user_id),
+                title="Therapy Session",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
+
+        # Save the user message
+        user_message = Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation.id,
+            role="user",
+            content=message.get("content", ""),
+            created_at=datetime.utcnow(),
+            message_metadata=message.get("metadata", {}),
+        )
+        db.add(user_message)
+
+        # Save the assistant response with metadata
+        assistant_message = Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation.id,
+            role="assistant",
+            content=assistant_content,
+            created_at=datetime.utcnow(),
+            message_metadata={"stage": mi_stage},
+        )
+        db.add(assistant_message)
+
+        # Update conversation timestamp
+        conversation.updated_at = datetime.utcnow()
+        db.commit()
+
+        # After saving messages, trigger background profile extraction
+        try:
+            # Initialize the profile analyzer service
+            from app.services.profile_analysis_service import ProfileAnalysisService
+            profile_analyzer = ProfileAnalysisService(lambda: Session(engine))
+            
+            # Process the message for real-time profile updates
+            insights = await profile_analyzer.analyze_message(user_id, {
+                "role": "user", 
+                "content": message.get("content", ""),
+                "metadata": message.get("metadata", {})
+            })
+            
+            logger.info(f"Real-time profile insights extracted: {insights}")
+            
+            # If this is a wrap-up message (summary_style = true), do deeper analysis
+            summary_style = False
+            if "summary_style" in response.get("metadata", {}) and response["metadata"]["summary_style"]:
+                summary_style = True
+            elif any(phrase in assistant_content.lower() for phrase in [
+                "let's summarize", "in summary", "your plan is", "you've committed", 
+                "you will", "we've discussed", "we have covered", "our session"
+            ]):
+                summary_style = True
+                response["metadata"]["summary_style"] = True
+            
+            # If it's a wrap-up message or we're in planning stage, do deeper analysis
+            if summary_style or mi_stage == "planning":
+                # Run background conversation analysis to extract comprehensive profile
+                await profile_analyzer.process_conversation_with_structured_output(
+                    str(conversation.id), user_id
+                )
+                logger.info(f"Comprehensive profile extraction triggered for conversation {conversation.id}")
+        
+        except Exception as e:
+            logger.error(f"Error in profile extraction: {str(e)}")
+            # Continue even if profile extraction fails
+    
+    except Exception as db_error:
+        logger.error(f"Database error: {str(db_error)}")
+        # Continue with response even if database operations fail
+
     # *** New Step: Check if the assistant's message signals a wrap-up ***
     # You could have your determine_mi_stage function or an additional check that inspects the assistant response for a "summary_style"
     summary_style = False
@@ -95,7 +191,7 @@ async def chat(user_id: str, message: dict, db: Session = Depends(get_db)):
             # This should do a short validation check to confirm that a plan + commitment have been stated
             # and then extract structured profile insights.
             result = await profile_analyzer.process_conversation(
-                conversation_id="(current_conversation_id)",  # Replace with your conversation ID retrieval logic
+                conversation_id=str(conversation.id),  # Use the actual conversation ID
                 user_id=user_id,
             )
             # Log the result or update the profile as needed.
@@ -103,19 +199,6 @@ async def chat(user_id: str, message: dict, db: Session = Depends(get_db)):
         except Exception as e:
             logger.error(f"Error in combined profile extraction: {str(e)}")
             # Continue even if profile extraction fails.
-
-    # Additionally, perform regular background profile extraction (if desired)
-    try:
-        profile_analyzer = ProfileAnalysisService(lambda: Session(engine))
-        # Separate analysis for user and assistant insights
-        user_insights = await profile_analyzer.analyze_message(user_id, message)
-        assistant_insights = await profile_analyzer.analyze_message(user_id, response)
-        logger.info(
-            f"Extracted {len(user_insights) + len(assistant_insights)} insights from chat."
-        )
-    except Exception as e:
-        logger.error(f"Error in regular profile analysis: {str(e)}")
-        # Continue even if profile analysis fails
 
     return response
 

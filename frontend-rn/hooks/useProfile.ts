@@ -43,6 +43,34 @@ export interface UserGoal {
   [key: string]: any;
 }
 
+// New interface for structured profile data
+export interface StructuredProfile {
+  profile: {
+    id: string;
+    addiction_type?: string;
+    recovery_stage?: string;
+    motivation_level?: number;
+    abstinence_days?: number;
+    abstinence_start_date?: string;
+    psychological_traits?: Record<string, boolean>;
+    last_updated?: string;
+  };
+  insights: Record<string, UserInsight[]>;
+  goals: UserGoal[];
+  summary: {
+    has_profile: boolean;
+    insight_count: number;
+    insight_types: string[];
+    goals_count: number;
+    last_updated?: string;
+  };
+  motivational_interviewing?: {
+    current_stage?: string;
+    stages_visited?: string[];
+    message_count?: number;
+  };
+}
+
 // Type for the hook return value
 export interface UseProfileResult {
   profile: UserProfile | null;
@@ -66,6 +94,15 @@ export interface UseProfileResult {
   updateGoal: (goalId: string, data: { status?: string; description?: string; target_date?: string }) => Promise<void>;
   triggerProfileExtraction: (conversationId: string) => Promise<void>;
   processAllConversations: () => Promise<void>;
+  // New structured profile methods
+  getStructuredProfile: () => {
+    data: StructuredProfile | undefined;
+    isLoading: boolean;
+    error: Error | null;
+    refetch: () => Promise<QueryObserverResult<StructuredProfile, Error>>;
+  };
+  analyzeConversation: (conversationId: string) => Promise<void>;
+  isAnalyzingConversation: boolean;
 }
 
 /**
@@ -106,6 +143,47 @@ export function useProfile(): UseProfileResult {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Get structured profile data - NEW FUNCTION
+  const getStructuredProfile = () => {
+    const {
+      data,
+      isLoading,
+      error,
+      refetch
+    } = useQuery<StructuredProfile, Error>({
+      queryKey: ['structuredProfile'],
+      queryFn: async () => {
+        try {
+          // Use the new structured profile endpoint
+          const response = await fetch('/api/v1/profiles/structured-profile', {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch structured profile');
+          }
+          
+          const data = await response.json();
+          return data as StructuredProfile;
+        } catch (error) {
+          console.error('Error fetching structured profile:', error);
+          throw new Error('Failed to fetch structured profile');
+        }
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+
+    return {
+      data,
+      isLoading,
+      error: error as Error | null,
+      refetch
+    };
+  };
 
   // Get user insights - returns a function that can be called with optional type
   const getInsights = (type?: string) => {
@@ -188,6 +266,7 @@ export function useProfile(): UseProfileResult {
     onSuccess: () => {
       // Invalidate and refetch profile
       queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['structuredProfile'] });
     }
   });
 
@@ -202,9 +281,11 @@ export function useProfile(): UseProfileResult {
     onSuccess: () => {
       // Invalidate and refetch goals
       queryClient.invalidateQueries({ queryKey: ['goals'] });
+      queryClient.invalidateQueries({ queryKey: ['structuredProfile'] });
     }
   });
 
+  
   // Update goal mutation
   const updateGoalMutation = useMutation({
     mutationFn: async ({
@@ -223,6 +304,7 @@ export function useProfile(): UseProfileResult {
     onSuccess: () => {
       // Invalidate and refetch goals
       queryClient.invalidateQueries({ queryKey: ['goals'] });
+      queryClient.invalidateQueries({ queryKey: ['structuredProfile'] });
     }
   });
 
@@ -238,6 +320,7 @@ export function useProfile(): UseProfileResult {
       // Invalidate and refetch profile and insights
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['insights'] });
+      queryClient.invalidateQueries({ queryKey: ['structuredProfile'] });
     }
   });
 
@@ -252,6 +335,33 @@ export function useProfile(): UseProfileResult {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['insights'] });
       queryClient.invalidateQueries({ queryKey: ['goals'] });
+      queryClient.invalidateQueries({ queryKey: ['structuredProfile'] });
+    }
+  });
+
+  // NEW - Analyze conversation mutation
+  const analyzeConversationMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      // Use the new analyze conversation endpoint
+      const response = await fetch(`/api/v1/profiles/analyze-full-conversation/${conversationId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to analyze conversation');
+      }
+      
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Invalidate and refetch everything related to profile
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['insights'] });
+      queryClient.invalidateQueries({ queryKey: ['structuredProfile'] });
     }
   });
 
@@ -283,6 +393,11 @@ export function useProfile(): UseProfileResult {
     await processAllConversationsMutation.mutateAsync();
   };
 
+  // NEW - Helper function to analyze a specific conversation
+  const analyzeConversation = async (conversationId: string) => {
+    await analyzeConversationMutation.mutateAsync(conversationId);
+  };
+
   return {
     profile: profile || null,
     isLoadingProfile,
@@ -294,6 +409,10 @@ export function useProfile(): UseProfileResult {
     createGoal,
     updateGoal,
     triggerProfileExtraction,
-    processAllConversations
+    processAllConversations,
+    // New methods
+    getStructuredProfile,
+    analyzeConversation,
+    isAnalyzingConversation: analyzeConversationMutation.isPending
   };
 }

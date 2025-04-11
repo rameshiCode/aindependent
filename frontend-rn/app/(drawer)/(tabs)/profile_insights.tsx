@@ -1,13 +1,12 @@
 // In frontend-rn/app/(drawer)/(tabs)/profile_insights.tsx
-
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { ThemedText } from '../../../components/ThemedText';
 import { useAuth } from '../../../context/authProvider';
-import UserProfileDashboard from '../../../components/UserProfileDashboard';
 import { Stack } from 'expo-router';
 import { useProfile } from '../../../hooks/useProfile';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import EnhancedProfileDashboard from '../../../components/UserProfileDashboard';
 
 export default function ProfileInsightsScreen() {
   const { currentUser } = useAuth();
@@ -83,8 +82,8 @@ export default function ProfileInsightsScreen() {
         </ThemedText>
       </View>
       
-      {/* Main Profile Dashboard */}
-      <UserProfileDashboard userId={userId} />
+      {/* Enhanced Profile Dashboard - Replace UserProfileDashboard with this */}
+      <EnhancedProfileDashboard userId={userId} />
     </View>
   );
 }
